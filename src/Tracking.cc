@@ -376,6 +376,114 @@ cv::Mat Tracking::GrabImageMonocularWithBirdview(const cv::Mat &im, const cv::Ma
     return mCurrentFrame.mTcw.clone();
 }
 
+cv::Mat Tracking::GrabImageMonocularWithBirdviewSem(const cv::Mat &im, const cv::Mat &birdview, const cv::Mat &birdviewmask, const cv::Mat &birdviewContour, const double &timestamp)
+{
+    mImGray = im;
+    mBirdviewGray = birdview;
+    mbHaveBirdview=true;
+
+    // Convert front view to grayscale
+    if(mImGray.channels()==3)
+    {
+        if(mbRGB)
+            cvtColor(mImGray,mImGray,CV_RGB2GRAY);
+        else
+            cvtColor(mImGray,mImGray,CV_BGR2GRAY);
+    }
+    else if(mImGray.channels()==4)
+    {
+        if(mbRGB)
+            cvtColor(mImGray,mImGray,CV_RGBA2GRAY);
+        else
+            cvtColor(mImGray,mImGray,CV_BGRA2GRAY);
+    }
+
+    //Convert bird view to grayscale
+    if(mBirdviewGray.channels()==3)
+    {
+        if(mbRGB)
+            cvtColor(mBirdviewGray,mBirdviewGray,CV_RGB2GRAY);
+        else
+            cvtColor(mBirdviewGray,mBirdviewGray,CV_BGR2GRAY);
+    }
+    else if(mBirdviewGray.channels()==4)
+    {
+        if(mbRGB)
+            cvtColor(mBirdviewGray,mBirdviewGray,CV_RGBA2GRAY);
+        else
+            cvtColor(mBirdviewGray,mBirdviewGray,CV_BGRA2GRAY);
+    }
+
+    if(mState==NOT_INITIALIZED || mState==NO_IMAGES_YET)
+        mCurrentFrame = Frame(mImGray,mBirdviewGray,birdviewmask,birdviewContour,timestamp,mpIniORBextractor,mpORBVocabulary,mK,mDistCoef,mbf,mThDepth);
+    else
+        mCurrentFrame = Frame(mImGray,mBirdviewGray,birdviewmask,birdviewContour,timestamp,mpORBextractorLeft,mpORBVocabulary,mK,mDistCoef,mbf,mThDepth);
+
+    // in the initialization stage, feature match is done in MonocularInitialization().
+    // if(mState==NO_IMAGES_YET||mState==NOT_INITIALIZED)
+    // {
+        // mvPrevMatchedBirdview.resize(mCurrentFrame.mvKeysBird.size());
+        // for(int k=0;k<mCurrentFrame.mvKeysBird.size();k++)
+        // {
+        //     mvPrevMatchedBirdview[k]=mCurrentFrame.mvKeysBird[k].pt;
+        // }
+        // mBirdviewRefFrame = mCurrentFrame;
+        // mnRefNumMatches = std::numeric_limits<float>::max();
+        // mCurrentFrame.mnBirdviewRefFrameId=0;
+        if(!mpmatcherBirdview)
+            mpmatcherBirdview = new ORBmatcher(0.99,true);
+        if(!mIcp)
+            mIcp = new IcpSolver(200);
+    // }
+//     else
+//     {
+//         int nmatches = mpmatcherBirdview->BirdviewMatch(mBirdviewRefFrame,mCurrentFrame,mvnBirdviewMatches12,mvPrevMatchedBirdview,10);
+//         if(nmatches<0.5*mnRefNumMatches)
+//         {
+//             // cout<<"Change RefFrame."<<endl;
+//             // cout<<"RefMatches : "<<mnRefNumMatches<<" , CurrentMatches : "<<nmatches<<endl;
+//             mBirdviewRefFrame = Frame(mLastFrame);
+//             mvPrevMatchedBirdview.resize(mLastFrame.mvKeysBird.size());
+//             for(int k=0;k<mLastFrame.mvKeysBird.size();k++)
+//             {
+//                 mvPrevMatchedBirdview[k]=mLastFrame.mvKeysBird[k].pt;
+//             }
+//             nmatches = mpmatcherBirdview->BirdviewMatch(mBirdviewRefFrame,mCurrentFrame,mvnBirdviewMatches12,mvPrevMatchedBirdview,10);
+//             mnRefNumMatches = nmatches;
+//             // cout<<"After change : "<<nmatches<<" Matches."<<endl;
+//         }
+//         mCurrentFrame.mnBirdviewRefFrameId = mBirdviewRefFrame.mnId;
+// #ifdef DRAW_MATCH
+//         cv::Mat matchesImg;
+//         vector<cv::DMatch> vMatches12;
+//         for(int k=0;k<mvnBirdviewMatches12.size();k++)
+//         {
+//             int idx2 = mvnBirdviewMatches12[k];
+//             if(idx2<0)
+//             {
+//                 continue;
+//             }
+//             cv::Mat d1 =  mBirdviewRefFrame.mDescriptorsBird.row(k);
+//             cv::Mat d2 =  mCurrentFrame.mDescriptorsBird.row(idx2);
+//             int distance = mpmatcherBirdview->DescriptorDistance(d1,d2);
+//             vMatches12.push_back(cv::DMatch(k,idx2,distance));
+//         }
+//         cv::drawMatches(mBirdviewRefFrame.mBirdviewImg,mBirdviewRefFrame.mvKeysBird,mCurrentFrame.mBirdviewImg,mCurrentFrame.mvKeysBird,vMatches12,matchesImg);
+//         // cout<<"Matches between "<<mBirdviewRefFrame.mnId<<" and "<<mCurrentFrame.mnId<<endl;
+//         cv::imshow("birdview matches",matchesImg);
+// #endif
+//     }
+
+    Track();
+
+    // if(mState==NOT_INITIALIZED||mState==NO_IMAGES_YET)
+    // {
+    //     mLastFrame = Frame(mCurrentFrame);
+    // }
+
+    return mCurrentFrame.mTcw.clone();
+}
+
 void Tracking::Track()
 {
     if(mState==NO_IMAGES_YET)
@@ -899,7 +1007,7 @@ void Tracking::CreateInitialMapMonocular()
     cout<<"mvnBirdviewMatches12.size() = "<<mvnBirdviewMatches12.size()<<endl;
     cout<<"mvbMatchesInliersBird12.size() = "<<mvbMatchesInliersBird12.size()<<endl;
 
-    for(int k=0;k<mvnBirdviewMatches12.size();k++)
+    for(size_t k=0;k<mvnBirdviewMatches12.size();k++)
     {
         if(mvnBirdviewMatches12[k]<0)
             continue;
@@ -945,7 +1053,7 @@ void Tracking::CreateInitialMapMonocular()
 
     // Set median depth to 1
     float medianDepth = pKFini->ComputeSceneMedianDepth(2);
-    float invMedianDepth = 1.0f/medianDepth;
+    // float invMedianDepth = 1.0f/medianDepth;
 
     if(medianDepth<0 || pKFcur->TrackedMapPoints(1)<100)
     {
@@ -1093,7 +1201,7 @@ bool Tracking::TrackReferenceKeyFrame()
     {
         // Discard outliers for birdview
         // cv::Mat Twc = mCurrentFrame.mTcw.inv();
-        for(int k=0;k<mCurrentFrame.mvKeysBird.size();k++)
+        for(size_t k=0;k<mCurrentFrame.mvKeysBird.size();k++)
         {
             if(mCurrentFrame.mvpMapPointsBird[k])
             {
@@ -1293,7 +1401,7 @@ bool Tracking::TrackWithMotionModel()
     {
         // Discard outliers for birdview
         // cv::Mat Twc = mCurrentFrame.mTcw.inv();
-        for(int k=0;k<mCurrentFrame.mvKeysBird.size();k++)
+        for(size_t k=0;k<mCurrentFrame.mvKeysBird.size();k++)
         {
             if(mCurrentFrame.mvpMapPointsBird[k])
             {
@@ -1381,7 +1489,7 @@ bool Tracking::TrackLocalMap()
     { 
         // Discard outliers for birdview
         // cv::Mat Twc = mCurrentFrame.mTcw.inv();
-        for(int k=0;k<mCurrentFrame.mvKeysBird.size();k++)
+        for(size_t k=0;k<mCurrentFrame.mvKeysBird.size();k++)
         {
             if(mCurrentFrame.mvpMapPointsBird[k])
             {
@@ -1584,7 +1692,7 @@ void Tracking::CreateNewKeyFrame()
     if(mbHaveBirdview)
     {
         int nMPBird=0;
-        for(int k=0;k<mCurrentFrame.mvpMapPointsBird.size();k++)
+        for(size_t k=0;k<mCurrentFrame.mvpMapPointsBird.size();k++)
         {
             MapPointBird *pMPBird = mCurrentFrame.mvpMapPointsBird[k];
             if(pMPBird)
@@ -2171,7 +2279,7 @@ void Tracking::MatchAndRetriveBirdMP()
     }
 
     int nMap=0;
-    for(int k=0;k<mvnBirdviewMatches12.size();k++)
+    for(size_t k=0;k<mvnBirdviewMatches12.size();k++)
     {
         int idx2 = mvnBirdviewMatches12[k];
         if(idx2<0)
@@ -2296,7 +2404,7 @@ void Tracking::DrawMatchesInliersBird()
     // draw matches
     cv::Mat matchesImg,matchesinliersImg;
     vector<cv::DMatch> vMatches12,vMatchesInliers12;
-    for(int k=0;k<mvnBirdviewMatches12.size();k++)
+    for(size_t k=0;k<mvnBirdviewMatches12.size();k++)
     {
         int idx2 = mvnBirdviewMatches12[k];
         if(idx2<0)

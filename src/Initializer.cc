@@ -67,7 +67,7 @@ bool Initializer::Initialize(const Frame &CurrentFrame, const vector<int> &vMatc
     mvKeysXYBird2 = CurrentFrame.mvKeysBirdBaseXY;
     mvkeysBird2 = CurrentFrame.mvKeysBird;
     mvMatchesBird12.clear();
-    for(int k=0;k<vMatchesBird12.size();k++)
+    for(size_t k=0;k<vMatchesBird12.size();k++)
     {
         if(vMatchesBird12[k]>=0)
         {
@@ -568,7 +568,7 @@ bool Initializer::ReconstructF(vector<bool> &vbMatchesInliers, cv::Mat &F21, cv:
     t12 = T12c.rowRange(0,3).col(3);
     // fill in matches inliers
     mvbMatchesInliersBird12 = vector<bool>(mvKeysBird1.size(),false);
-    for(int k=0;k<mvMatchesBird12.size();k++)
+    for(size_t k=0;k<mvMatchesBird12.size();k++)
     {
         if(!vbMatchesInliersBird[k])
             continue;

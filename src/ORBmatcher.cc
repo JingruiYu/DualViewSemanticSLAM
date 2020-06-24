@@ -1904,7 +1904,7 @@ int ORBmatcher::SearchByMatchBird(Frame &CurrentFrame, const Frame &LastFrame, c
     std::vector<int> vnMatches12;
     BirdviewMatch(LastFrame,CurrentFrame,vnMatches12,windowSize);
 
-    for(int k=0;k<LastFrame.mvKeysBird.size();k++)
+    for(size_t k=0;k<LastFrame.mvKeysBird.size();k++)
     {
         int idx2 = vnMatches12[k];
         if(idx2<0)
@@ -2011,7 +2011,7 @@ int ORBmatcher::SearchByMatchBird(KeyFrame *pKF, Frame &F, std::vector<MapPointB
         rotHist[i].reserve(500);
     const float factor = 1.0f/HISTO_LENGTH;
 
-    for(int k=0;k<vpMapPointsBirdKF.size();k++)
+    for(size_t k=0;k<vpMapPointsBirdKF.size();k++)
     {
         MapPointBird *pMPBird = vpMapPointsBirdKF[k];
         if(!pMPBird)

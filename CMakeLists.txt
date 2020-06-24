@@ -1,9 +1,8 @@
 cmake_minimum_required(VERSION 2.8)
 project(ORB_SLAM2)
 
-IF(NOT CMAKE_BUILD_TYPE)
-  SET(CMAKE_BUILD_TYPE Release)
-ENDIF()
+
+SET(CMAKE_BUILD_TYPE Debug)
 
 MESSAGE("Build type: " ${CMAKE_BUILD_TYPE})
 
@@ -90,3 +89,7 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/Examples/Monocular)
 add_executable(mono_Bird
 Examples/Monocular/mono_Bird.cc)
 target_link_libraries(mono_Bird ${PROJECT_NAME})
+
+add_executable(mono_Bird_sem
+Examples/Monocular/mono_Bird_sem.cc)
+target_link_libraries(mono_Bird_sem ${PROJECT_NAME})

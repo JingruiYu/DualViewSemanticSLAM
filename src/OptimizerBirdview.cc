@@ -72,7 +72,7 @@ void Optimizer::BundleAdjustmentWithBirdview(const vector<KeyFrame *> &vpKFs, co
     const float thHuber2D = sqrt(5.99);
     const float thHuber3D = sqrt(7.815);
 
-    long unsigned int maxMPid = 0;
+    int maxMPid = 0;
     // Set MapPoint vertices
     for(size_t i=0; i<vpMP.size(); i++)
     {
@@ -343,7 +343,7 @@ int Optimizer::PoseOptimizationWithBirdview(Frame *pFrame, Frame* pRefFrame)
 
     const float deltaMono = sqrt(5.991);
     // const float deltaStereo = sqrt(7.815);
-    const float delta3D = sqrt(7.815);
+    // const float delta3D = sqrt(7.815);
 
 
     {
@@ -877,9 +877,9 @@ void Optimizer::LocalBundleAdjustmentWithBirdview(KeyFrame *pKF, bool* pbStopFla
 
     const float thHuberMono = sqrt(5.991);
     // const float thHuberStereo = sqrt(7.815);
-    const float thHuber3D = sqrt(7.815);
+    // const float thHuber3D = sqrt(7.815);
 
-    long unsigned int maxMPid=0;
+    int maxMPid=0;
     for(list<MapPoint*>::iterator lit=lLocalMapPoints.begin(), lend=lLocalMapPoints.end(); lit!=lend; lit++)
     {
         MapPoint* pMP = *lit;

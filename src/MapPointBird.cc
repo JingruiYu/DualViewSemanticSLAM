@@ -7,16 +7,16 @@ namespace ORB_SLAM2
 long unsigned int MapPointBird::nNextId=0;
 
 MapPointBird::MapPointBird(const cv::Mat &Pos, KeyFrame* pRefKF, Map* pMap)
-:mWorldPos(Pos.clone()),mpRefKF(pRefKF),mpMap(pMap),nObs(0),mnBALocalForKF(0),
-mnTrackReferenceForFrame(0),mnLastFrameSeen(0)
+:mWorldPos(Pos.clone()),mpRefKF(pRefKF),mnBALocalForKF(0),nObs(0),
+mnTrackReferenceForFrame(0),mnLastFrameSeen(0),mpMap(pMap)
 {
     // cout<<"Construct Birdview MapPoint with KeyFrame "<<pRefKF->mnId<<endl;
     mnId = nNextId++;
 }
 
 MapPointBird::MapPointBird(const cv::Mat &Pos, Frame* pFrame, Map* pMap, const int &idxF)
-:mWorldPos(Pos.clone()),mpMap(pMap),mpRefKF(static_cast<KeyFrame*>(NULL)),nObs(0),mnBALocalForKF(0),
-mnTrackReferenceForFrame(0),mnLastFrameSeen(0)
+:mWorldPos(Pos.clone()),mpRefKF(static_cast<KeyFrame*>(NULL)),mnBALocalForKF(0),nObs(0),
+mnTrackReferenceForFrame(0),mnLastFrameSeen(0),mpMap(pMap)
 {
     // cout<<"Construct Birdview MapPoint with Frame "<<pFrame->mnId<<endl;
     mnId = nNextId++;

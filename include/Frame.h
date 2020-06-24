@@ -64,6 +64,8 @@ public:
     // Constructor for Monocular cameras with birdview.
     Frame(const cv::Mat &imGray, const cv::Mat &birdviewGray, const cv::Mat &birdviewMask, const double &timeStamp, ORBextractor* extractor,ORBVocabulary* voc, cv::Mat &K, cv::Mat &distCoef, const float &bf, const float &thDepth);
 
+    Frame(const cv::Mat &imGray, const cv::Mat &birdviewGray, const cv::Mat &birdviewMask, const cv::Mat &birdviewContour, const double &timeStamp, ORBextractor* extractor,ORBVocabulary* voc, cv::Mat &K, cv::Mat &distCoef, const float &bf, const float &thDepth);
+
     // Extract ORB on the image. 0 for left image and 1 for right image.
     void ExtractORB(int flag, const cv::Mat &im);
 
@@ -115,6 +117,8 @@ public:
     static cv::Point2f ProjectXYZ2Birdview(const cv::Point3f &p);
     static cv::Point3f TransformPoint3fWithMat(cv::Mat T, cv::Point3f p);
     static cv::Mat InverseTransformSE3(cv::Mat T12);
+    void  getContourPixels();
+
 
 public:
     // Vocabulary used for relocalization.
@@ -186,6 +190,8 @@ public:
     // birdview images
     cv::Mat mBirdviewImg;
     cv::Mat mBirdviewMask;
+    // birdview contours
+    cv::Mat mBirdviewContour;
 
     // Corresponding stereo coordinate and depth for each keypoint.
     // "Monocular" keypoints have a negative value.
@@ -243,6 +249,8 @@ public:
 
     static bool mbInitialComputations;
 
+    vector<cv::Point3f> mvMeasurement_p;
+    vector<float> mvMeasurement_g;
 
 private:
 
