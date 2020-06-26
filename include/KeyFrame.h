@@ -205,7 +205,11 @@ public:
     const int mnMaxY;
     const cv::Mat mK;
 
-
+    // for contour
+    cv::Mat mBirdviewContour;
+    vector<cv::Mat> mvMeasurement_p;
+    vector<float> mvMeasurement_g;
+    
     // The following variables need to be accessed trough a mutex to be thread safe.
 protected:
 

@@ -936,6 +936,18 @@ void Tracking::MonocularInitialization()
             cv::Mat Tcw = cv::Mat::eye(4,4,CV_32F);
             Rcw.copyTo(Tcw.rowRange(0,3).colRange(0,3));
             tcw.copyTo(Tcw.rowRange(0,3).col(3));
+
+            cout << "Tcw before: " << endl << Tcw << endl;
+            chrono::steady_clock::time_point t1 = chrono::steady_clock::now();
+            Optimizer::poseDirectEstimation( mInitialFrame, mCurrentFrame, Tcw ); 
+            chrono::steady_clock::time_point t2 = chrono::steady_clock::now();
+            chrono::duration<double> time_used = chrono::duration_cast<chrono::duration<double>> ( t2-t1 );
+            
+            cout << "Tcw after: " << endl << Tcw << endl;
+
+            cout << "time_used : " << time_used.count() << endl;
+
+
             mCurrentFrame.SetPose(Tcw);
 
             CreateInitialMapMonocular();
@@ -963,10 +975,10 @@ void Tracking::MonocularInitialization()
 
 void Tracking::CreateInitialMapMonocular()
 {
+    // The pose of the KF is getting from Frame and not changed below
     // Create KeyFrames
     KeyFrame* pKFini = new KeyFrame(mInitialFrame,mpMap,mpKeyFrameDB);
     KeyFrame* pKFcur = new KeyFrame(mCurrentFrame,mpMap,mpKeyFrameDB);
-
 
     pKFini->ComputeBoW();
     pKFcur->ComputeBoW();
@@ -1063,21 +1075,6 @@ void Tracking::CreateInitialMapMonocular()
         return;
     }
 
-    // // Scale initial baseline
-    // cv::Mat Tc2w = pKFcur->GetPose();
-    // Tc2w.col(3).rowRange(0,3) = Tc2w.col(3).rowRange(0,3)*invMedianDepth;
-    // pKFcur->SetPose(Tc2w);
-
-    // // Scale points
-    // vector<MapPoint*> vpAllMapPoints = pKFini->GetMapPointMatches();
-    // for(size_t iMP=0; iMP<vpAllMapPoints.size(); iMP++)
-    // {
-    //     if(vpAllMapPoints[iMP])
-    //     {
-    //         MapPoint* pMP = vpAllMapPoints[iMP];
-    //         pMP->SetWorldPos(pMP->GetWorldPos()*invMedianDepth);
-    //     }
-    // }
 
     mpLocalMapper->InsertKeyFrame(pKFini);
     mpLocalMapper->InsertKeyFrame(pKFcur);

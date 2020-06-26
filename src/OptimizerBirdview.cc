@@ -1207,4 +1207,49 @@ void Optimizer::LocalBundleAdjustmentWithBirdview(KeyFrame *pKF, bool* pbStopFla
     }
 }
 
+void Optimizer::poseDirectEstimation(const Frame &ReferenceFrame, const Frame &CurrentFrame, cv::Mat &Tcw )
+{
+    typedef g2o::BlockSolver< g2o::BlockSolverTraits<6,1> > DirectBlock;  // 求解的向量是6＊1的 //TODO
+    DirectBlock::LinearSolverType* linearSolver = new g2o::LinearSolverDense< DirectBlock::PoseMatrixType > ();
+    DirectBlock* solver_ptr = new DirectBlock ( linearSolver );
+    // g2o::OptimizationAlgorithmGaussNewton* solver = new g2o::OptimizationAlgorithmGaussNewton( solver_ptr ); // G-N
+    g2o::OptimizationAlgorithmLevenberg* solver = new g2o::OptimizationAlgorithmLevenberg ( solver_ptr ); // L-M
+    g2o::SparseOptimizer optimizer;
+    optimizer.setAlgorithm ( solver );
+    optimizer.setVerbose( true );
+
+    g2o::VertexSE3Expmap* pose = new g2o::VertexSE3Expmap();
+    pose->setEstimate ( Converter::toSE3Quat(Tcw) );
+    pose->setId ( 0 );
+    optimizer.addVertex ( pose );
+
+
+    // 添加边
+    int id=1;
+    vector<EdgeSE3ProjectDirect*> edges; //test
+    for ( size_t i = 0; i < ReferenceFrame.mvMeasurement_p.size(); i++ )
+    {
+        EdgeSE3ProjectDirect* edge = new EdgeSE3ProjectDirect (
+            Converter::toVector3d(ReferenceFrame.mvMeasurement_p[i]), 
+            ReferenceFrame.Tcb.rowRange(0,3).colRange(0,3), 
+            ReferenceFrame.Tcb.rowRange(0,3).col(3), 
+            ReferenceFrame.Rro, ReferenceFrame.tro, 
+            ReferenceFrame.Ror, ReferenceFrame.tor,
+            CurrentFrame.mBirdviewContour
+        );
+        edge->setVertex ( 0, pose );
+        edge->setMeasurement ( ReferenceFrame.mvMeasurement_g[i] );
+        edge->setInformation ( Eigen::Matrix<double,1,1>::Identity() );
+        edge->setId ( id++ );
+        optimizer.addEdge ( edge );
+        edges.push_back( edge ); //test
+    }
+    cout<<"edges in graph: "<<optimizer.edges().size() <<endl;
+    optimizer.initializeOptimization();
+    optimizer.optimize ( 30 );
+    Eigen::Isometry3d tmpTcw = pose->estimate();
+    Tcw = Converter::toCvMat(tmpTcw);
+}
+
+
 }  // namespace ORB_SLAM2

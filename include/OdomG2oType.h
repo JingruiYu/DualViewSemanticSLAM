@@ -7,7 +7,10 @@
 #include "Thirdparty/g2o/g2o/core/base_binary_edge.h"
 #include "Thirdparty/g2o/g2o/types/types_seven_dof_expmap.h"
 
+#include "Converter.h"
+
 #include <eigen3/Eigen/Core>
+#include <opencv2/opencv.hpp>
 
 namespace ORB_SLAM2
 {
@@ -161,13 +164,78 @@ public:
 	{
 		g2o::SE3Quat v1 = (static_cast<VertexSE3Quat*> (_vertices[0]))->estimate();
 		g2o::SE3Quat v2 = (static_cast<VertexSE3Quat*> (_vertices[1]))->estimate();
-	//   _error = (_measurement.inverse()*v1.inverse()*v2).log();
 		_error = (_measurement.inverse()*v1*v2.inverse()).log();
 	}
 	virtual void linearizeOplus();
 	Matrix6d JRInv(Vector6d e);
 	Matrix3d skew(Vector3d phi);
 };
+
+
+// project a 3d point into an image plane, the error is photometric error
+// an unary edge with one vertex SE3Expmap (the pose of camera)
+class EdgeSE3ProjectDirect: public g2o::BaseUnaryEdge< 1, double, g2o::VertexSE3Expmap>
+{
+public:
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
+    EdgeSE3ProjectDirect() {}
+
+    EdgeSE3ProjectDirect ( Eigen::Vector3d point, const cv::Mat& Rcb, const cv::Mat& tcb, const cv::Mat& Rro, const cv::Mat& tro, const cv::Mat& Ror, const cv::Mat& tor, const cv::Mat& image )
+        : x_world_ ( point )
+    {
+		Rcb_ = Rcb.clone();
+		tcb_ = tcb.clone();
+		Rro_ = Rro.clone();
+		tro_ = tro.clone();
+        Ror_ = Ror.clone();
+		tor_ = tor.clone();
+		image_ = image.clone();
+    }
+
+    virtual void computeError()
+    {
+        const g2o::VertexSE3Expmap* v  =static_cast<const g2o::VertexSE3Expmap*> ( _vertices[0] );
+        Eigen::Vector3d x_local = v->estimate().map ( x_world_ );
+        cv::Mat p_c = Converter::toCvMat(x_local);
+		cv::Mat uv = Ror_ * Rcb_.t() * ( p_c - tcb_) + tor_; 
+        float x = uv.at<float>(0);
+        float y = uv.at<float>(1);
+
+        // check x,y is in the image
+        if ( x-4<0 || ( x+4 ) >image_.cols || ( y-4 ) <0 || ( y+4 ) >image_.rows )
+        {
+            _error ( 0,0 ) = 0.0;
+            this->setLevel ( 1 );
+        }
+        else
+        {
+            _error ( 0,0 ) = getPixelValue ( x,y ) - _measurement;
+        }
+    }
+
+	virtual void linearizeOplus();
+
+    // dummy read and write functions because we don't care...
+    virtual bool read ( std::istream& in ) {return false;}
+    virtual bool write ( std::ostream& out ) const {return false;}
+
+protected:
+    // get a gray scale value from reference image (bilinear interpolated)
+    inline float getPixelValue ( float x, float y )
+    {
+        int xx = int(x);
+        int yy = int(y);
+        float colorscale = float (image_.at<cv::Vec3b>(yy,xx)[0] + image_.at<cv::Vec3b>(yy,xx)[1] + image_.at<cv::Vec3b>(yy,xx)[2]);
+
+        return colorscale;
+    }
+public:
+    Eigen::Vector3d x_world_;   // 3D point in world frame
+    cv::Mat Rro_,tro_,Ror_,tor_,Rcb_,tcb_;
+	cv::Mat image_;    // reference image
+};
+
 
 }  //namespace ORB_SLAM2
 

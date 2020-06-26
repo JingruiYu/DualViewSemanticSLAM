@@ -63,7 +63,7 @@ public:
     /********************* Modified Here *********************/
     // Constructor for Monocular cameras with birdview.
     Frame(const cv::Mat &imGray, const cv::Mat &birdviewGray, const cv::Mat &birdviewMask, const double &timeStamp, ORBextractor* extractor,ORBVocabulary* voc, cv::Mat &K, cv::Mat &distCoef, const float &bf, const float &thDepth);
-
+    // for contour
     Frame(const cv::Mat &imGray, const cv::Mat &birdviewGray, const cv::Mat &birdviewMask, const cv::Mat &birdviewContour, const double &timeStamp, ORBextractor* extractor,ORBVocabulary* voc, cv::Mat &K, cv::Mat &distCoef, const float &bf, const float &thDepth);
 
     // Extract ORB on the image. 0 for left image and 1 for right image.
@@ -117,6 +117,7 @@ public:
     static cv::Point2f ProjectXYZ2Birdview(const cv::Point3f &p);
     static cv::Point3f TransformPoint3fWithMat(cv::Mat T, cv::Point3f p);
     static cv::Mat InverseTransformSE3(cv::Mat T12);
+    // for contour
     void  getContourPixels();
 
 
@@ -141,7 +142,7 @@ public:
     cv::Mat mDistCoef;
     /********************* Modified Here *********************/
     //front camera - odometer extrinsics
-    static cv::Mat Tbc,Tcb;
+    static cv::Mat Tbc,Tcb,Rro,tro,Ror,tor;
 
     // Stereo baseline multiplied by fx.
     float mbf;
@@ -190,7 +191,7 @@ public:
     // birdview images
     cv::Mat mBirdviewImg;
     cv::Mat mBirdviewMask;
-    // birdview contours
+    // for contour
     cv::Mat mBirdviewContour;
 
     // Corresponding stereo coordinate and depth for each keypoint.
@@ -248,8 +249,8 @@ public:
     static float mnMaxY;
 
     static bool mbInitialComputations;
-
-    vector<cv::Point3f> mvMeasurement_p;
+    // for contour
+    vector<cv::Mat> mvMeasurement_p;
     vector<float> mvMeasurement_g;
 
 private:

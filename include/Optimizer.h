@@ -64,6 +64,8 @@ public:
                                        const unsigned long nLoopKF=0, const bool bRobust = true);
     void static LocalBundleAdjustmentWithBirdview(KeyFrame* pKF, bool *pbStopFlag, Map *pMap);
     int static PoseOptimizationWithBirdview(Frame* pFrame, Frame* pRefFrame=NULL);
+
+    void static poseDirectEstimation(const Frame &ReferenceFrame, const Frame &CurrentFrame, cv::Mat &Tcw );
 };
 
 } //namespace ORB_SLAM

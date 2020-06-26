@@ -33,7 +33,7 @@ float Frame::mnMinX, Frame::mnMinY, Frame::mnMaxX, Frame::mnMaxY;
 float Frame::mfGridElementWidthInv, Frame::mfGridElementHeightInv;
 /********************* Modified Here *********************/
 float Frame::mfGridElementWidthInvBirdview, Frame::mfGridElementHeightInvBirdview;
-cv::Mat Frame::Tbc,Frame::Tcb;
+cv::Mat Frame::Tbc,Frame::Tcb,Frame::Rro,Frame::tro,Frame::Ror,Frame::tor;
 int Frame::birdviewRows, Frame::birdviewCols;
 
 const double correction = 1.7;
@@ -275,10 +275,6 @@ Frame::Frame(const cv::Mat &imGray, const cv::Mat &birdviewGray, const cv::Mat &
     {
         ComputeImageBounds(imGray);
 
-        cout<<"Image Bounds:"<<endl;
-        cout<<"minX = "<<mnMinX<<" , maxX = "<<mnMaxX<<endl;
-        cout<<"minY = "<<mnMinY<<" , maxY = "<<mnMaxY<<endl;
-
         mfGridElementWidthInv=static_cast<float>(FRAME_GRID_COLS)/static_cast<float>(mnMaxX-mnMinX);
         mfGridElementHeightInv=static_cast<float>(FRAME_GRID_ROWS)/static_cast<float>(mnMaxY-mnMinY);
 
@@ -373,8 +369,6 @@ Frame::Frame(const cv::Mat &imGray, const cv::Mat &birdviewGray, const cv::Mat &
     }
     mvnBirdviewMatches21 = vector<int>(mvKeysBird.size(),-1);
     mvbBirdviewInliers = vector<bool>(mvKeysBird.size(),true);
-
-    // cout<<"Frame "<<mnId<<" Created."<<endl;
 }
 
 Frame::Frame(const cv::Mat &imGray, const cv::Mat &birdviewGray, const cv::Mat &birdviewMask, const cv::Mat &birdviewContour, const double &timeStamp, ORBextractor* extractor,ORBVocabulary* voc, cv::Mat &K, cv::Mat &distCoef, const float &bf, const float &thDepth)
@@ -388,10 +382,6 @@ Frame::Frame(const cv::Mat &imGray, const cv::Mat &birdviewGray, const cv::Mat &
     if(mbInitialComputations)
     {
         ComputeImageBounds(imGray);
-
-        cout<<"Image Bounds:"<<endl;
-        cout<<"minX = "<<mnMinX<<" , maxX = "<<mnMaxX<<endl;
-        cout<<"minY = "<<mnMinY<<" , maxY = "<<mnMaxY<<endl;
 
         mfGridElementWidthInv=static_cast<float>(FRAME_GRID_COLS)/static_cast<float>(mnMaxX-mnMinX);
         mfGridElementHeightInv=static_cast<float>(FRAME_GRID_ROWS)/static_cast<float>(mnMaxY-mnMinY);
@@ -489,8 +479,6 @@ Frame::Frame(const cv::Mat &imGray, const cv::Mat &birdviewGray, const cv::Mat &
     }
     mvnBirdviewMatches21 = vector<int>(mvKeysBird.size(),-1);
     mvbBirdviewInliers = vector<bool>(mvKeysBird.size(),true);
-
-    // cout<<"Frame "<<mnId<<" Created."<<endl;
 }
 
 void Frame::AssignFeaturesToGrid()
@@ -1106,6 +1094,19 @@ void Frame::CalculateExtrinsics()
     cout<<"extrinsics: "<<endl;
     cout<<"Tbc = "<<endl<<Tbc<<endl;
     cout<<"Tcb = "<<endl<<Tcb<<endl;
+
+    // For the Translation between the Pc in the front camera and the Pb in the bridview image
+    Rro = (cv::Mat_<float>(3,3) << 0, -1*pixel2meter, 0,
+                                -1*pixel2meter, 0, 0,
+                                0, 0, 0);
+    
+    tro = (cv::Mat_<float>(3,1) << pixel2meter*birdviewRows/2+rear_axle_to_center, pixel2meter*birdviewCols/2, 0);
+
+    Ror = (cv::Mat_<float>(3,3) << 0, -1*meter2pixel, 0,
+                                -1*meter2pixel, 0, 0,
+                                0, 0, 0);
+    
+    tor = (cv::Mat_<float>(3,1) << birdviewCols/2, birdviewRows/2 + meter2pixel*rear_axle_to_center, 0);
 }
 
 cv::Point3f Frame::BirdviewKP2XYZ(const cv::KeyPoint &kp)
@@ -1155,27 +1156,20 @@ void Frame::getContourPixels()
     {
         for (int y = 0; y < mBirdviewContour.rows-10; y++)
         {
-            cv::KeyPoint delta;
-            delta.pt.x = (mBirdviewContour.at<cv::Vec3b>(y,x+1)[0] + mBirdviewContour.at<cv::Vec3b>(y,x+1)[1] + mBirdviewContour.at<cv::Vec3b>(y,x+1)[2])
-                       - (mBirdviewContour.at<cv::Vec3b>(y,x-1)[0] + mBirdviewContour.at<cv::Vec3b>(y,x-1)[1] + mBirdviewContour.at<cv::Vec3b>(y,x-1)[2]);
-
-            delta.pt.y = (mBirdviewContour.at<cv::Vec3b>(y+1,x)[0] + mBirdviewContour.at<cv::Vec3b>(y+1,x)[1] + mBirdviewContour.at<cv::Vec3b>(y+1,x)[2])
-                       - (mBirdviewContour.at<cv::Vec3b>(y-1,x)[0] + mBirdviewContour.at<cv::Vec3b>(y-1,x)[1] + mBirdviewContour.at<cv::Vec3b>(y-1,x)[2]);
+            cv::Mat delta = cv::Mat::zeros(3,1,CV_32F);
+            delta.at<float>(0,0) = (mBirdviewContour.at<cv::Vec3b>(y,x+1)[0] + mBirdviewContour.at<cv::Vec3b>(y,x+1)[1] + mBirdviewContour.at<cv::Vec3b>(y,x+1)[2])
+                                    - (mBirdviewContour.at<cv::Vec3b>(y,x-1)[0] + mBirdviewContour.at<cv::Vec3b>(y,x-1)[1] + mBirdviewContour.at<cv::Vec3b>(y,x-1)[2]);
+            delta.at<float>(1,0) = (mBirdviewContour.at<cv::Vec3b>(y+1,x)[0] + mBirdviewContour.at<cv::Vec3b>(y+1,x)[1] + mBirdviewContour.at<cv::Vec3b>(y+1,x)[2])
+                                    - (mBirdviewContour.at<cv::Vec3b>(y-1,x)[0] + mBirdviewContour.at<cv::Vec3b>(y-1,x)[1] + mBirdviewContour.at<cv::Vec3b>(y-1,x)[2]);
             
-            if ( cv::norm(delta.pt) < 50)
+            if ( cv::norm(delta) < 50)
                 continue;
-            
-            // cout << "point : " << delta << endl << "norm is : " << normdelta << endl;
+ 
+            cv::Mat p3d = Rro * delta + tro;
+            cv::Mat KeysSemCamXYZ = Tcb.rowRange(0,3).colRange(0,3)*p3d+Tcb.rowRange(0,3).col(3);
 
-            cv::Point3f p3d = BirdviewKP2XYZ(delta);
-            cv::Point2f p2d;
-            p2d.x = p3d.x;
-            p2d.y = p3d.y;
-            cv::Point3f KeysSemBaseXY = p3d;
-            cv::Point3f KeysSemCamXYZ = TransformPoint3fWithMat(Tcb,p3d);
-            
             float grayscale = float (mBirdviewContour.at<cv::Vec3b>(y,x)[0] + mBirdviewContour.at<cv::Vec3b>(y,x)[1] + mBirdviewContour.at<cv::Vec3b>(y,x)[2]);
-            mvMeasurement_p.push_back(p3d);
+            mvMeasurement_p.push_back(KeysSemCamXYZ);
             mvMeasurement_g.push_back(grayscale);
         }
     }
