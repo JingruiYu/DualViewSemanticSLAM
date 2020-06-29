@@ -148,13 +148,13 @@ protected:
     void StereoInitialization();
 
     // Map initialization for monocular
-    void MonocularInitialization();
+    void MonocularInitialization(bool mSemDirect);
     void CreateInitialMapMonocular();
 
     void CheckReplacedInLastFrame();
-    bool TrackReferenceKeyFrame();
+    bool TrackReferenceKeyFrame(bool mSemDirect);
     void UpdateLastFrame();
-    bool TrackWithMotionModel();
+    bool TrackWithMotionModel(bool mSemDirect);
 
     bool Relocalization();
 

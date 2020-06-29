@@ -203,14 +203,14 @@ public:
         float y = uv.at<float>(1);
 
         // check x,y is in the image
-        if ( x-4<0 || ( x+4 ) >image_.cols || ( y-4 ) <0 || ( y+4 ) >image_.rows )
+        if ( x-4<0 || ( x+4 ) >image_.cols || ( y-4 ) <0 || ( y+4 ) >image_.rows || std::isnan(x) || std::isnan(y) )
         {
             _error ( 0,0 ) = 0.0;
             this->setLevel ( 1 );
         }
         else
         {
-            _error ( 0,0 ) = getPixelValue ( x,y ) - _measurement;
+			_error ( 0,0 ) = getPixelValue ( x,y ) - _measurement;
         }
     }
 
@@ -226,7 +226,11 @@ protected:
     {
         int xx = int(x);
         int yy = int(y);
-        float colorscale = float (image_.at<cv::Vec3b>(yy,xx)[0] + image_.at<cv::Vec3b>(yy,xx)[1] + image_.at<cv::Vec3b>(yy,xx)[2]);
+		float colorscale = 0.0;
+		if (!image_.empty())
+		{
+			colorscale = float (image_.at<cv::Vec3b>(yy,xx)[0] + image_.at<cv::Vec3b>(yy,xx)[1] + image_.at<cv::Vec3b>(yy,xx)[2]);
+		}
 
         return colorscale;
     }

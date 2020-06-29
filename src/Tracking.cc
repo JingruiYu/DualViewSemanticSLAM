@@ -273,6 +273,7 @@ cv::Mat Tracking::GrabImageMonocularWithBirdview(const cv::Mat &im, const cv::Ma
     mImGray = im;
     mBirdviewGray = birdview;
     mbHaveBirdview=true;
+    mbHaveBirdview=true;
 
     // Convert front view to grayscale
     if(mImGray.channels()==3)
@@ -501,7 +502,7 @@ void Tracking::Track()
         if(mSensor==System::STEREO || mSensor==System::RGBD)
             StereoInitialization();
         else
-            MonocularInitialization();
+            MonocularInitialization(true);
 
         mpFrameDrawer->Update(this);
 
@@ -531,22 +532,34 @@ void Tracking::Track()
 
                 if(mVelocity.empty() || mCurrentFrame.mnId<mnLastRelocFrameId+2)
                 {
-                    bOK = TrackReferenceKeyFrame();
+                    bOK = TrackReferenceKeyFrame(true);
                     if(!bOK)
                     {
-                        cout<<"No Motion Model Track Reference KeyFrame failed, tracking lost."<<endl;
+                        bOK = TrackReferenceKeyFrame(false);
+                        if (!bOK)
+                        {
+                            cout<<"No Motion Model Track Reference KeyFrame failed, tracking lost."<<endl;
+                        }
                     }
                 }
                 else
                 {
-                    bOK = TrackWithMotionModel();
+                    bOK = TrackWithMotionModel(true);
                     if(!bOK)
                     {
-                        cout<<"Track Motion Model failed, Track with Reference KeyFrame."<<endl;
-                        bOK = TrackReferenceKeyFrame();
-                        if(!bOK)
+                        bOK = TrackWithMotionModel(false);
+                        if (!bOK)
                         {
-                            cout<<"Track Reference KeyFrame failed, tracking lost."<<endl;
+                            cout<<"Track Motion Model failed, Track with Reference KeyFrame."<<endl;
+                            bOK = TrackReferenceKeyFrame(true);
+                            if(!bOK)
+                            {
+                                bOK = TrackReferenceKeyFrame(false);
+                                if (!bOK)
+                                {
+                                    cout<<"No Motion Model Track Reference KeyFrame failed, tracking lost."<<endl;
+                                }
+                            }
                         }
                     }
                 }
@@ -572,11 +585,11 @@ void Tracking::Track()
 
                     if(!mVelocity.empty())
                     {
-                        bOK = TrackWithMotionModel();
+                        bOK = TrackWithMotionModel(false);
                     }
                     else
                     {
-                        bOK = TrackReferenceKeyFrame();
+                        bOK = TrackReferenceKeyFrame(false);
                     }
                 }
                 else
@@ -594,7 +607,7 @@ void Tracking::Track()
                     cv::Mat TcwMM;
                     if(!mVelocity.empty())
                     {
-                        bOKMM = TrackWithMotionModel();
+                        bOKMM = TrackWithMotionModel(false);
                         vpMPsMM = mCurrentFrame.mvpMapPoints;
                         vbOutMM = mCurrentFrame.mvbOutlier;
                         TcwMM = mCurrentFrame.mTcw.clone();
@@ -797,7 +810,7 @@ void Tracking::StereoInitialization()
     }
 }
 
-void Tracking::MonocularInitialization()
+void Tracking::MonocularInitialization(bool mSemDirect)
 {
 
     if(!mpInitializer)
@@ -937,17 +950,18 @@ void Tracking::MonocularInitialization()
             Rcw.copyTo(Tcw.rowRange(0,3).colRange(0,3));
             tcw.copyTo(Tcw.rowRange(0,3).col(3));
 
-            cout << "Tcw before: " << endl << Tcw << endl;
-            chrono::steady_clock::time_point t1 = chrono::steady_clock::now();
-            Optimizer::poseDirectEstimation( mInitialFrame, mCurrentFrame, Tcw ); 
-            chrono::steady_clock::time_point t2 = chrono::steady_clock::now();
-            chrono::duration<double> time_used = chrono::duration_cast<chrono::duration<double>> ( t2-t1 );
+            /******** Add by Yujr ************/
+            if (mSemDirect)
+            {
+                cout << "Tcw before: " << endl << Tcw << endl;
+                chrono::steady_clock::time_point t1 = chrono::steady_clock::now();
+                Optimizer::poseDirectEstimation( mInitialFrame, mCurrentFrame, Tcw ); 
+                chrono::steady_clock::time_point t2 = chrono::steady_clock::now();
+                chrono::duration<double> time_used = chrono::duration_cast<chrono::duration<double>> ( t2-t1 );
+                cout << "Tcw after: " << endl << Tcw << endl;
+                cout << "time_used : " << time_used.count() << endl;
+            }
             
-            cout << "Tcw after: " << endl << Tcw << endl;
-
-            cout << "time_used : " << time_used.count() << endl;
-
-
             mCurrentFrame.SetPose(Tcw);
 
             CreateInitialMapMonocular();
@@ -1124,7 +1138,7 @@ void Tracking::CheckReplacedInLastFrame()
 }
 
 
-bool Tracking::TrackReferenceKeyFrame()
+bool Tracking::TrackReferenceKeyFrame(bool mSemDirect)
 {
     // Compute Bag of Words vector
     mCurrentFrame.ComputeBoW();
@@ -1156,12 +1170,20 @@ bool Tracking::TrackReferenceKeyFrame()
         mCurrentFrame.mvpMapPointsBird = vpMapPointMatchesBird;
         cout<<"Track Reference KeyFrame, "<<nmatchesbird<<" Birdview Matches."<<endl;
 
+        if (mSemDirect)
+        {
+            /***** Yujr TODO Add another Direct optimization *****/
+            cv::Mat tmpTcw = mCurrentFrame.mTcw;
+            cout << "Tcw Reference before: " << endl << tmpTcw << endl;
+            chrono::steady_clock::time_point t1 = chrono::steady_clock::now();
+            Optimizer::poseDirectEstimation( mLastFrame, mCurrentFrame, tmpTcw ); 
+            chrono::steady_clock::time_point t2 = chrono::steady_clock::now();
+            chrono::duration<double> time_used = chrono::duration_cast<chrono::duration<double>> ( t2-t1 );
+            cout << "Tcw after: " << endl << tmpTcw << endl;
+            cout << "time_used : " << time_used.count() << endl;
+            mCurrentFrame.SetPose(tmpTcw);
+        }
         Optimizer::PoseOptimizationWithBirdview(&mCurrentFrame);
-        // MatchAndRetriveBirdMP();
-        // Optimizer::PoseOptimizationWithBirdview(&mCurrentFrame);
-        // Optimizer::PoseOptimization(&mCurrentFrame);
-        // DrawMatchesInliersBird();
-        // Optimizer::PoseOptimizationWithBirdview(&mCurrentFrame,&mBirdviewRefFrame);
     }
     else
     {
@@ -1292,7 +1314,7 @@ void Tracking::UpdateLastFrame()
     }
 }
 
-bool Tracking::TrackWithMotionModel()
+bool Tracking::TrackWithMotionModel(bool mSemDirect)
 {
     ORBmatcher matcher(0.9,true);
 
@@ -1358,6 +1380,19 @@ bool Tracking::TrackWithMotionModel()
     // Optimize frame pose with all matches
     if(mbHaveBirdview)
     {
+        if (mSemDirect)
+        {
+            /***** Yujr TODO Add another Direct optimization *****/
+            cv::Mat tmpTcw = mCurrentFrame.mTcw;
+            cout << "Tcw MotionModel before: " << endl << tmpTcw << endl;
+            chrono::steady_clock::time_point t1 = chrono::steady_clock::now();
+            Optimizer::poseDirectEstimation( mLastFrame, mCurrentFrame, tmpTcw ); 
+            chrono::steady_clock::time_point t2 = chrono::steady_clock::now();
+            chrono::duration<double> time_used = chrono::duration_cast<chrono::duration<double>> ( t2-t1 );
+            cout << "Tcw after: " << endl << tmpTcw << endl;
+            cout << "time_used : " << time_used.count() << endl;
+            mCurrentFrame.SetPose(tmpTcw);
+        }
         Optimizer::PoseOptimizationWithBirdview(&mCurrentFrame);
         // MatchAndRetriveBirdMP();
         // Optimizer::PoseOptimizationWithBirdview(&mCurrentFrame);

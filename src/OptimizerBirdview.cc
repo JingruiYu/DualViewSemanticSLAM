@@ -1223,7 +1223,6 @@ void Optimizer::poseDirectEstimation(const Frame &ReferenceFrame, const Frame &C
     pose->setId ( 0 );
     optimizer.addVertex ( pose );
 
-
     // 添加边
     int id=1;
     vector<EdgeSE3ProjectDirect*> edges; //test
@@ -1244,11 +1243,15 @@ void Optimizer::poseDirectEstimation(const Frame &ReferenceFrame, const Frame &C
         optimizer.addEdge ( edge );
         edges.push_back( edge ); //test
     }
-    cout<<"edges in graph: "<<optimizer.edges().size() <<endl;
+    // cout<<"edges in graph: "<<optimizer.edges().size() <<endl;
     optimizer.initializeOptimization();
     optimizer.optimize ( 30 );
     Eigen::Isometry3d tmpTcw = pose->estimate();
-    Tcw = Converter::toCvMat(tmpTcw);
+    double adpStep = abs(tmpTcw(0,3)-Tcw.at<float>(0,3)) + abs(tmpTcw(1,3)-Tcw.at<float>(1,3)) + abs(tmpTcw(2,3)-Tcw.at<float>(2,3));
+    if (adpStep < 18)
+    {
+        Tcw = Converter::toCvMat(tmpTcw);
+    }
 }
 
 

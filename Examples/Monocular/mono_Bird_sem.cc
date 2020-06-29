@@ -167,7 +167,7 @@ int main(int argc, char **argv)
     // Save camera trajectory
     // SLAM.SaveTrajectoryTUM("FrameTrajectoryOfMono_Bird-1.txt");
     // SLAM.SaveTrajectoryTUM("TrajectoryTUM.txt");
-    SLAM.SaveKeyFrameTrajectoryOdomTUM("KeyFrameTrajectoryOfMono_Bird-1.txt");
+    SLAM.SaveKeyFrameTrajectoryOdomTUM("KeyFrameTrajectoryOfSem_Bird-6.txt");
 
     return 0;
 }
