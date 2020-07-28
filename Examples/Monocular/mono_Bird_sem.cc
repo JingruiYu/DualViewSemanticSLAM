@@ -124,7 +124,8 @@ int main(int argc, char **argv)
 #else
         std::chrono::monotonic_clock::time_point t1 = std::chrono::monotonic_clock::now();
 #endif
-
+        if (ni % 10 == 0)          
+            cout << endl << "it is frame ... " << ni << endl;
         // Pass the image to the SLAM system
         //SLAM.TrackMonocular(im,tframe);
         SLAM.TrackMonocularWithBirdviewSem(im,birdview,birdviewmask,birdviewContour,tframe);

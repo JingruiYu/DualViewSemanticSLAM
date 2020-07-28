@@ -1150,7 +1150,7 @@ void Optimizer::LocalBundleAdjustmentWithBirdview(KeyFrame *pKF, bool* pbStopFla
 
     // Get Map Mutex
     unique_lock<mutex> lock(pMap->mMutexMapUpdate);
-    cout<<"Erase "<<vToErase.size()<<" MapPoints, and "<<vToEraseBird.size()<<" Birdview Points."<<endl;
+    //cout<<"Erase "<<vToErase.size()<<" MapPoints, and "<<vToEraseBird.size()<<" Birdview Points."<<endl;
 
     if(!vToErase.empty())
     {

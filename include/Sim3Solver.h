@@ -36,13 +36,13 @@ class Sim3Solver
 {
 public:
 
-    Sim3Solver(KeyFrame* pKF1, KeyFrame* pKF2, const std::vector<MapPoint*> &vpMatched12, const bool bFixScale = true);
+    Sim3Solver(KeyFrame* pKF1, KeyFrame* pKF2, const std::vector<MapPoint*> &vpMatched12, const vector<MapPointBird*> &vpMatchedBrid12, const bool bFixScale = true, int mode = 1);
 
     void SetRansacParameters(double probability = 0.99, int minInliers = 6 , int maxIterations = 300);
 
     cv::Mat find(std::vector<bool> &vbInliers12, int &nInliers);
 
-    cv::Mat iterate(int nIterations, bool &bNoMore, std::vector<bool> &vbInliers, int &nInliers);
+    cv::Mat iterate(int nIterations, bool &bNoMore, std::vector<bool> &vbInliers, vector<bool> &vbridInliers, int &nInliers);
 
     cv::Mat GetEstimatedRotation();
     cv::Mat GetEstimatedTranslation();
@@ -56,8 +56,11 @@ protected:
     void ComputeSim3(cv::Mat &P1, cv::Mat &P2);
 
     void CheckInliers();
+    void CheckBridInliers();
 
     void Project(const std::vector<cv::Mat> &vP3Dw, std::vector<cv::Mat> &vP2D, cv::Mat Tcw, cv::Mat K);
+    void ProjectBrid(const std::vector<cv::Mat> &vP3Dw, std::vector<cv::Mat> &vP2D, cv::Mat Tcw, cv::Mat K);
+    
     void FromCameraToImage(const std::vector<cv::Mat> &vP3Dc, std::vector<cv::Mat> &vP2D, cv::Mat K);
 
 
@@ -69,18 +72,23 @@ protected:
 
     std::vector<cv::Mat> mvX3Dc1;
     std::vector<cv::Mat> mvX3Dc2;
+    std::vector<cv::Mat> mvX3Bc1;
+    std::vector<cv::Mat> mvX3Bc2;
     std::vector<MapPoint*> mvpMapPoints1;
     std::vector<MapPoint*> mvpMapPoints2;
     std::vector<MapPoint*> mvpMatches12;
     std::vector<size_t> mvnIndices1;
+    std::vector<size_t> mvnBridIndices1;
     std::vector<size_t> mvSigmaSquare1;
     std::vector<size_t> mvSigmaSquare2;
     std::vector<size_t> mvnMaxError1;
     std::vector<size_t> mvnMaxError2;
 
     int N;
+    int NB;
     int mN1;
-
+    int mNB1;
+    
     // Current Estimation
     cv::Mat mR12i;
     cv::Mat mt12i;
@@ -88,11 +96,14 @@ protected:
     cv::Mat mT12i;
     cv::Mat mT21i;
     std::vector<bool> mvbInliersi;
+    std::vector<bool> mvbBridInliersi;
     int mnInliersi;
+    int mnBridInliersi;
 
     // Current Ransac State
     int mnIterations;
     std::vector<bool> mvbBestInliers;
+    std::vector<bool> mvbBestBridInliers;
     int mnBestInliers;
     cv::Mat mBestT12;
     cv::Mat mBestRotation;
@@ -101,9 +112,11 @@ protected:
 
     // Scale is fixed to 1 in the stereo/RGBD case
     bool mbFixScale;
+    int mMode;
 
     // Indices for random selection
     std::vector<size_t> mvAllIndices;
+    std::vector<size_t> mvAllIndicesBrid;
 
     // Projections
     std::vector<cv::Mat> mvP1im1;

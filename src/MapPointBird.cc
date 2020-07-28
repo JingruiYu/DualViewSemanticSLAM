@@ -7,16 +7,16 @@ namespace ORB_SLAM2
 long unsigned int MapPointBird::nNextId=0;
 
 MapPointBird::MapPointBird(const cv::Mat &Pos, KeyFrame* pRefKF, Map* pMap)
-:mWorldPos(Pos.clone()),mpRefKF(pRefKF),mnBALocalForKF(0),nObs(0),
-mnTrackReferenceForFrame(0),mnLastFrameSeen(0),mpMap(pMap)
+:mWorldPos(Pos.clone()),mpRefKF(pRefKF),mnBALocalForKF(0),nObs(0),mnTrackReferenceForFrame(0),
+mnLastFrameSeen(0),mnCorrectedByKF(0),mnCorrectedReference(0),mbBad(false),mpMap(pMap)
 {
     // cout<<"Construct Birdview MapPoint with KeyFrame "<<pRefKF->mnId<<endl;
     mnId = nNextId++;
 }
 
 MapPointBird::MapPointBird(const cv::Mat &Pos, Frame* pFrame, Map* pMap, const int &idxF)
-:mWorldPos(Pos.clone()),mpRefKF(static_cast<KeyFrame*>(NULL)),mnBALocalForKF(0),nObs(0),
-mnTrackReferenceForFrame(0),mnLastFrameSeen(0),mpMap(pMap)
+:mWorldPos(Pos.clone()),mpRefKF(static_cast<KeyFrame*>(NULL)),mnBALocalForKF(0),nObs(0),mnTrackReferenceForFrame(0),
+mnLastFrameSeen(0),mnCorrectedByKF(0),mnCorrectedReference(0),mbBad(false),mpMap(pMap)
 {
     // cout<<"Construct Birdview MapPoint with Frame "<<pFrame->mnId<<endl;
     mnId = nNextId++;
@@ -38,16 +38,23 @@ void MapPointBird::AddObservation(KeyFrame* pKF, size_t idx)
 
 void MapPointBird::EraseObservation(KeyFrame* pKF)
 {
-    // cout<<"Birdview MapPoint "<<mnId<<"Erase Observation for KeyFrame "<<pKF->mnId<<endl;
-    unique_lock<mutex> lock(mMutexFeatures);
-    if(mObservations.count(pKF))
+    bool bBad=false;
     {
-        nObs--;
-        mObservations.erase(pKF);
-        if(mpRefKF==pKF)
-            mpRefKF=mObservations.begin()->first;
+        unique_lock<mutex> lock(mMutexFeatures);
+        if(mObservations.count(pKF))
+        {
+            nObs--;
+            mObservations.erase(pKF);
+            if(mpRefKF==pKF)
+                mpRefKF=mObservations.begin()->first;
+            
+            if(nObs<=2)
+                bBad=true;
+        }
     }
-    // cout<<"Erase Observation Successful."<<endl;
+
+    if(bBad)
+        SetBadFlag();
 }
 
 map<KeyFrame*, size_t> MapPointBird::GetObservations()
@@ -84,6 +91,34 @@ int MapPointBird::GetIndexInKeyFrame(KeyFrame *pKF)
         return -1;
 }
 
+void MapPointBird::SetBadFlag()
+{
+    map<KeyFrame*,size_t> obs;
+    {
+        unique_lock<mutex> lock1(mMutexFeatures);
+        unique_lock<mutex> lock2(mMutexPos);
+        mbBad=true;
+        obs = mObservations;
+        mObservations.clear();
+    }
+    for(map<KeyFrame*,size_t>::iterator mit=obs.begin(), mend=obs.end(); mit!=mend; mit++)
+    {
+        KeyFrame* pKF = mit->first;
+        pKF->EraseMapPointMatchBird(mit->second);
+    }
+
+    mpMap->EraseMapPointBird(this);
+}
+
+
+bool MapPointBird::isBad()
+{
+    unique_lock<mutex> lock(mMutexFeatures);
+    unique_lock<mutex> lock2(mMutexPos);
+    return mbBad;
+}
+
+
 void MapPointBird::ComputeDistinctiveDescriptors()
 {
     // Retrieve all observed descriptors
@@ -92,6 +127,8 @@ void MapPointBird::ComputeDistinctiveDescriptors()
     map<KeyFrame*,size_t> observations;
     {
         unique_lock<mutex> lock1(mMutexFeatures);
+        if(mbBad)
+            return;
         observations=mObservations;
     }
 
@@ -155,8 +192,13 @@ cv::Mat MapPointBird::GetDescriptor()
 {
     // cout<<"Get MapPoint Bird Descriptor..."<<endl;
     unique_lock<mutex> lock(mMutexFeatures);
-    // cout<<"Get MapPoint Bird Descriptor Successful."<<endl;
-    return mDescriptor.clone();
+    if (mDescriptor.empty())
+    {
+        cout << "MapPointBird's mDescriptor is empty ...................................................." << endl;
+        return mDescriptor.clone();
+    }
+    else
+       return mDescriptor.clone();
 }
 
 int MapPointBird::Observations()

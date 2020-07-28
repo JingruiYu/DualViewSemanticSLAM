@@ -98,6 +98,8 @@ public:
 
     int SearchByMatchBird(KeyFrame *pKF, Frame &F, std::vector<MapPointBird*> &vpMapPointMatchesBird, const float r=10);
 
+    int SearchByMatchBird(KeyFrame *pKF1, KeyFrame *pKF2, std::vector<MapPointBird*> &vpMatches12, vector<int> &vnMatches12);
+
 
 public:
 

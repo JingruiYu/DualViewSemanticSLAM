@@ -87,6 +87,7 @@ public:
     void EraseMapPointMatch(const size_t &idx);
     void EraseMapPointMatch(MapPoint* pMP);
     /********************* Modified Here *********************/
+    void EraseMapPointMatchBird(const size_t &idx);
     void EraseMapPointMatchBird(MapPointBird* pMP);
     vector<MapPointBird*> GetMapPointMatchesBird();
     void ReplaceMapPointMatch(const size_t &idx, MapPoint* pMP);
@@ -150,8 +151,11 @@ public:
 
     // Variables used by the keyframe database
     long unsigned int mnLoopQuery;
+    long unsigned int mnLoopQueryBrid;
     int mnLoopWords;
+    int mnLoopWordsBird;
     float mLoopScore;
+    float mLoopScoreBrid;
     long unsigned int mnRelocQuery;
     int mnRelocWords;
     float mRelocScore;
@@ -179,11 +183,15 @@ public:
     // bool mbBirdviewRefKF = false;
     // long unsigned int mnBirdviewRefKFId;
     std::vector<cv::Point3f> mvKeysBirdCamXYZ;
+    std::vector<cv::Point2f> mvKeysBirdBaseXY;
     std::vector<cv::KeyPoint> mvKeysBird;
     vector<int> mvnBirdviewMatches21;
     std::vector<MapPointBird*> mvpMapPointsBird;
+    const cv::Mat mDescriptorsBird;
 
     //BoW
+    DBoW2::BowVector mBowVecBrid;
+    DBoW2::FeatureVector mFeatVecBrid;
     DBoW2::BowVector mBowVec;
     DBoW2::FeatureVector mFeatVec;
 

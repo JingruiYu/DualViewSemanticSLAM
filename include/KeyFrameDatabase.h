@@ -52,7 +52,7 @@ public:
    void clear();
 
    // Loop Detection
-   std::vector<KeyFrame *> DetectLoopCandidates(KeyFrame* pKF, float minScore);
+   std::vector<KeyFrame *> DetectLoopCandidates(KeyFrame* pKF, float minScore, float minScoreBird);
 
    // Relocalization
    std::vector<KeyFrame*> DetectRelocalizationCandidates(Frame* F);
@@ -64,6 +64,7 @@ protected:
 
   // Inverted file
   std::vector<list<KeyFrame*> > mvInvertedFile;
+  std::vector<list<KeyFrame*> > mvInvertedFileBrid;
 
   // Mutex
   std::mutex mMutex;

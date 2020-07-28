@@ -44,7 +44,8 @@ class KeyFrameDatabase;
 class LoopClosing
 {
 public:
-
+    typedef pair<int,int> Match;
+    
     typedef pair<set<KeyFrame*>,int> ConsistentGroup;    
     typedef map<KeyFrame*,g2o::Sim3,std::less<KeyFrame*>,
         Eigen::aligned_allocator<std::pair<const KeyFrame*, g2o::Sim3> > > KeyFrameAndPose;

@@ -202,6 +202,8 @@ public:
     // Bag of Words Vector structures.
     DBoW2::BowVector mBowVec;
     DBoW2::FeatureVector mFeatVec;
+    DBoW2::BowVector mBowVecBrid;
+    DBoW2::FeatureVector mFeatVecBrid;
 
     // ORB descriptor, each row associated to a keypoint.
     cv::Mat mDescriptors, mDescriptorsRight;

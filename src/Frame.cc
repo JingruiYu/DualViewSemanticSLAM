@@ -59,9 +59,9 @@ Frame::Frame(const Frame &frame)
      mpReferenceKFBird(frame.mpReferenceKFBird), mBirdviewImg(frame.mBirdviewImg.clone()),
      mBirdviewMask(frame.mBirdviewMask.clone()), mBirdviewContour(frame.mBirdviewContour.clone()),
      mvuRight(frame.mvuRight), mvDepth(frame.mvDepth), mBowVec(frame.mBowVec), mFeatVec(frame.mFeatVec),
-     mDescriptors(frame.mDescriptors.clone()), mDescriptorsRight(frame.mDescriptorsRight.clone()),
-     mvpMapPoints(frame.mvpMapPoints), mvbOutlier(frame.mvbOutlier), mnId(frame.mnId),
-     mpReferenceKF(frame.mpReferenceKF), mnScaleLevels(frame.mnScaleLevels),
+     mBowVecBrid(frame.mBowVecBrid), mFeatVecBrid(frame.mFeatVecBrid), mDescriptors(frame.mDescriptors.clone()), 
+     mDescriptorsRight(frame.mDescriptorsRight.clone()), mvpMapPoints(frame.mvpMapPoints), 
+     mvbOutlier(frame.mvbOutlier), mnId(frame.mnId), mpReferenceKF(frame.mpReferenceKF), mnScaleLevels(frame.mnScaleLevels),
      mfScaleFactor(frame.mfScaleFactor), mfLogScaleFactor(frame.mfLogScaleFactor),
      mvScaleFactors(frame.mvScaleFactors), mvInvScaleFactors(frame.mvInvScaleFactors),
      mvLevelSigma2(frame.mvLevelSigma2), mvInvLevelSigma2(frame.mvInvLevelSigma2),
@@ -671,6 +671,12 @@ void Frame::ComputeBoW()
     {
         vector<cv::Mat> vCurrentDesc = Converter::toDescriptorVector(mDescriptors);
         mpORBvocabulary->transform(vCurrentDesc,mBowVec,mFeatVec,4);
+    }
+
+    if(mBowVecBrid.empty())
+    {
+        vector<cv::Mat> vCurrentDescBrid = Converter::toDescriptorVector(mDescriptorsBird);
+        mpORBvocabulary->transform(vCurrentDescBrid,mBowVecBrid,mFeatVecBrid,4);
     }
 }
 

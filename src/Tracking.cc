@@ -1150,7 +1150,7 @@ bool Tracking::TrackReferenceKeyFrame(bool mSemDirect)
 
     int nmatches = matcher.SearchByBoW(mpReferenceKF,mCurrentFrame,vpMapPointMatches);
 
-    cout<<"Track Reference KeyFrame, "<<nmatches<<" Matches."<<endl;
+    // cout<<"Track Reference KeyFrame, "<<nmatches<<" Matches."<<endl;
 
     if(nmatches<15)
         return false;
@@ -1160,7 +1160,7 @@ bool Tracking::TrackReferenceKeyFrame(bool mSemDirect)
 
     if(mbHaveBirdview)
     {
-        cout<<"Search Birdview Matches."<<endl;
+        // cout<<"Search Birdview Matches."<<endl;
         vector<MapPointBird*> vpMapPointMatchesBird;
         int nmatchesbird = mpmatcherBirdview->SearchByMatchBird(mpReferenceKF,mCurrentFrame,vpMapPointMatchesBird,15);
         if(nmatchesbird<15)
@@ -1168,19 +1168,19 @@ bool Tracking::TrackReferenceKeyFrame(bool mSemDirect)
             nmatchesbird = mpmatcherBirdview->SearchByMatchBird(mpReferenceKF,mCurrentFrame,vpMapPointMatchesBird,20);
         }
         mCurrentFrame.mvpMapPointsBird = vpMapPointMatchesBird;
-        cout<<"Track Reference KeyFrame, "<<nmatchesbird<<" Birdview Matches."<<endl;
+        // cout<<"Track Reference KeyFrame, "<<nmatchesbird<<" Birdview Matches."<<endl;
 
         if (mSemDirect)
         {
             /***** Yujr TODO Add another Direct optimization *****/
             cv::Mat tmpTcw = mCurrentFrame.mTcw;
-            cout << "Tcw Reference before: " << endl << tmpTcw << endl;
+            // cout << "Tcw Reference before: " << endl << tmpTcw << endl;
             chrono::steady_clock::time_point t1 = chrono::steady_clock::now();
             Optimizer::poseDirectEstimation( mLastFrame, mCurrentFrame, tmpTcw ); 
             chrono::steady_clock::time_point t2 = chrono::steady_clock::now();
             chrono::duration<double> time_used = chrono::duration_cast<chrono::duration<double>> ( t2-t1 );
-            cout << "Tcw after: " << endl << tmpTcw << endl;
-            cout << "time_used : " << time_used.count() << endl;
+            // cout << "Tcw after: " << endl << tmpTcw << endl;
+            // cout << "time_used : " << time_used.count() << endl;
             mCurrentFrame.SetPose(tmpTcw);
         }
         Optimizer::PoseOptimizationWithBirdview(&mCurrentFrame);
@@ -1212,7 +1212,7 @@ bool Tracking::TrackReferenceKeyFrame(bool mSemDirect)
         }
     }
 
-    cout<<"After Optimization, "<<nmatches<<" Matches, "<<nmatchesMap<<" Matches in Map."<<endl;
+    // cout<<"After Optimization, "<<nmatches<<" Matches, "<<nmatchesMap<<" Matches in Map."<<endl;
 
     /********************* Modified Here *********************/
     int nmatchesBirdMap=0;
@@ -1371,7 +1371,7 @@ bool Tracking::TrackWithMotionModel(bool mSemDirect)
             fill(mCurrentFrame.mvpMapPointsBird.begin(),mCurrentFrame.mvpMapPointsBird.end(),static_cast<MapPointBird*>(NULL));
             nmatchesBird = mpmatcherBirdview->SearchByMatchBird(mCurrentFrame,mLastFrame,20);
         }
-        cout<<"Track with Motion Model, "<<nmatches<<" Matches and "<<nmatchesBird<<" Birdview Matchces."<<endl;
+        // cout<<"Track with Motion Model, "<<nmatches<<" Matches and "<<nmatchesBird<<" Birdview Matchces."<<endl;
     }
 
     if(nmatches<20)
@@ -1384,13 +1384,13 @@ bool Tracking::TrackWithMotionModel(bool mSemDirect)
         {
             /***** Yujr TODO Add another Direct optimization *****/
             cv::Mat tmpTcw = mCurrentFrame.mTcw;
-            cout << "Tcw MotionModel before: " << endl << tmpTcw << endl;
+            // cout << "Tcw MotionModel before: " << endl << tmpTcw << endl;
             chrono::steady_clock::time_point t1 = chrono::steady_clock::now();
             Optimizer::poseDirectEstimation( mLastFrame, mCurrentFrame, tmpTcw ); 
             chrono::steady_clock::time_point t2 = chrono::steady_clock::now();
             chrono::duration<double> time_used = chrono::duration_cast<chrono::duration<double>> ( t2-t1 );
-            cout << "Tcw after: " << endl << tmpTcw << endl;
-            cout << "time_used : " << time_used.count() << endl;
+            // cout << "Tcw after: " << endl << tmpTcw << endl;
+            // cout << "time_used : " << time_used.count() << endl;
             mCurrentFrame.SetPose(tmpTcw);
         }
         Optimizer::PoseOptimizationWithBirdview(&mCurrentFrame);
@@ -1427,7 +1427,7 @@ bool Tracking::TrackWithMotionModel(bool mSemDirect)
         }
     }
 
-    cout<<"After Optimization, "<<nmatches<<" Matches and "<<nmatchesMap<<" Matches in Map."<<endl;
+    // cout<<"After Optimization, "<<nmatches<<" Matches and "<<nmatchesMap<<" Matches in Map."<<endl;
 
     if(mbHaveBirdview)
     {
@@ -1451,7 +1451,7 @@ bool Tracking::TrackWithMotionModel(bool mSemDirect)
                 }
             }
         }
-        cout<<"After Optimization, "<<nmatchesBird<<" Birdview Matches."<<endl;    
+        // cout<<"After Optimization, "<<nmatchesBird<<" Birdview Matches."<<endl;    
     }
     
 
@@ -1466,7 +1466,7 @@ bool Tracking::TrackWithMotionModel(bool mSemDirect)
 
 bool Tracking::TrackLocalMap()
 {
-    cout<<"Start Track Local Map."<<endl;
+    // cout<<"Start Track Local Map."<<endl;
     // We have an estimation of the camera pose and some map points tracked in the frame.
     // We retrieve the local map and try to find matches to points in the local map.
 
@@ -1514,7 +1514,7 @@ bool Tracking::TrackLocalMap()
         }
     }
 
-    cout<<"Track Local Map, MatchesInliers = "<<mnMatchesInliers<<endl;
+    // cout<<"Track Local Map, MatchesInliers = "<<mnMatchesInliers<<endl;
 
     int nMatchesInliersBird=0;
     if(mbHaveBirdview)
@@ -1543,7 +1543,7 @@ bool Tracking::TrackLocalMap()
             }
         }  
 
-        cout<<"Track Local Map, Birdview MatchesInliers = "<<nMatchesInliersBird<<endl;
+        // cout<<"Track Local Map, Birdview MatchesInliers = "<<nMatchesInliersBird<<endl;
     }
 
     // Decide if the tracking was succesful
@@ -1736,7 +1736,7 @@ void Tracking::CreateNewKeyFrame()
                 nMPBird++;
             }
         }
-        cout<<"Insert "<<nMPBird<<" Birdview MapPoints to Map."<<endl;
+        // cout<<"Insert "<<nMPBird<<" Birdview MapPoints to Map."<<endl;
     }
 
     mpLocalMapper->InsertKeyFrame(pKF);
@@ -1749,7 +1749,7 @@ void Tracking::CreateNewKeyFrame()
 
 void Tracking::SearchLocalPoints()
 {
-    cout<<"Start Search Local Points."<<endl;
+    // cout<<"Start Search Local Points."<<endl;
     // Do not search map points already matched
     for(vector<MapPoint*>::iterator vit=mCurrentFrame.mvpMapPoints.begin(), vend=mCurrentFrame.mvpMapPoints.end(); vit!=vend; vit++)
     {
@@ -1815,7 +1815,7 @@ void Tracking::SearchLocalPoints()
 
 void Tracking::UpdateLocalMap()
 {
-    cout<<"Start Update Local Map."<<endl;
+    // cout<<"Start Update Local Map."<<endl;
     // This is for visualization
     mpMap->SetReferenceMapPoints(mvpLocalMapPoints);
 
@@ -1826,7 +1826,7 @@ void Tracking::UpdateLocalMap()
 
 void Tracking::UpdateLocalPoints()
 {
-    cout<<"Start Update Local Point."<<endl;
+    // cout<<"Start Update Local Point."<<endl;
     mvpLocalMapPoints.clear();
 
     for(vector<KeyFrame*>::const_iterator itKF=mvpLocalKeyFrames.begin(), itEndKF=mvpLocalKeyFrames.end(); itKF!=itEndKF; itKF++)
@@ -1876,7 +1876,7 @@ void Tracking::UpdateLocalPoints()
 
 void Tracking::UpdateLocalKeyFrames()
 {
-    cout<<"Start Update Local KeyFrames."<<endl;
+    // cout<<"Start Update Local KeyFrames."<<endl;
     // Each map point vote for the keyframes in which it has been observed
     map<KeyFrame*,int> keyframeCounter;
     for(int i=0; i<mCurrentFrame.N; i++)
@@ -2292,7 +2292,7 @@ void Tracking::InformOnlyTracking(const bool &flag)
 /********************* Modified Here *********************/
 void Tracking::MatchAndRetriveBirdMP()
 {
-    cout<<"Match and Retrive Bird MapPoint."<<endl;
+    // cout<<"Match and Retrive Bird MapPoint."<<endl;
 
     mvnBirdviewMatches12.clear();
     int nmatches = mpmatcherBirdview->BirdviewMatch(mLastFrame,mCurrentFrame,mvnBirdviewMatches12,10);
@@ -2300,7 +2300,7 @@ void Tracking::MatchAndRetriveBirdMP()
     {
         nmatches = mpmatcherBirdview->BirdviewMatch(mLastFrame,mCurrentFrame,mvnBirdviewMatches12,20);
     }
-    cout<<"Matched "<<nmatches<<" birdview points."<<endl;
+    // cout<<"Matched "<<nmatches<<" birdview points."<<endl;
 
     cv::Mat Twc1 = Frame::InverseTransformSE3(mLastFrame.mTcw);
     cv::Mat Tb2w = Frame::Tbc*mCurrentFrame.mTcw;
@@ -2344,93 +2344,9 @@ void Tracking::MatchAndRetriveBirdMP()
             nMap++;
         }
     }
-    cout<<"Added "<<nMap<<" map points bird"<<endl;
+    // cout<<"Added "<<nMap<<" map points bird"<<endl;
 }
-/*
-void Tracking::MatchAndRetriveBirdMP()
-{
-    mvnBirdviewMatches12.clear();
-    int nmatches = mpmatcherBirdview->BirdviewMatch(mBirdviewRefFrame,mCurrentFrame,mvnBirdviewMatches12,mvPrevMatchedBirdview,75);
-    // if matches less than 30, choose a new reference frame.
-    if(nmatches<75)
-    {
-        mBirdviewRefFrame = Frame(mLastFrame);
-        mvPrevMatchedBirdview.resize(mLastFrame.mvKeysBird.size());
-        for(int k=0;k<mLastFrame.mvKeysBird.size();k++)
-        {
-            mvPrevMatchedBirdview[k]=mLastFrame.mvKeysBird[k].pt;
-        }
-        mvnBirdviewMatches12.clear();
-        nmatches = mpmatcherBirdview->BirdviewMatch(mBirdviewRefFrame,mCurrentFrame,mvnBirdviewMatches12,mvPrevMatchedBirdview,75);
-        mvbMatchesInliersBird12.resize(mvnBirdviewMatches12.size(),false);
-        cout<<"Change Reference : "<<mBirdviewRefFrame.mnId<<" , "<<nmatches<<" matches."<<endl;
-    }
-    // select matches inliers by ICP
-    // if(mCurrentFrame.mnId-mBirdviewRefFrame.mnId>2)
-    // {
-        vector<Match> vMatchesBird;
-        for(int k=0;k<mvnBirdviewMatches12.size();k++)
-        {
-            if(mvnBirdviewMatches12[k]<0)
-                continue;
-            vMatchesBird.push_back(make_pair(k,mvnBirdviewMatches12[k]));
-        }
-        vector<bool> vbMatchesInliers(vMatchesBird.size(),false);
-        cv::Mat R12,t12;
-        float score;
-        float sigma = Frame::pixel2meter;
-        mIcp->FindRtICP2D(mBirdviewRefFrame.mvKeysBirdBaseXY,mCurrentFrame.mvKeysBirdBaseXY,vMatchesBird,vbMatchesInliers,R12,t12,score,sigma);
-        mvbMatchesInliersBird12.resize(mvnBirdviewMatches12.size(),false);
-        for(int k=0;k<vMatchesBird.size();k++)
-        {
-            if(vbMatchesInliers[k])
-            {
-                int idx1 = vMatchesBird[k].first;
-                int idx2 = vMatchesBird[k].second;
-                mvbMatchesInliersBird12[idx1]=true;
-                mCurrentFrame.mvbBirdviewInliers[idx2] = true;
-            }
-        }
-        cv::Mat T12b = cv::Mat::eye(4,4,CV_32F);
-        R12.copyTo(T12b.rowRange(0,2).colRange(0,2));
-        t12.copyTo(T12b.rowRange(0,2).col(3));
-        cv::Mat T12c = Frame::Tcb*T12b*Frame::Tbc;
-        mTcrBirdc = Frame::InverseTransformSE3(T12c);
-        mbTcrBirdUpdated = true;
-        cout<<"Reference = "<<mBirdviewRefFrame.mnId<<" , Current = "<<mCurrentFrame.mnId<<" , score = "<<score<<endl;
-    // }
 
-    cv::Mat Twc = Frame::InverseTransformSE3(mBirdviewRefFrame.mTcw);
-    for(int k=0;k<mvnBirdviewMatches12.size();k++)
-    {
-        if(mvnBirdviewMatches12[k]<0)
-            continue;
-
-        MapPointBird *pMPBird=NULL;
-
-        if(mBirdviewRefFrame.mvpMapPointsBird[k])
-        {
-            pMPBird = mBirdviewRefFrame.mvpMapPointsBird[k];
-        }
-        else
-        {
-            if(mvbMatchesInliersBird12[k])
-            {
-                cv::Mat localPos(mBirdviewRefFrame.mvKeysBirdCamXYZ[k]);
-                cv::Mat worldPos = Twc.rowRange(0,3).colRange(0,3)*localPos+Twc.rowRange(0,3).col(3);
-                pMPBird = new MapPointBird(worldPos,&mCurrentFrame,mpMap,mvnBirdviewMatches12[k]);
-                mBirdviewRefFrame.mvpMapPointsBird[k] = pMPBird;
-            }  
-        }
-
-        mCurrentFrame.mvpMapPointsBird[mvnBirdviewMatches12[k]] = pMPBird;
-
-        mpMap->AddMapPointBird(pMPBird);
-    }
-
-    DrawMatchesInliersBird();
-}
-*/
 void Tracking::DrawMatchesInliersBird()
 {
     // draw matches
@@ -2457,7 +2373,7 @@ void Tracking::DrawMatchesInliersBird()
     cv::drawMatches(mLastFrame.mBirdviewImg,mLastFrame.mvKeysBird,mCurrentFrame.mBirdviewImg,mCurrentFrame.mvKeysBird,
             vMatchesInliers12,matchesinliersImg,cv::Scalar::all(-1),cv::Scalar::all(-1),std::vector<char>(),cv::DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS);
     // cout<<"Matches between "<<mBirdviewRefFrame.mnId<<" and "<<mCurrentFrame.mnId<<endl; 
-    cout<<vMatches12.size()<<" matches, "<<vMatchesInliers12.size()<<" inliers."<<endl; 
+    // cout<<vMatches12.size()<<" matches, "<<vMatchesInliers12.size()<<" inliers."<<endl; 
     cv::imshow("birdview matches",matchesImg);
     cv::imshow("birdview matches inliers",matchesinliersImg);
 }

@@ -524,42 +524,12 @@ bool Initializer::ReconstructF(vector<bool> &vbMatchesInliers, cv::Mat &F21, cv:
     //save ICP 2D results
     file<<setprecision(6)<<mRefFrame.mTimeStamp<<" "<<mCurFrame.mTimeStamp<<" "<<t12.t()<<" "<<atan2(R12.at<float>(0,1),R12.at<float>(0,0))<<endl;
 
-
-    // // draw matches
-    // cv::Mat matchesImg;
-    // vector<cv::DMatch> vMatches12;
-    // ORBmatcher matcher(0.99,true);
-    // cout<<"Match size = "<<vbMatchesInliersBird.size()<<endl;
-    // for(int k=0;k<mvMatchesBird12.size();k++)
-    // {
-    //     if(!vbMatchesInliersBird[k])
-    //         continue;
-    //     int idx1 = mvMatchesBird12[k].first;
-    //     int idx2 = mvMatchesBird12[k].second;
-    //     cv::Mat d1 =  mRefFrame.mDescriptorsBird.row(idx1);
-    //     cv::Mat d2 =  mCurFrame.mDescriptorsBird.row(idx2);
-    //     int distance = matcher.DescriptorDistance(d1,d2);
-    //     vMatches12.push_back(cv::DMatch(idx1,idx2,distance));
-    // }
-    // cout<<"Inlier size = "<<vMatches12.size()<<"/"<<mvMatchesBird12.size()<<endl;
-    // cv::drawMatches(mRefFrame.mBirdviewImg,mvKeysBird1,mCurFrame.mBirdviewImg,mvkeysBird2,
-    //         vMatches12,matchesImg,cv::Scalar::all(-1),cv::Scalar::all(-1),std::vector<char>(),cv::DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS);
-    // cv::imshow("matches inliers inside",matchesImg);
-    // cv::waitKey(0);
-
     if(norm(t12)<0.3)
     {
         cout<<"t12<0.3"<<endl;
         return false;
     }
     
-    // cv::Mat R123D,t123D;
-    // vector<bool> vbMatchesInliersBird3D;
-    // mIcp.FindRtICP(mvKeysXYZBird1,mvKeysXYZBird2,mvMatchesBird12,vbMatchesInliersBird3D,R123D,t123D,score,sigma);
-    // cout<<"Current ICP Score = "<<score<<endl;
-    // cv::Mat R213D = R123D.t();
-    // cv::Mat t213D = -R213D*t123D;
-
     cv::Mat T12b = cv::Mat::eye(4,4,CV_32F);
     R12.copyTo(T12b.rowRange(0,2).colRange(0,2));
     t12.copyTo(T12b.rowRange(0,2).col(3));
@@ -589,51 +559,6 @@ bool Initializer::ReconstructF(vector<bool> &vbMatchesInliers, cv::Mat &F21, cv:
     cout<<"difference between R2 and R3 = "<<((cv::trace(R2*R3.t()).val[0]-1)/2)<<endl;
     t = t/norm(t);
     t = t.dot(t_icp)*t;
-
-
-    // // find homography using birdview points
-    // vector<cv::Point2f> vKeysBird1,vKeysBird2;
-    // for(int k=0;k<mvMatchesBird12.size();k++)
-    // {
-    //     vKeysBird1.push_back(mvKeysBird1[mvMatchesBird12[k].first].pt);
-    //     vKeysBird2.push_back(mvkeysBird2[mvMatchesBird12[k].second].pt);
-    // }
-    // std::vector<uchar> inliersMask(mvMatchesBird12.size());
-    // cv::Mat H21bird = cv::findHomography(vKeysBird1,vKeysBird2,cv::RANSAC,3.0,inliersMask);
-    // cv::Mat invH = H21bird.inv();
-    // int good=0;
-    // for(int k=0;k<inliersMask.size();k++)
-    // {
-    //     if(inliersMask[k])
-    //     {
-    //         good++;
-    //     }
-    // }
-    // cout<<"Homography : "<<inliersMask.size()<<" matches, "<<good<<" inliers."<<endl;
-    // cv::Point2f Ob1,Ob2;
-    // vector<cv::Point2f> vOb1,vOb2;
-    // Ob1.x = Frame::birdviewCols / 2;
-    // Ob1.y = Frame::birdviewRows / 2 + Frame::rear_axle_to_center / Frame::pixel2meter;
-    // vOb1.push_back(Ob1);
-    // cv::perspectiveTransform(vOb1,vOb2,invH);
-    // Ob2 = vOb2[0];
-    // cout<<"Ob1 = "<<Ob1.x<<" "<<Ob1.y<<endl;
-    // cout<<"Ob2 = "<<Ob2.x<<" "<<Ob2.y<<endl;
-    // cv::Point2f dt;
-    // dt.x = (Ob1.y-Ob2.y)*Frame::pixel2meter;
-    // dt.y = (Ob1.x-Ob2.x)*Frame::pixel2meter;
-    // double dth = atan2(H21bird.at<double>(0, 1), H21bird.at<double>(0, 0));
-    // cv::Mat T12b = (cv::Mat_<float>(4,4)<<cos(dth),-sin(dth),0,dt.x,
-    //                                       sin(dth), cos(dth),0,dt.y,
-    //                                         0,        0,    1,  0,
-    //                                         0,        0,    0,  1);
-    // cv::Mat T21c = Frame::Tcb*T12b.inv()*Frame::Tbc;
-    // cv::Mat R3 = T21c.rowRange(0,3).colRange(0,3);
-    // cv::Mat t_bird = T21c.rowRange(0,3).col(3);
-    // t = t/norm(t);
-    // t = t.dot(t_bird)*t;
-    // cout<<"translation = "<<dt.x<<" "<<dt.y<<" , rotation = "<<dth<<endl;
-
 
     cv::Mat t1=t;
     cv::Mat t2=-t;
