@@ -54,5 +54,6 @@
         "core": "cpp",
         "sparsecore": "cpp",
         "string": "cpp"
-    }
+    },
+    "git.ignoreLimitWarning": true
 }
