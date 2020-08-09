@@ -66,7 +66,7 @@ public:
     cv::Mat GrabImageMonocular(const cv::Mat &im, const double &timestamp);
     /********************* Modified Here *********************/
     cv::Mat GrabImageMonocularWithBirdview(const cv::Mat &im, const cv::Mat &birdview, const cv::Mat &birdviewmask, const double &timestamp);
-    cv::Mat GrabImageMonocularWithBirdviewSem(const cv::Mat &im, const cv::Mat &birdview, const cv::Mat &birdviewmask, const cv::Mat &birdviewContour, const double &timestamp);
+    cv::Mat GrabImageMonocularWithBirdviewSem(const cv::Mat &im, const cv::Mat &birdview, const cv::Mat &birdviewmask, const cv::Mat &birdviewContour, const cv::Mat &birdviewContourICP, const double &timestamp);
 
     void SetLocalMapper(LocalMapping* pLocalMapper);
     void SetLoopClosing(LoopClosing* pLoopClosing);
@@ -105,6 +105,7 @@ public:
     /********************* Modified Here *********************/
     typedef pair<int,int> Match;
     cv::Mat mBirdviewGray;
+    cv::Mat mBirdICP;
     cv::Mat mTcrBirdc;
     bool mbTcrBirdUpdated=false;
     bool mbHaveBirdview=false;

@@ -57,20 +57,6 @@ KeyFrame::KeyFrame(Frame &F, Map *pMap, KeyFrameDatabase *pKFDB):
     }
 
     SetPose(F.mTcw); 
-
-    // for(int k=0;k<mvpMapPointsBird.size();k++)
-    // {
-    //     if(mvpMapPointsBird[k])
-    //     {
-    //         MapPointBird *pMPBird = mvpMapPointsBird[k];
-    //         if(!pMPBird->mpRefKF)
-    //             pMPBird->mpRefKF=this;
-    //         pMPBird->AddObservation(this,k);
-    //         pMPBird->ComputeDistinctiveDescriptors();
-    //     }
-    // }
-
-    // mvpMapPointsBird = vector<MapPointBird*>(mvKeysBirdCamXYZ.size(),static_cast<MapPointBird*>(NULL));   
 }
 
 void KeyFrame::ComputeBoW()

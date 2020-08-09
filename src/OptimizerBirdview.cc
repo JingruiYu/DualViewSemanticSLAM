@@ -305,13 +305,6 @@ int Optimizer::PoseOptimizationWithBirdview(Frame *pFrame, Frame* pRefFrame)
     g2o::OptimizationAlgorithmLevenberg* solver = new g2o::OptimizationAlgorithmLevenberg(solver_ptr);
     optimizer.setAlgorithm(solver);
 
-    // g2o::SparseOptimizer optimizer;
-    // g2o::BlockSolverX::LinearSolverType * linearSolver;
-    // linearSolver = new g2o::LinearSolverEigen<g2o::BlockSolverX::PoseMatrixType>();
-    // g2o::BlockSolverX * solver_ptr = new g2o::BlockSolverX(linearSolver);
-    // g2o::OptimizationAlgorithmLevenberg* solver = new g2o::OptimizationAlgorithmLevenberg(solver_ptr);
-    // optimizer.setAlgorithm(solver);
-
     int nInitialCorrespondences=0;
 
     // Set Frame vertex
@@ -614,83 +607,10 @@ int Optimizer::PoseOptimizationWithBirdview(Frame *pFrame, Frame* pRefFrame)
             if(it==2)
                 e->setRobustKernel(0);
         }
-        // cout<<"nGoodBird = "<<nGoodBird<<endl;
-
-        // cout<<"Iteration : "<<it<<" , nGoodBird = "<<nGoodBird<<endl;
-
-        // int nGoodBird = 0;
-        // for(size_t i=0,iend=vpEdgesBird.size();i<iend;i++)
-        // {
-        //     EdgePointTransformSE3Quat *e = vpEdgesBird[i];
-
-        //     const size_t idx = vnIndexEdgeBird[i];
-
-        //     e->computeError();
-
-        //     const float chi2 = e->chi2();
-
-        //     if(chi2>chi2Bird[it])
-        //     {                
-        //         pFrame->mvbBirdviewInliers[idx]=false;
-        //         e->setLevel(1);
-        //     }
-        //     else
-        //     {
-        //         pFrame->mvbBirdviewInliers[idx]=true;
-        //         e->setLevel(0);
-        //         nGoodBird++;
-        //     }
-
-        //     if(it==2)
-        //         e->setRobustKernel(0);
-        // }
-        // cout<<"number of good matches in birdview : "<<nGoodBird<<endl;
-
-        // for(size_t i=0, iend=vpEdgesStereo.size(); i<iend; i++)
-        // {
-        //     g2o::EdgeStereoSE3ProjectXYZOnlyPose* e = vpEdgesStereo[i];
-
-        //     const size_t idx = vnIndexEdgeStereo[i];
-
-        //     if(pFrame->mvbOutlier[idx])
-        //     {
-        //         e->computeError();
-        //     }
-
-        //     const float chi2 = e->chi2();
-
-        //     if(chi2>chi2Stereo[it])
-        //     {
-        //         pFrame->mvbOutlier[idx]=true;
-        //         e->setLevel(1);
-        //         nBad++;
-        //     }
-        //     else
-        //     {                
-        //         e->setLevel(0);
-        //         pFrame->mvbOutlier[idx]=false;
-        //     }
-
-        //     if(it==2)
-        //         e->setRobustKernel(0);
-        // }
 
         if(optimizer.edges().size()<10)
             break;
     }
-
-
-    // vector<MapPointBird*> &vpMapPointsBird = pFrame->mvpMapPointsBird;
-    // for(int k=0;k<vpMapPointsBird.size();k++)
-    // {
-    //     if(vpMapPointsBird[k]&&!pFrame->mvbBirdviewInliers[k])
-    //     {
-    //         MapPointBird *pMPBird = vpMapPointsBird[k];
-    //         pMPBird->mpMap->EraseMapPointBird(pMPBird);
-    //         vpMapPointsBird[k] = static_cast<MapPointBird*>(NULL);
-    //     }
-    // }
-
 
     // Recover optimized pose and return number of inliers
     VertexSE3Quat *vSE3_recov = static_cast<VertexSE3Quat*>(optimizer.vertex(0));
@@ -864,16 +784,6 @@ void Optimizer::LocalBundleAdjustmentWithBirdview(KeyFrame *pKF, bool* pbStopFla
     vector<MapPointBird*> vpMapPointEdgeBird;
     vpMapPointEdgeBird.reserve(nExpectedSize);
 
-
-
-    // vector<g2o::EdgeStereoSE3ProjectXYZ*> vpEdgesStereo;
-    // vpEdgesStereo.reserve(nExpectedSize);
-
-    // vector<KeyFrame*> vpEdgeKFStereo;
-    // vpEdgeKFStereo.reserve(nExpectedSize);
-
-    // vector<MapPoint*> vpMapPointEdgeStereo;
-    // vpMapPointEdgeStereo.reserve(nExpectedSize);
 
     const float thHuberMono = sqrt(5.991);
     // const float thHuberStereo = sqrt(7.815);
@@ -1069,22 +979,6 @@ void Optimizer::LocalBundleAdjustmentWithBirdview(KeyFrame *pKF, bool* pbStopFla
         e->setRobustKernel(0);
     }
 
-    // for(size_t i=0, iend=vpEdgesStereo.size(); i<iend;i++)
-    // {
-    //     g2o::EdgeStereoSE3ProjectXYZ* e = vpEdgesStereo[i];
-    //     MapPoint* pMP = vpMapPointEdgeStereo[i];
-
-    //     if(pMP->isBad())
-    //         continue;
-
-    //     if(e->chi2()>7.815 || !e->isDepthPositive())
-    //     {
-    //         e->setLevel(1);
-    //     }
-
-    //     e->setRobustKernel(0);
-    // }
-
     // Optimize again without the outliers
 
     optimizer.initializeOptimization(0);
@@ -1133,20 +1027,6 @@ void Optimizer::LocalBundleAdjustmentWithBirdview(KeyFrame *pKF, bool* pbStopFla
         }
     }
 
-    // for(size_t i=0, iend=vpEdgesStereo.size(); i<iend;i++)
-    // {
-    //     g2o::EdgeStereoSE3ProjectXYZ* e = vpEdgesStereo[i];
-    //     MapPoint* pMP = vpMapPointEdgeStereo[i];
-
-    //     if(pMP->isBad())
-    //         continue;
-
-    //     if(e->chi2()>7.815 || !e->isDepthPositive())
-    //     {
-    //         KeyFrame* pKFi = vpEdgeKFStereo[i];
-    //         vToErase.push_back(make_pair(pKFi,pMP));
-    //     }
-    // }
 
     // Get Map Mutex
     unique_lock<mutex> lock(pMap->mMutexMapUpdate);

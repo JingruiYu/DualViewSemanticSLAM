@@ -50,6 +50,8 @@ public:
 
     cv::Mat DrawBird();
 
+    cv::Mat DrawBirdIcp();
+
     vector<cv::DMatch> mvMatchesInlierBird12;
 protected:
 
@@ -59,6 +61,7 @@ protected:
     cv::Mat mIm;
     cv::Mat mbIm;
     cv::Mat mLastbIm;
+    cv::Mat mICPMat;
     int N;
     vector<cv::KeyPoint> mvCurrentKeys;
     vector<cv::KeyPoint> mvCurrentKeysBird;

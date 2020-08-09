@@ -334,7 +334,7 @@ cv::Mat System::TrackMonocularWithBirdview(const cv::Mat &im, const cv::Mat &bir
     return Tcw;
 }
 
-cv::Mat System::TrackMonocularWithBirdviewSem(const cv::Mat &im, const cv::Mat &birdview, const cv::Mat &birdviewmask, const cv::Mat &birdviewContour, const double &timestamp)
+cv::Mat System::TrackMonocularWithBirdviewSem(const cv::Mat &im, const cv::Mat &birdview, const cv::Mat &birdviewmask, const cv::Mat &birdviewContour, const cv::Mat &birdviewContourICP, const double &timestamp)
 {
     if(mSensor!=MONOCULAR)
     {
@@ -377,7 +377,7 @@ cv::Mat System::TrackMonocularWithBirdviewSem(const cv::Mat &im, const cv::Mat &
     }
 
     //cv::Mat Tcw = mpTracker->GrabImageMonocular(im,timestamp);
-    cv::Mat Tcw = mpTracker->GrabImageMonocularWithBirdviewSem(im, birdview, birdviewmask, birdviewContour, timestamp);
+    cv::Mat Tcw = mpTracker->GrabImageMonocularWithBirdviewSem(im, birdview, birdviewmask, birdviewContour, birdviewContourICP, timestamp);
 
     unique_lock<mutex> lock2(mMutexState);
     mTrackingState = mpTracker->mState;

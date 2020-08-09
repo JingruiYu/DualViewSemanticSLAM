@@ -35,6 +35,7 @@ FrameDrawer::FrameDrawer(Map* pMap):mpMap(pMap)
     mIm = cv::Mat(480,640,CV_8UC3, cv::Scalar(0,0,0));
     mbIm = cv::Mat(480,640,CV_8UC3, cv::Scalar(0,0,0));
     mLastbIm = cv::Mat(480,640,CV_8UC3, cv::Scalar(0,0,0));
+    mICPMat = cv::Mat(480,640,CV_8UC3, cv::Scalar(0,0,0));
 }
 
 cv::Mat FrameDrawer::DrawFrame()
@@ -150,6 +151,11 @@ cv::Mat FrameDrawer::DrawBird()
     return bIm;
 }
 
+cv::Mat FrameDrawer::DrawBirdIcp()
+{
+    return mICPMat.clone();
+}
+
 void FrameDrawer::DrawTextInfo(cv::Mat &im, int nState, cv::Mat &imText)
 {
     stringstream s;
@@ -191,6 +197,7 @@ void FrameDrawer::DrawTextInfo(cv::Mat &im, int nState, cv::Mat &imText)
 void FrameDrawer::Update(Tracking *pTracker)
 {
     unique_lock<mutex> lock(mMutex);
+    pTracker->mBirdICP.copyTo(mICPMat);
     pTracker->mImGray.copyTo(mIm);
     pTracker->mCurrentFrame.mBirdviewImg.copyTo(mbIm);
     mvCurrentKeys=pTracker->mCurrentFrame.mvKeys;

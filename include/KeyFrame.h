@@ -180,8 +180,6 @@ public:
 
     /********************* Modified Here *********************/
     // Birdview Features
-    // bool mbBirdviewRefKF = false;
-    // long unsigned int mnBirdviewRefKFId;
     std::vector<cv::Point3f> mvKeysBirdCamXYZ;
     std::vector<cv::Point2f> mvKeysBirdBaseXY;
     std::vector<cv::KeyPoint> mvKeysBird;

@@ -136,8 +136,10 @@ void Viewer::Run()
 
         cv::Mat im = mpFrameDrawer->DrawFrame();
         cv::Mat bIm = mpFrameDrawer->DrawBird();
+        cv::Mat icpMat = mpFrameDrawer->DrawBirdIcp();
         cv::imshow("ORB-SLAM2: Current Frame",im);
         cv::imshow("Birdview Frame",bIm);
+        cv::imshow("Birdview icpMat",icpMat);
         cv::waitKey(mT);
 
         if(menuReset)
