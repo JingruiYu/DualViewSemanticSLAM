@@ -951,7 +951,7 @@ void Tracking::MonocularInitialization(bool mSemDirect)
             tcw.copyTo(Tcw.rowRange(0,3).col(3));
 
             /******** Add by Yujr ************/
-            if (mSemDirect)
+            if (mSemDirect && 0)
             {
                 cout << "Tcw before: " << endl << Tcw << endl;
                 chrono::steady_clock::time_point t1 = chrono::steady_clock::now();
@@ -1170,7 +1170,7 @@ bool Tracking::TrackReferenceKeyFrame(bool mSemDirect)
         mCurrentFrame.mvpMapPointsBird = vpMapPointMatchesBird;
         // cout<<"Track Reference KeyFrame, "<<nmatchesbird<<" Birdview Matches."<<endl;
 
-        if (mSemDirect)
+        if (mSemDirect && 0)
         {
             /***** Yujr TODO Add another Direct optimization *****/
             cv::Mat tmpTcw = mCurrentFrame.mTcw;
@@ -1380,7 +1380,7 @@ bool Tracking::TrackWithMotionModel(bool mSemDirect)
     // Optimize frame pose with all matches
     if(mbHaveBirdview)
     {
-        if (mSemDirect)
+        if (mSemDirect && 0)
         {
             /***** Yujr TODO Add another Direct optimization *****/
             cv::Mat tmpTcw = mCurrentFrame.mTcw;
@@ -1397,7 +1397,6 @@ bool Tracking::TrackWithMotionModel(bool mSemDirect)
         // MatchAndRetriveBirdMP();
         // Optimizer::PoseOptimizationWithBirdview(&mCurrentFrame);
         // Optimizer::PoseOptimization(&mCurrentFrame);
-        // DrawMatchesInliersBird();
         // Optimizer::PoseOptimizationWithBirdview(&mCurrentFrame,&mBirdviewRefFrame);
     }
     else
@@ -1481,7 +1480,6 @@ bool Tracking::TrackLocalMap()
         // generate more birdview mappoints
         MatchAndRetriveBirdMP();
         Optimizer::PoseOptimizationWithBirdview(&mCurrentFrame);
-        DrawMatchesInliersBird();
         // Optimizer::PoseOptimization(&mCurrentFrame);
     }
     else
@@ -2347,35 +2345,39 @@ void Tracking::MatchAndRetriveBirdMP()
     // cout<<"Added "<<nMap<<" map points bird"<<endl;
 }
 
-void Tracking::DrawMatchesInliersBird()
+
+void Tracking::GetMatchesInliersBird(vector<cv::DMatch> &vMatchesInliers12)
 {
-    // draw matches
-    cv::Mat matchesImg,matchesinliersImg;
-    vector<cv::DMatch> vMatches12,vMatchesInliers12;
-    for(size_t k=0;k<mvnBirdviewMatches12.size();k++)
+    vMatchesInliers12.clear();
+    
+    for(int k=0, kend = mvnBirdviewMatches12.size();k<kend;k++)
     {
         int idx2 = mvnBirdviewMatches12[k];
         if(idx2<0)
         {
             continue;
         }
-        cv::Mat d1 =  mLastFrame.mDescriptorsBird.row(k);
-        cv::Mat d2 =  mCurrentFrame.mDescriptorsBird.row(idx2);
-        int distance = mpmatcherBirdview->DescriptorDistance(d1,d2);
-        vMatches12.push_back(cv::DMatch(k,idx2,distance));
+        
         if(mCurrentFrame.mvbBirdviewInliers[idx2])
         {
+            if (k > mLastFrame.mDescriptorsBird.rows)
+            {
+                cout << "k: " << k << " -mLastFrame.mDescriptorsBird.rows: " << mLastFrame.mDescriptorsBird.rows << " - mLastFrame.mvKeysBird: " << mLastFrame.mvKeysBird.size() << endl;
+                continue;
+            }
+            
+            if (idx2 > mCurrentFrame.mDescriptorsBird.rows)
+            {
+                cout << "idx2: " << idx2 << " -mCurrentFrame.mDescriptorsBird.rows: " << mCurrentFrame.mDescriptorsBird.rows << " - mCurrentFrame.mvKeysBird: " << mCurrentFrame.mvKeysBird.size() << endl;
+                continue;
+            }
+
+            cv::Mat d1 =  mLastFrame.mDescriptorsBird.row(k);
+            cv::Mat d2 =  mCurrentFrame.mDescriptorsBird.row(idx2);
+            int distance = mpmatcherBirdview->DescriptorDistance(d1,d2);
             vMatchesInliers12.push_back(cv::DMatch(k,idx2,distance));
         }
     }
-    cv::drawMatches(mLastFrame.mBirdviewImg,mLastFrame.mvKeysBird,mCurrentFrame.mBirdviewImg,mCurrentFrame.mvKeysBird,
-            vMatches12,matchesImg,cv::Scalar::all(-1),cv::Scalar::all(-1),std::vector<char>(),cv::DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS);
-    cv::drawMatches(mLastFrame.mBirdviewImg,mLastFrame.mvKeysBird,mCurrentFrame.mBirdviewImg,mCurrentFrame.mvKeysBird,
-            vMatchesInliers12,matchesinliersImg,cv::Scalar::all(-1),cv::Scalar::all(-1),std::vector<char>(),cv::DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS);
-    // cout<<"Matches between "<<mBirdviewRefFrame.mnId<<" and "<<mCurrentFrame.mnId<<endl; 
-    // cout<<vMatches12.size()<<" matches, "<<vMatchesInliers12.size()<<" inliers."<<endl; 
-    cv::imshow("birdview matches",matchesImg);
-    cv::imshow("birdview matches inliers",matchesinliersImg);
 }
 
 } //namespace ORB_SLAM

@@ -59,6 +59,7 @@ int main(int argc, char **argv)
     if(mask_img.empty())
     {
         cerr<<"failed to read mask image."<<endl;
+        return 1;
     }
 
     cout << endl << "-------" << endl;
@@ -87,20 +88,28 @@ int main(int argc, char **argv)
                  << string(argv[3]) << "/" << vstrImageFilenames[ni] << endl;
             return 1;
         }
-        // if(birdview.empty())
-        // {
-        //     cerr<<endl<<"Failed to load birdview image at: "
-        //         <<string(argv[3])<<"/"<<vstrBirdviewFilenames[ni]<<endl
-        //         <<"skip image."<<endl;
-        //     continue;
-        // }
 
-        if(!birdviewmask.empty())
+        if(birdview.empty())
         {
-            // cv::Mat birdview_masked;
-            // applyMaskBirdview(birdview,birdview_masked,birdviewmask);
-            // birdview=birdview_masked.clone();
+            cerr << endl << "Failed to load image at: "
+                 << string(argv[3]) << "/" << vstrBirdviewFilenames[ni] << endl;
+            return 1;
+        }
+
+        if(birdviewmask.empty())
+        {
+            cerr << endl << "Failed to load image at: "
+                 << string(argv[3]) << "/" << vstrBirdviewMaskFilenames[ni] << endl;
+            return 1;
+        }
+        else
             ConvertMaskBirdview(birdviewmask,birdviewmask);
+        
+        if(birdviewContour.empty())
+        {
+            cerr << endl << "Failed to load image at: "
+                 << string(argv[3]) << "/" << vstrBirdviewContourFilenames[ni] << endl;
+            return 1;
         }
 
         // apply mask
@@ -230,24 +239,6 @@ void applyMaskBirdview(const cv::Mat& src, cv::Mat& dst, const cv::Mat& mask)
     }
 }
 
-// void ConvertMaskBirdview(const cv::Mat& src, cv::Mat& dst)
-// {
-//     if(src.empty())
-//         return;
-
-//     cv::Mat dst_out = cv::Mat(src.rows,src.cols,CV_8UC1);
-//     for (int i = 0; i < src.rows; ++i)
-//         for (int j = 0; j < src.cols; ++j)
-//         {
-//             cv::Vec3b pixel = src.at<cv::Vec3b>(i, j);
-//             if (pixel[1] < 20)
-//                 dst_out.at<uchar>(i, j) = 0;
-//             else
-//                 dst_out.at<uchar>(i, j) = 250;
-//         }
-
-//     dst = dst_out.clone();
-// }
 void ConvertMaskBirdview(const cv::Mat& src, cv::Mat& dst)
 {
     if(src.empty())

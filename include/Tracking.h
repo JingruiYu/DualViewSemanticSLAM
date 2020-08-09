@@ -100,6 +100,7 @@ public:
 
     // Current Frame
     Frame mCurrentFrame;
+    Frame mLastFrame;
     cv::Mat mImGray;
     /********************* Modified Here *********************/
     typedef pair<int,int> Match;
@@ -139,6 +140,8 @@ public:
 
     void Reset();
 
+    void GetMatchesInliersBird(vector<cv::DMatch> &vMatchesInliers12);
+
 protected:
 
     // Main tracking function. It is independent of the input sensor.
@@ -170,7 +173,6 @@ protected:
 
     /********************* Modified Here *********************/
     void MatchAndRetriveBirdMP();
-    void DrawMatchesInliersBird();
 
     // In case of performing only localization, this flag is true when there are no matches to
     // points in the map. Still tracking will continue if there are enough matches with temporal points.
@@ -231,7 +233,6 @@ protected:
 
     //Last Frame, KeyFrame and Relocalisation Info
     KeyFrame* mpLastKeyFrame;
-    Frame mLastFrame;
     unsigned int mnLastKeyFrameId;
     unsigned int mnLastRelocFrameId;
 
