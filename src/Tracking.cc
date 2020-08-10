@@ -330,6 +330,9 @@ cv::Mat Tracking::GrabImageMonocularWithBirdviewSem(const cv::Mat &im, const cv:
     mBirdICP = birdviewContourICP;
     mbHaveBirdview=true;
 
+    if (mBirdICP.channels() == 3)
+        cvtColor(mBirdICP, mBirdICP, CV_RGB2GRAY);
+
     // Convert front view to grayscale
     if(mImGray.channels()==3)
     {

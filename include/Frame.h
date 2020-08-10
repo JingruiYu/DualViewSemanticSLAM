@@ -32,7 +32,16 @@
 /********************* Modified Here *********************/
 #include "MapPointBird.h"
 
+#include<iostream>
 #include <opencv2/opencv.hpp>
+#include <pcl/filters/voxel_grid.h>
+#include <pcl/io/ply_io.h>
+#include <pcl/kdtree/kdtree_flann.h>
+#include <pcl/point_types.h>
+#include <pcl/point_types_conversion.h>
+#include <pcl/visualization/pcl_visualizer.h>
+
+using namespace std;
 
 namespace ORB_SLAM2
 {
@@ -118,7 +127,8 @@ public:
     static cv::Point3f TransformPoint3fWithMat(cv::Mat T, cv::Point3f p);
     static cv::Mat InverseTransformSE3(cv::Mat T12);
     // for contour
-    void  getContourPixels();
+    void getContourPixels();
+    void getICPEdges();
 
 
 public:
@@ -189,6 +199,7 @@ public:
     static const double vehicle_length;
     static const double vehicle_width;
     // birdview images
+    cv::Mat mBirdICP;
     cv::Mat mBirdviewImg;
     cv::Mat mBirdviewMask;
     // for contour
@@ -254,6 +265,8 @@ public:
     // for contour
     vector<cv::Mat> mvMeasurement_p;
     vector<float> mvMeasurement_g;
+
+    pcl::PointCloud<pcl::PointXYZ>::Ptr mCloud;//(new pcl::PointCloud<pcl::PointXYZ>);
 
 private:
 

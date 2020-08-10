@@ -53,7 +53,10 @@
         "typeinfo": "cpp",
         "core": "cpp",
         "sparsecore": "cpp",
-        "string": "cpp"
+        "string": "cpp",
+        "csignal": "cpp",
+        "condition_variable": "cpp",
+        "valarray": "cpp"
     },
     "git.ignoreLimitWarning": true
 }

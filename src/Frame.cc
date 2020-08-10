@@ -422,6 +422,7 @@ Frame::Frame(const cv::Mat &imGray, const cv::Mat &birdviewGray, const cv::Mat &
     if(mvKeys.empty())
         return;
 
+    mBirdICP = birdICP.clone();
     mBirdviewImg = birdviewGray.clone();
     mBirdviewMask = birdviewMask.clone();
     mBirdviewContour = birdviewContour.clone();
@@ -454,6 +455,10 @@ Frame::Frame(const cv::Mat &imGray, const cv::Mat &birdviewGray, const cv::Mat &
     mvpMapPointsBird = vector<MapPointBird*>(mvKeysBird.size(),static_cast<MapPointBird*>(NULL));  
 
     getContourPixels();
+
+    mCloud = pcl::PointCloud<pcl::PointXYZ>::Ptr(new pcl::PointCloud<pcl::PointXYZ>);
+    
+    getICPEdges();
 
     UndistortKeyPoints();
 
@@ -1155,6 +1160,34 @@ void Frame::getContourPixels()
             mvMeasurement_g.push_back(grayscale);
         }
     }
+}
+
+void Frame::getICPEdges()
+{
+    // get image info
+    int frame_width = mBirdICP.cols;
+    int frame_height = mBirdICP.rows;
+
+    // convert pixels to points
+    for (int row = 0; row < frame_height; row++)
+    {
+        for (int col = 0; col < frame_width; col++)
+        {
+            if (mBirdICP.at<uchar>(row,col) > 10)
+            {
+                pcl::PointXYZ point;
+                point.x = (frame_height / 2 - row) * pixel2meter + rear_axle_to_center;
+                point.y = (frame_width / 2 - col) * pixel2meter;
+                point.z = 0.0;
+
+                mCloud->points.push_back(point);
+            }
+        }
+    }
+
+    mCloud->width = mCloud->points.size();
+    mCloud->height = 1;
+    mCloud->is_dense = true;
 }
 
 } //namespace ORB_SLAM
