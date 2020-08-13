@@ -24,6 +24,15 @@
 
 #include<opencv2/core/core.hpp>
 #include<opencv2/features2d/features2d.hpp>
+#include <pcl/filters/voxel_grid.h>
+#include <pcl/io/ply_io.h>
+#include <pcl/kdtree/kdtree_flann.h>
+#include <pcl/point_types.h>
+#include <pcl/point_types_conversion.h>
+#include <pcl/visualization/pcl_visualizer.h>
+#include <pclomp/ndt_omp.h>
+#include <pcl/io/pcd_io.h>
+#include <pcl/registration/icp.h>
 
 #include"Viewer.h"
 #include"FrameDrawer.h"
@@ -159,6 +168,7 @@ protected:
     bool TrackReferenceKeyFrame(bool mSemDirect);
     void UpdateLastFrame();
     bool TrackWithMotionModel(bool mSemDirect);
+    bool TrackingWithICP(const Eigen::Matrix4f &M);
 
     bool Relocalization();
 
@@ -208,6 +218,7 @@ protected:
     Viewer* mpViewer;
     FrameDrawer* mpFrameDrawer;
     MapDrawer* mpMapDrawer;
+    pcl::visualization::PCLVisualizer vis;
 
     //Map
     Map* mpMap;

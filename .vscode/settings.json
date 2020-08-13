@@ -56,7 +56,8 @@
         "string": "cpp",
         "csignal": "cpp",
         "condition_variable": "cpp",
-        "valarray": "cpp"
+        "valarray": "cpp",
+        "numericaldiff": "cpp"
     },
     "git.ignoreLimitWarning": true
 }

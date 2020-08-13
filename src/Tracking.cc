@@ -29,7 +29,7 @@
 #include"Converter.h"
 #include"Map.h"
 #include"Initializer.h"
-
+#include"Converter.h"
 #include"Optimizer.h"
 #include"PnPsolver.h"
 
@@ -1032,8 +1032,10 @@ bool Tracking::TrackReferenceKeyFrame(bool mSemDirect)
         mCurrentFrame.mvpMapPointsBird = vpMapPointMatchesBird;
         // cout<<"Track Reference KeyFrame, "<<nmatchesbird<<" Birdview Matches."<<endl;
 
+        TrackingWithICP(Eigen::Matrix4f::Identity());
+
         if (mSemDirect && 0)
-        {
+        {    
             /***** Yujr TODO Add another Direct optimization *****/
             cv::Mat tmpTcw = mCurrentFrame.mTcw;
             // cout << "Tcw Reference before: " << endl << tmpTcw << endl;
@@ -1181,13 +1183,6 @@ bool Tracking::TrackWithMotionModel(bool mSemDirect)
     /********************* Modified Here *********************/
     if(mbHaveBirdview)
     {
-        // if(mbTcrBirdUpdated)
-        // {
-        //     mCurrentFrame.SetPose(mTcrBirdc*mBirdviewRefFrame.mTcw);
-        //     mbTcrBirdUpdated = false;
-        //     mpMapDrawer->SetCurrentCameraPose(mCurrentFrame.mTcw);
-        // }
-        // else
         {
             mCurrentFrame.SetPose(mVelocity*mLastFrame.mTcw);
             mpMapDrawer->SetCurrentCameraPose(mCurrentFrame.mTcw);
@@ -1232,6 +1227,8 @@ bool Tracking::TrackWithMotionModel(bool mSemDirect)
 
     if(nmatches<20)
         return false;
+
+    TrackingWithICP(Converter::toMatrix4f(mVelocity));
 
     // Optimize frame pose with all matches
     if(mbHaveBirdview)
@@ -1317,6 +1314,63 @@ bool Tracking::TrackWithMotionModel(bool mSemDirect)
     }
 
     return nmatchesMap>=10;
+}
+
+bool Tracking::TrackingWithICP(const Eigen::Matrix4f &M)
+{
+    Eigen::Matrix4f initTransfom = M; 
+
+    // using NDT
+    pclomp::NormalDistributionsTransform<pcl::PointXYZ, pcl::PointXYZ>::Ptr ndt_omp(
+      new pclomp::NormalDistributionsTransform<pcl::PointXYZ, pcl::PointXYZ>());
+    ndt_omp->setStepSize(0.1);
+    ndt_omp->setResolution(1.0);
+
+    ndt_omp->setInputSource(mLastFrame.mCloud);
+    ndt_omp->setInputTarget(mCurrentFrame.mCloud);
+
+    pcl::PointCloud<pcl::PointXYZ>::Ptr aligned_cloud(new pcl::PointCloud<pcl::PointXYZ>());
+    ndt_omp->align(*aligned_cloud, initTransfom);
+
+    Eigen::Matrix4f finalTransform = ndt_omp->getFinalTransformation();
+    cout << "final transform: \n" << finalTransform << endl;
+
+    double score = ndt_omp->getFitnessScore();
+    cout << "score: " << ndt_omp->getFitnessScore() << endl;
+
+    // visualization
+    // pcl::visualization::PCLVisualizer vis("viewer");
+    vis.removePointCloud("ref_cloud");
+    vis.removePointCloud("aligned_cloud");
+    vis.removeShape("vehicle");
+    pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZ> ref_handler(mLastFrame.mCloud, 0.0, 255.0, 0.0);
+    pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZ> aligned_handler(mCurrentFrame.mCloud, 255.0, 0.0, 0.0);
+
+    vis.addPointCloud(mLastFrame.mCloud, ref_handler, "ref_cloud");
+    vis.addPointCloud(aligned_cloud, aligned_handler, "aligned_cloud");
+    vis.addCube(-(Frame::vehicle_length / 2 - Frame::rear_axle_to_center),
+                Frame::vehicle_length / 2 + Frame::rear_axle_to_center, -Frame::vehicle_width / 2,
+                Frame::vehicle_width / 2, 0.0, 0.2, 255.0, 140.0, 0.0, "vehicle");
+    vis.addCoordinateSystem(1.0, 0.0, 0.0, 0.3);
+    vis.spinOnce(100);
+    vis.wasStopped();
+
+    // // using original
+    // pcl::IterativeClosestPoint<pcl::PointXYZ, pcl::PointXYZ> icp;
+    // icp.setInputCloud(mLastFrame.mCloud);
+    // icp.setInputTarget(mCurrentFrame.mCloud);
+
+    // pcl::PointCloud<pcl::PointXYZ> Final;
+    // icp.align(Final);
+    // std::cout << "has converged: " << icp.hasConverged() <<std::endl;
+
+    // //Obtain the Euclidean fitness score (e.g., sum of squared distances from the source to the target) 
+    // std::cout << "score: " <<icp.getFitnessScore() << std::endl; 
+    // std::cout << "----------------------------------------------------------"<< std::endl;
+
+    // //Get the final transformation matrix estimated by the registration method. 
+    // std::cout << icp.getFinalTransformation() << std::endl;
+    return true;
 }
 
 bool Tracking::TrackLocalMap()
