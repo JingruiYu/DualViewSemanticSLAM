@@ -61,8 +61,8 @@ Frame::Frame(const Frame &frame)
      mvuRight(frame.mvuRight), mvDepth(frame.mvDepth), mBowVec(frame.mBowVec), mFeatVec(frame.mFeatVec),
      mBowVecBrid(frame.mBowVecBrid), mFeatVecBrid(frame.mFeatVecBrid), mDescriptors(frame.mDescriptors.clone()), 
      mDescriptorsRight(frame.mDescriptorsRight.clone()), mvpMapPoints(frame.mvpMapPoints), 
-     mvbOutlier(frame.mvbOutlier), mnId(frame.mnId), mpReferenceKF(frame.mpReferenceKF), mnScaleLevels(frame.mnScaleLevels),
-     mfScaleFactor(frame.mfScaleFactor), mfLogScaleFactor(frame.mfLogScaleFactor),
+     mvbOutlier(frame.mvbOutlier), mOdomPose(frame.mOdomPose), mnId(frame.mnId), mpReferenceKF(frame.mpReferenceKF), 
+     mnScaleLevels(frame.mnScaleLevels), mfScaleFactor(frame.mfScaleFactor), mfLogScaleFactor(frame.mfLogScaleFactor),
      mvScaleFactors(frame.mvScaleFactors), mvInvScaleFactors(frame.mvInvScaleFactors),
      mvLevelSigma2(frame.mvLevelSigma2), mvInvLevelSigma2(frame.mvInvLevelSigma2),
      mvMeasurement_p(frame.mvMeasurement_p), mvMeasurement_g(frame.mvMeasurement_g), mCloud(frame.mCloud)
@@ -371,9 +371,9 @@ Frame::Frame(const cv::Mat &imGray, const cv::Mat &birdviewGray, const cv::Mat &
     mvbBirdviewInliers = vector<bool>(mvKeysBird.size(),true);
 }
 
-Frame::Frame(const cv::Mat &imGray, const cv::Mat &birdviewGray, const cv::Mat &birdICP, const cv::Mat &birdviewMask, const cv::Mat &birdviewContour, const double &timeStamp, ORBextractor* extractor,ORBVocabulary* voc, cv::Mat &K, cv::Mat &distCoef, const float &bf, const float &thDepth)
+Frame::Frame(const cv::Mat &imGray, const cv::Mat &birdviewGray, const cv::Mat &birdICP, const cv::Mat &birdviewMask, const cv::Mat &birdviewContour, const cv::Vec3d odomPose, const double &timeStamp, ORBextractor* extractor,ORBVocabulary* voc, cv::Mat &K, cv::Mat &distCoef, const float &bf, const float &thDepth)
     :mpORBvocabulary(voc),mpORBextractorLeft(extractor),mpORBextractorRight(static_cast<ORBextractor*>(NULL)), mTimeStamp(timeStamp), mK(K.clone()),
-     mDistCoef(distCoef.clone()), mbf(bf), mThDepth(thDepth),mbHaveBirdview(true),mpReferenceKFBird(static_cast<KeyFrame*>(NULL))
+     mDistCoef(distCoef.clone()), mbf(bf), mThDepth(thDepth),mbHaveBirdview(true),mpReferenceKFBird(static_cast<KeyFrame*>(NULL)),mOdomPose(odomPose)
 {
     // Frame ID
     mnId=nNextId++;

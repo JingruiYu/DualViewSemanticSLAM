@@ -79,7 +79,7 @@ int main(int argc, char **argv)
         birdviewContour = cv::imread(string(argv[3])+"/"+vstrBirdviewContourFilenames[ni], CV_LOAD_IMAGE_UNCHANGED);
         birdviewContourICP = cv::imread(string(argv[3])+"/"+vstrBirdviewContourICPFilenames[ni], CV_LOAD_IMAGE_UNCHANGED);
         double tframe = vTimestamps[ni];
-        // cv::Vec3d odomframe=vodomPose[ni];
+        cv::Vec3d odomframe=vodomPose[ni];
 
         if(im.empty())
         {
@@ -143,7 +143,7 @@ int main(int argc, char **argv)
             cout << endl << "it is frame ... " << ni << endl;
         // Pass the image to the SLAM system
         //SLAM.TrackMonocular(im,tframe);
-        SLAM.TrackMonocularWithBirdviewSem(im,birdview,birdviewmask,birdviewContour,birdviewContourICP,tframe);
+        SLAM.TrackMonocularWithBirdviewSem(im,birdview,birdviewmask,birdviewContour,birdviewContourICP,odomframe,tframe);
 
 #ifdef COMPILEDWITHC11
         std::chrono::steady_clock::time_point t2 = std::chrono::steady_clock::now();

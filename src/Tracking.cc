@@ -322,7 +322,7 @@ cv::Mat Tracking::GrabImageMonocularWithBirdview(const cv::Mat &im, const cv::Ma
     return mCurrentFrame.mTcw.clone();
 }
 
-cv::Mat Tracking::GrabImageMonocularWithBirdviewSem(const cv::Mat &im, const cv::Mat &birdview, const cv::Mat &birdviewmask, const cv::Mat &birdviewContour, const cv::Mat &birdviewContourICP, const double &timestamp)
+cv::Mat Tracking::GrabImageMonocularWithBirdviewSem(const cv::Mat &im, const cv::Mat &birdview, const cv::Mat &birdviewmask, const cv::Mat &birdviewContour, const cv::Mat &birdviewContourICP, const double &timestamp, cv::Vec3d odomPose)
 {
     mImGray = im;
     mBirdviewGray = birdview;
@@ -366,9 +366,9 @@ cv::Mat Tracking::GrabImageMonocularWithBirdviewSem(const cv::Mat &im, const cv:
 
 
     if(mState==NOT_INITIALIZED || mState==NO_IMAGES_YET)
-        mCurrentFrame = Frame(mImGray,mBirdviewGray,mBirdICP,birdviewmask,birdviewContour,timestamp,mpIniORBextractor,mpORBVocabulary,mK,mDistCoef,mbf,mThDepth);
+        mCurrentFrame = Frame(mImGray,mBirdviewGray,mBirdICP,birdviewmask,birdviewContour,odomPose,timestamp,mpIniORBextractor,mpORBVocabulary,mK,mDistCoef,mbf,mThDepth);
     else
-        mCurrentFrame = Frame(mImGray,mBirdviewGray,mBirdICP,birdviewmask,birdviewContour,timestamp,mpORBextractorLeft,mpORBVocabulary,mK,mDistCoef,mbf,mThDepth);
+        mCurrentFrame = Frame(mImGray,mBirdviewGray,mBirdICP,birdviewmask,birdviewContour,odomPose,timestamp,mpORBextractorLeft,mpORBVocabulary,mK,mDistCoef,mbf,mThDepth);
 
     
     if(!mpmatcherBirdview)
@@ -431,10 +431,21 @@ void Tracking::Track()
                     cout << "Using ICP... " << endl;
                     // Get the initial transform
                     Eigen::Matrix4f initTransform = Eigen::Matrix4f::Identity();
-                    if (!mVelocity.empty())
+
+                    cv::Mat encPose = GetEncoderPose();
+                    if (!encPose.empty())
+                    {
+                        initTransform = Converter::toMatrix4f(encPose);
+                    }
+                    else if (!mVelocity.empty())
                     {
                         initTransform = Converter::toMatrix4f(mVelocity);
-                        cout << "not empty ... " << endl;
+                    }
+                    else
+                    {
+                        cv::Mat birdICP = GetBirdICP();
+                        if (!birdICP.empty())
+                            initTransform = Converter::toMatrix4f(birdICP);
                     }
                     
                     bOK = TrackingWithICP(initTransform);
@@ -1368,7 +1379,7 @@ bool Tracking::TrackingWithICP(const Eigen::Matrix4f &M)
 
     UpdateLastFrame();
 
-    // cout << "Converter: \n" << Converter::toCVMat(finalTransform) << endl;
+    cout << "Converter: \n" << Converter::toCVMat(finalTransform) << endl;
 
     mCurrentFrame.SetPose(Converter::toCVMat(finalTransform)*mLastFrame.mTcw);
     mpMapDrawer->SetCurrentCameraPose(mCurrentFrame.mTcw);
@@ -2348,6 +2359,62 @@ void Tracking::MatchAndRetriveBirdMP()
     // cout<<"Added "<<nMap<<" map points bird"<<endl;
 }
 
+
+cv::Mat Tracking::GetEncoderPose()
+{
+    //odometer pose    
+    double x1=mLastFrame.mOdomPose[0],y1=mLastFrame.mOdomPose[1],theta1=mLastFrame.mOdomPose[2];
+    double x2=mCurrentFrame.mOdomPose[0],y2=mCurrentFrame.mOdomPose[1],theta2=mCurrentFrame.mOdomPose[2];
+
+    //pre-integration terms
+    double theta12=theta2-theta1;
+    double x12=(x2-x1)*cos(theta1)+(y2-y1)*sin(theta1);
+    double y12=(y2-y1)*cos(theta1)-(x2-x1)*sin(theta1);
+
+    //T12
+    cv::Mat T12b=(cv::Mat_<float>(4,4)<<cos(theta12),-sin(theta12),0,x12,
+                                        sin(theta12), cos(theta12),0,y12,
+                                             0,            0,      1, 0,
+                                             0,            0,      0, 1);
+
+    cv::Mat T12c = Frame::Tcb * T12b * Frame::Tbc;
+
+    return T12c.clone();
+}
+
+
+cv::Mat Tracking::GetBirdICP()
+{
+    cv::Mat T12c;
+
+    mvnBirdviewMatches12.clear();
+    int nmatches = mpmatcherBirdview->BirdviewMatch(mLastFrame,mCurrentFrame,mvnBirdviewMatches12,10);
+    
+    if (nmatches < 20)
+        return T12c.clone();
+    
+    vector<Match> vMatchesBird12;
+    for(size_t k=0;k<mvnBirdviewMatches12.size();k++)
+    {
+        if(mvnBirdviewMatches12[k]>=0)
+        {
+            vMatchesBird12.push_back(make_pair(k,mvnBirdviewMatches12[k]));
+        }
+    }
+
+    vector<bool> vbMatchesInliersBird;
+    cv::Mat R12,t12;
+    float score=0;
+    float sigma = 1.0*Frame::pixel2meter;
+    mIcp->FindRtICP2D(mLastFrame.mvKeysBirdBaseXY,mCurrentFrame.mvKeysBirdBaseXY,vMatchesBird12,vbMatchesInliersBird,R12,t12,score,sigma);
+
+    cv::Mat T12b = cv::Mat::eye(4,4,CV_32F);
+    R12.copyTo(T12b.rowRange(0,2).colRange(0,2));
+    t12.copyTo(T12b.rowRange(0,2).col(3));
+    T12c = Frame::Tcb*T12b*Frame::Tbc;
+
+    return T12c.clone();
+}
 
 void Tracking::GetMatchesInliersBird(vector<cv::DMatch> &vMatchesInliers12)
 {

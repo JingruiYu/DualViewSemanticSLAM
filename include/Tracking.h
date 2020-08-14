@@ -75,7 +75,7 @@ public:
     cv::Mat GrabImageMonocular(const cv::Mat &im, const double &timestamp);
     /********************* Modified Here *********************/
     cv::Mat GrabImageMonocularWithBirdview(const cv::Mat &im, const cv::Mat &birdview, const cv::Mat &birdviewmask, const double &timestamp);
-    cv::Mat GrabImageMonocularWithBirdviewSem(const cv::Mat &im, const cv::Mat &birdview, const cv::Mat &birdviewmask, const cv::Mat &birdviewContour, const cv::Mat &birdviewContourICP, const double &timestamp);
+    cv::Mat GrabImageMonocularWithBirdviewSem(const cv::Mat &im, const cv::Mat &birdview, const cv::Mat &birdviewmask, const cv::Mat &birdviewContour, const cv::Mat &birdviewContourICP, const double &timestamp, cv::Vec3d odomPose);
 
     void SetLocalMapper(LocalMapping* pLocalMapper);
     void SetLoopClosing(LoopClosing* pLoopClosing);
@@ -184,6 +184,8 @@ protected:
 
     /********************* Modified Here *********************/
     void MatchAndRetriveBirdMP();
+    cv::Mat GetEncoderPose();
+    cv::Mat GetBirdICP();
 
     // In case of performing only localization, this flag is true when there are no matches to
     // points in the map. Still tracking will continue if there are enough matches with temporal points.
