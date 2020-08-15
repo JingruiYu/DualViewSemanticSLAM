@@ -428,9 +428,10 @@ void Tracking::Track()
                 // MatchAndRetriveBirdMP();
                 if (mbHaveBirdview)
                 {
-                    cout << "Using ICP... " << endl;
+                    // cout << "Using ICP... " << endl;
+
                     // Get the initial transform
-                    Eigen::Matrix4f initTransform = Eigen::Matrix4f::Identity();
+                    /* Eigen::Matrix4f initTransform = Eigen::Matrix4f::Identity();
 
                     cv::Mat encPose = GetEncoderPose();
                     if (!encPose.empty())
@@ -439,44 +440,39 @@ void Tracking::Track()
                     }
                     else if (!mVelocity.empty())
                     {
-                        initTransform = Converter::toMatrix4f(mVelocity);
+                        cv::Mat tmpMat = Frame::Tbc * mVelocity * Frame::Tcb;
+                        initTransform = Converter::toMatrix4f(tmpMat);
                     }
                     else
                     {
                         cv::Mat birdICP = GetBirdICP();
                         if (!birdICP.empty())
-                            initTransform = Converter::toMatrix4f(birdICP);
+                            initTransform = Converter::toMatrix4f(birdICP);  
                     }
                     
-                    bOK = TrackingWithICP(initTransform);
-
-                    cout << "1..." << bOK << endl;
+                    bOK = TrackingWithICP(initTransform); */
 
                     if(!bOK)
                     {
-                        cout << "2..." << mVelocity.empty() << endl;
                         if (!mVelocity.empty())
                         {
-                            cout << "TrackWithMotionModel." << endl;
-                            bOK = TrackWithMotionModel(false);
+                            bOK = TrackWithMotionModel();
                             if(!bOK)
                             {
-                                cout << "TrackReferenceKeyFrame." << endl;
-                                bOK = TrackReferenceKeyFrame(false);
+                                bOK = TrackReferenceKeyFrame();
                             }
                         }
                         else
                         {
-                            bOK = TrackReferenceKeyFrame(false);
+                            bOK = TrackReferenceKeyFrame();
                         }
                     }  
-                    cout << "3..." << bOK << endl;
                 }
                 else
                 {
                     if(mVelocity.empty() || mCurrentFrame.mnId<mnLastRelocFrameId+2)
                     {
-                        bOK = TrackReferenceKeyFrame(false);
+                        bOK = TrackReferenceKeyFrame();
                         if (!bOK)
                         {
                             cout<<"No Motion Model Track Reference KeyFrame failed, tracking lost."<<endl;
@@ -484,10 +480,10 @@ void Tracking::Track()
                     }
                     else
                     {
-                        bOK = TrackWithMotionModel(false);
+                        bOK = TrackWithMotionModel();
                         if(!bOK)
                         {
-                            bOK = TrackReferenceKeyFrame(false);
+                            bOK = TrackReferenceKeyFrame();
                             if (!bOK)
                             {
                                 cout<<"No Motion Model Track Reference KeyFrame failed, tracking lost."<<endl;
@@ -517,11 +513,11 @@ void Tracking::Track()
 
                     if(!mVelocity.empty())
                     {
-                        bOK = TrackWithMotionModel(false);
+                        bOK = TrackWithMotionModel();
                     }
                     else
                     {
-                        bOK = TrackReferenceKeyFrame(false);
+                        bOK = TrackReferenceKeyFrame();
                     }
                 }
                 else
@@ -539,7 +535,7 @@ void Tracking::Track()
                     cv::Mat TcwMM;
                     if(!mVelocity.empty())
                     {
-                        bOKMM = TrackWithMotionModel(false);
+                        bOKMM = TrackWithMotionModel();
                         vpMPsMM = mCurrentFrame.mvpMapPoints;
                         vbOutMM = mCurrentFrame.mvbOutlier;
                         TcwMM = mCurrentFrame.mTcw.clone();
@@ -1033,7 +1029,7 @@ void Tracking::CheckReplacedInLastFrame()
 }
 
 
-bool Tracking::TrackReferenceKeyFrame(bool mSemDirect)
+bool Tracking::TrackReferenceKeyFrame()
 {
     // Compute Bag of Words vector
     mCurrentFrame.ComputeBoW();
@@ -1190,7 +1186,7 @@ void Tracking::UpdateLastFrame()
     }
 }
 
-bool Tracking::TrackWithMotionModel(bool mSemDirect)
+bool Tracking::TrackWithMotionModel()
 {
     ORBmatcher matcher(0.9,true);
 
@@ -1313,6 +1309,7 @@ bool Tracking::TrackWithMotionModel(bool mSemDirect)
 
     if(mbOnlyTracking)
     {
+        cout << "Is only Tracking ??????? " << endl;
         mbVO = nmatchesMap<10;
         return nmatches>20;
     }
@@ -1379,9 +1376,13 @@ bool Tracking::TrackingWithICP(const Eigen::Matrix4f &M)
 
     UpdateLastFrame();
 
-    cout << "Converter: \n" << Converter::toCVMat(finalTransform) << endl;
+    // cout << "Converter: \n" << Converter::toCVMat(finalTransform) << endl;
 
-    mCurrentFrame.SetPose(Converter::toCVMat(finalTransform)*mLastFrame.mTcw);
+    cv::Mat T12c = Frame::Tcb * Converter::toCVMat(finalTransform) * Frame::Tbc;
+
+    // cout << "T12c: \n" << T12c << endl;
+
+    mCurrentFrame.SetPose(T12c*mLastFrame.mTcw);
     mpMapDrawer->SetCurrentCameraPose(mCurrentFrame.mTcw);
 
     fill(mCurrentFrame.mvpMapPoints.begin(),mCurrentFrame.mvpMapPoints.end(),static_cast<MapPoint*>(NULL));
@@ -2377,9 +2378,7 @@ cv::Mat Tracking::GetEncoderPose()
                                              0,            0,      1, 0,
                                              0,            0,      0, 1);
 
-    cv::Mat T12c = Frame::Tcb * T12b * Frame::Tbc;
-
-    return T12c.clone();
+    return T12b.clone();
 }
 
 
@@ -2411,9 +2410,8 @@ cv::Mat Tracking::GetBirdICP()
     cv::Mat T12b = cv::Mat::eye(4,4,CV_32F);
     R12.copyTo(T12b.rowRange(0,2).colRange(0,2));
     t12.copyTo(T12b.rowRange(0,2).col(3));
-    T12c = Frame::Tcb*T12b*Frame::Tbc;
 
-    return T12c.clone();
+    return T12b.clone();
 }
 
 void Tracking::GetMatchesInliersBird(vector<cv::DMatch> &vMatchesInliers12)

@@ -165,9 +165,9 @@ protected:
     void CreateInitialMapMonocular();
 
     void CheckReplacedInLastFrame();
-    bool TrackReferenceKeyFrame(bool mSemDirect);
+    bool TrackReferenceKeyFrame();
     void UpdateLastFrame();
-    bool TrackWithMotionModel(bool mSemDirect);
+    bool TrackWithMotionModel();
     bool TrackingWithICP(const Eigen::Matrix4f &M);
 
     bool Relocalization();
