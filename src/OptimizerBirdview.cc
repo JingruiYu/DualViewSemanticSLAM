@@ -1134,5 +1134,272 @@ void Optimizer::poseDirectEstimation(const Frame &ReferenceFrame, const Frame &C
     }
 }
 
+int Optimizer::poseOptimizationFull(Frame* pCurFrame, Frame* pRefFrame)
+{
+    // 0. graph model
+    g2o::SparseOptimizer optimizer;
+
+    // 1. linearSolver
+    g2o::BlockSolverX::LinearSolverType * linearSolver;
+    linearSolver = new g2o::LinearSolverDense<g2o::BlockSolverX::PoseMatrixType>(); // linear solver using dense cholesky decomposition
+    // linearSolver = new g2o::LinearSolverEigen<g2o::BlockSolverX::PoseMatrixType>(); using sparse cholesky solver from Eigen
+    // linearSolver = new g2o::LinearSolverCSparse<g2o::BlockSolverX::PoseMatrixType>(); using CSparse
+    // linearSolver = new g2o::LinearSolverCholmod<g2o::BlockSolverX::PoseMatrixType>(); basic solver 
+
+    // 2. blockSolver
+    g2o::BlockSolverX * solver_ptr = new g2o::BlockSolverX(linearSolver);
+
+    // 3. optimizer algorithm
+    g2o::OptimizationAlgorithmLevenberg * solver = new g2o::OptimizationAlgorithmLevenberg(solver_ptr);
+
+    // 4. set solver 
+    optimizer.setAlgorithm(solver);
+    optimizer.setVerbose(true); // for output
+
+    // 5. vertex
+    g2o::VertexSE3Expmap * vSE3c = new g2o::VertexSE3Expmap();
+    vSE3c->setId(0);
+    vSE3c->setEstimate(Converter::toSE3Quat(pCurFrame->mTcw));
+    vSE3c->setFixed(false);
+    optimizer.addVertex(vSE3c);
+
+    g2o::VertexSE3Expmap * vSE3r = new g2o::VertexSE3Expmap();
+    vSE3r->setId(1);
+    vSE3r->setEstimate(Converter::toSE3Quat(pRefFrame->mTcw));
+    vSE3r->setFixed(false);
+    optimizer.addVertex(vSE3r); 
+
+    // 6. edge
+    const int Nf = pCurFrame->N;
+    vector<g2o::EdgeSE3ProjectXYZOnlyPose*> vpEdgesFront;
+    vector<size_t> vnIndexEdgeFront;
+    vpEdgesFront.reserve(Nf);
+    vnIndexEdgeFront.reserve(Nf);
+    int nFrontInitialCorrespondences = 0;
+
+    const int Nb = pCurFrame->mvbBirdviewInliers.size();
+    vector<EdgeSE3ProjectXYZ2XYZOnlyPoseQuat*> vpEdgesBird;
+    vector<size_t> vnIndexEdgeBird;
+    vpEdgesBird.reserve(Nb);
+    vnIndexEdgeBird.reserve(Nb);
+    int nBirdInitialCorrespondences = 0;
+    
+    const int Nd = pRefFrame->mvMeasurement_p.size();
+    vector<EdgeSE3ProjectDirect*> vpEdgesDirect;
+    vector<size_t> vnIndexEdgeDirect;
+    vector<bool> vOutlierDirect;
+    vpEdgesDirect.reserve(Nd);
+    vnIndexEdgeDirect.reserve(Nd);
+    vOutlierDirect = vector<bool>(Nd,false);
+
+    const float deltaMono = sqrt(5.991);
+    {
+    unique_lock<mutex> lock(MapPoint::mGlobalMutex);
+    // front pts
+    for (int i = 0; i < Nf; i++)
+    {
+        MapPoint* pMP = pCurFrame->mvpMapPoints[i];
+        if (pMP)
+        {
+            nFrontInitialCorrespondences++;
+            pCurFrame->mvbOutlier[i] = false;
+
+            Eigen::Matrix<double,2,1> obs;
+            const cv::KeyPoint &kpUn = pCurFrame->mvKeysUn[i];
+            obs << kpUn.pt.x, kpUn.pt.y;
+
+            g2o::EdgeSE3ProjectXYZOnlyPose * e = new g2o::EdgeSE3ProjectXYZOnlyPose();
+            e->setVertex(0,dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertex(0))); // TODO
+            e->setMeasurement(obs);
+            const float invSigma2 = pCurFrame->mvInvLevelSigma2[kpUn.octave]; // TODO
+            e->setInformation(Eigen::Matrix2d::Identity()*invSigma2);
+
+            g2o::RobustKernelHuber * rk = new g2o::RobustKernelHuber;
+            e->setRobustKernel(rk);
+            rk->setDelta(deltaMono);
+
+            e->fx = pCurFrame->fx;
+            e->fy = pCurFrame->fy;
+            e->cx = pCurFrame->cx;
+            e->cy = pCurFrame->cy;
+
+            cv::Mat Xw = pMP->GetWorldPos();
+            e->Xw[0] = Xw.at<float>(0);
+            e->Xw[1] = Xw.at<float>(1);
+            e->Xw[2] = Xw.at<float>(2);
+            
+            optimizer.addEdge(e);
+            vpEdgesFront.push_back(e);
+            vnIndexEdgeFront.push_back(i);
+        }
+    }
+
+    // bird pts
+    for (int i = 0; i < Nb; i++)
+    {
+        MapPointBird* pMP = pCurFrame->mvpMapPointsBird[i];
+        if (pMP)
+        {
+            nBirdInitialCorrespondences++;
+            pCurFrame->mvbBirdviewInliers[i] = true;
+            
+            Vector3d Xw = Converter::toVector3d(pMP->GetWorldPos());
+            Vector3d Xc;
+            cv::Point3f p = pCurFrame->mvKeysBirdCamXYZ[i];
+            Xc << p.x, p.y, p.z;
+
+            EdgeSE3ProjectXYZ2XYZOnlyPoseQuat * e = new EdgeSE3ProjectXYZ2XYZOnlyPoseQuat();
+            e->setVertex(0,dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertex(0)));
+            e->Xc = Xc;
+            float scale = 3.0;
+            const float invSigma2 = pCurFrame->mvInvLevelSigma2[pCurFrame->mvKeysBird[i].octave]*scale; // TODO
+            e->setInformation(Eigen::Matrix3d::Identity()*invSigma2); 
+
+            g2o::RobustKernelHuber * rk = new g2o::RobustKernelHuber;
+            e->setRobustKernel(rk);
+            rk->setDelta(deltaMono); // TODO
+
+            e->Xw = Xw;
+
+            optimizer.addEdge(e);
+            vpEdgesBird.push_back(e);
+            vnIndexEdgeBird.push_back(i);
+        }
+    }
+
+    // bird direct
+    for (int i = 0; i < Nd; i++)
+    {
+        EdgeSE3ProjectDirect * edge = new EdgeSE3ProjectDirect(
+            Converter::toVector3d(pRefFrame->mvMeasurement_p[i]),
+            pRefFrame->Tcb.rowRange(0,3).colRange(0,3),
+            pRefFrame->Tcb.rowRange(0,3).col(3),
+            pRefFrame->Rro, pRefFrame->tro,
+            pRefFrame->Ror, pRefFrame->tor,
+            pCurFrame->mBirdviewContour
+        );
+        edge->setVertex(0,dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertex(0)));
+        edge->setMeasurement(pRefFrame->mvMeasurement_g[i]);
+        edge->setInformation(Eigen::Matrix<double,1,1>::Identity());
+
+        g2o::RobustKernelHuber * rk = new g2o::RobustKernelHuber;
+        edge->setRobustKernel(rk);
+        rk->setDelta(deltaMono);
+
+        optimizer.addEdge(edge);
+        vpEdgesDirect.push_back(edge);
+        vnIndexEdgeDirect.push_back(i);
+    }
+        
+    }
+
+    if (nFrontInitialCorrespondences < 3 && nBirdInitialCorrespondences < 3)
+        return 0;
+
+    
+    
+    // 7. iteration optimization
+    const float chi2Mono[4]={5.991,5.991,5.991,5.991};
+    const int its[4]={10,10,10,10};
+    int nFrontBad = 0;
+    int nBirdBad = 0;
+    int nDirectBad = 0;
+
+    for (size_t it = 0; it < 4; it++)
+    {
+        vSE3c->setEstimate(Converter::toSE3Quat(pCurFrame->mTcw));
+        optimizer.initializeOptimization(0);
+        optimizer.optimize(its[it]);
+
+        nFrontBad = 0;
+        for (size_t i = 0, iend = vpEdgesFront.size(); i < iend; i++)
+        {
+            g2o::EdgeSE3ProjectXYZOnlyPose * e = vpEdgesFront[i];
+            const size_t idx = vnIndexEdgeFront[i];
+
+            if (pCurFrame->mvbOutlier[idx])
+                e->computeError();
+            
+            const float chi2 = e->chi2();
+            if (chi2>chi2Mono[it])
+            {
+                pCurFrame->mvbOutlier[idx] = true;
+                e->setLevel(1);
+                nFrontBad++;
+            }
+            else
+            {
+                pCurFrame->mvbOutlier[idx] = false;
+                e->setLevel(0);
+            }
+
+            if (it==2)
+                e->setRobustKernel(0); //TODO        
+        }
+
+        nBirdBad = 0;
+        for (size_t i = 0, iend = vpEdgesBird.size(); i < iend; i++)
+        {
+            EdgeSE3ProjectXYZ2XYZOnlyPoseQuat * e = vpEdgesBird[i];
+            const size_t idx = vnIndexEdgeBird[i];
+
+            if (!pCurFrame->mvbBirdviewInliers[idx])
+                e->computeError();
+            
+            const float chi2 = e->chi2();
+            if (chi2>chi2Mono[it])
+            {
+                pCurFrame->mvbBirdviewInliers[idx] = false;
+                e->setLevel(1);
+                nBirdBad++;
+            }
+            else
+            {
+                pCurFrame->mvbBirdviewInliers[idx] = true;
+                e->setLevel(0);
+            }
+            
+            if (it==2)
+                e->setRobustKernel(0); //TODO
+        }
+
+        nDirectBad = 0;
+        for (size_t i = 0, iend = vpEdgesDirect.size(); i < iend; i++)
+        {
+            EdgeSE3ProjectDirect * edge = vpEdgesDirect[i];
+            const size_t idx = vnIndexEdgeDirect[i];
+
+            if (!vOutlierDirect[idx])
+                edge->computeError();
+            
+            const float chi2 = edge->chi2();
+            if (chi2>chi2Mono[it])
+            {
+                vOutlierDirect[idx] = true;
+                edge->setLevel(1);
+                nDirectBad++;
+            }
+            else
+            {
+                vOutlierDirect[idx] = false;
+                edge->setLevel(0);
+            }
+        }
+        
+        if (optimizer.edges().size() < 10)
+            break;
+    }
+    
+    // 8. get result
+    g2o::VertexSE3Expmap * vSE3c_recov = static_cast<g2o::VertexSE3Expmap*>(optimizer.vertex(0));
+    g2o::SE3Quat SE3c_recov = vSE3c_recov->estimate();
+    cv::Mat pose = Converter::toCvMat(SE3c_recov);
+    if (1)
+    {
+        pCurFrame->SetPose(pose);
+    }
+
+    return nFrontInitialCorrespondences-nFrontBad;
+}
 
 }  // namespace ORB_SLAM2

@@ -66,6 +66,8 @@ public:
     int static PoseOptimizationWithBirdview(Frame* pFrame, Frame* pRefFrame=NULL);
 
     void static poseDirectEstimation(const Frame &ReferenceFrame, const Frame &CurrentFrame, cv::Mat &Tcw );
+
+    int static poseOptimizationFull(Frame* pCurFrame, Frame* pRefFrame);
 };
 
 } //namespace ORB_SLAM

@@ -431,7 +431,7 @@ void Tracking::Track()
                     // cout << "Using ICP... " << endl;
 
                     // Get the initial transform
-                    /* Eigen::Matrix4f initTransform = Eigen::Matrix4f::Identity();
+                    Eigen::Matrix4f initTransform = Eigen::Matrix4f::Identity();
 
                     cv::Mat encPose = GetEncoderPose();
                     if (!encPose.empty())
@@ -450,7 +450,7 @@ void Tracking::Track()
                             initTransform = Converter::toMatrix4f(birdICP);  
                     }
                     
-                    bOK = TrackingWithICP(initTransform); */
+                    bOK = TrackingWithICP(initTransform);
 
                     if(!bOK)
                     {
@@ -1422,7 +1422,7 @@ bool Tracking::TrackingWithICP(const Eigen::Matrix4f &M)
         mCurrentFrame.SetPose(tmpTcw);
     }
     Optimizer::PoseOptimizationWithBirdview(&mCurrentFrame);
-
+    Optimizer::poseOptimizationFull(&mCurrentFrame, &mLastFrame);
 
     // Discard outliers
     int nmatchesMap = 0;
