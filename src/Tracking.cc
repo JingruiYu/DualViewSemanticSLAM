@@ -1421,7 +1421,7 @@ bool Tracking::TrackingWithICP(const Eigen::Matrix4f &M)
         // cout << "time_used : " << time_used.count() << endl;
         mCurrentFrame.SetPose(tmpTcw);
     }
-    Optimizer::PoseOptimizationWithBirdview(&mCurrentFrame);
+    //Optimizer::PoseOptimizationWithBirdview(&mCurrentFrame);
     Optimizer::poseOptimizationFull(&mCurrentFrame, &mLastFrame);
 
     // Discard outliers
