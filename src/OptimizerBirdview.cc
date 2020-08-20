@@ -1184,7 +1184,7 @@ int Optimizer::poseOptimizationFull(Frame* pCurFrame, Frame* pRefFrame)
     vnIndexEdgeBird.reserve(Nb);
     int nBirdInitialCorrespondences = 0;
     
-    const int Nd = pRefFrame->mvMeasurement_p.size();
+    const int Nd = 50; //pRefFrame->mvMeasurement_p.size(); // the number of these edge should be controlled
     vector<EdgeSE3ProjectDirect*> vpEdgesDirect;
     vector<size_t> vnIndexEdgeDirect;
     vector<bool> vOutlierDirect;
@@ -1209,9 +1209,9 @@ int Optimizer::poseOptimizationFull(Frame* pCurFrame, Frame* pRefFrame)
             obs << kpUn.pt.x, kpUn.pt.y;
 
             g2o::EdgeSE3ProjectXYZOnlyPose * e = new g2o::EdgeSE3ProjectXYZOnlyPose();
-            e->setVertex(0,dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertex(0))); // TODO
+            e->setVertex(0,dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertex(0))); // dynamic_cast : type convert for class only
             e->setMeasurement(obs);
-            const float invSigma2 = pCurFrame->mvInvLevelSigma2[kpUn.octave]; // TODO
+            const float invSigma2 = pCurFrame->mvInvLevelSigma2[kpUn.octave]; // uncertainty per pixel
             e->setInformation(Eigen::Matrix2d::Identity()*invSigma2);
 
             g2o::RobustKernelHuber * rk = new g2o::RobustKernelHuber;
@@ -1252,12 +1252,12 @@ int Optimizer::poseOptimizationFull(Frame* pCurFrame, Frame* pRefFrame)
             e->setVertex(0,dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertex(0)));
             e->Xc = Xc;
             float scale = 3.0;
-            const float invSigma2 = pCurFrame->mvInvLevelSigma2[pCurFrame->mvKeysBird[i].octave]*scale; // TODO
+            const float invSigma2 = pCurFrame->mvInvLevelSigma2[pCurFrame->mvKeysBird[i].octave]*scale; // set according to the uncertainty of pixel location
             e->setInformation(Eigen::Matrix3d::Identity()*invSigma2); 
 
             g2o::RobustKernelHuber * rk = new g2o::RobustKernelHuber;
             e->setRobustKernel(rk);
-            rk->setDelta(deltaMono); // TODO
+            rk->setDelta(deltaMono); // less, more linear
 
             e->Xw = Xw;
 
@@ -1292,6 +1292,10 @@ int Optimizer::poseOptimizationFull(Frame* pCurFrame, Frame* pRefFrame)
     }
         
     }
+
+    cout << "the feature of front: ... " << vnIndexEdgeFront.size() << endl;
+    cout << "the feature of bird : ... " << vnIndexEdgeBird.size() << endl;
+    cout << "the directio of bird: ... " << vnIndexEdgeDirect.size() << endl << endl;
 
     if (nFrontInitialCorrespondences < 3 && nBirdInitialCorrespondences < 3)
         return 0;
@@ -1334,7 +1338,7 @@ int Optimizer::poseOptimizationFull(Frame* pCurFrame, Frame* pRefFrame)
             }
 
             if (it==2)
-                e->setRobustKernel(0); //TODO        
+                e->setRobustKernel(0); // means no kernel used
         }
 
         nBirdBad = 0;
@@ -1360,7 +1364,7 @@ int Optimizer::poseOptimizationFull(Frame* pCurFrame, Frame* pRefFrame)
             }
             
             if (it==2)
-                e->setRobustKernel(0); //TODO
+                e->setRobustKernel(0);
         }
 
         nDirectBad = 0;
