@@ -1,0 +1,1 @@
+Using the bird view and front view for SLAM
