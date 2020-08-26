@@ -1139,27 +1139,55 @@ cv::Mat Frame::InverseTransformSE3(cv::Mat T12)
 
 void Frame::getContourPixels()
 {
-    for (int x = 10; x < mBirdviewContour.cols-10; x++)
+    for (int row = 3; row < mBirdviewContour.rows-3; row++)
     {
-        for (int y = 0; y < mBirdviewContour.rows-10; y++)
+        for (int col = 3; col < mBirdviewContour.cols-3; col++)
         {
-            cv::Mat delta = cv::Mat::zeros(3,1,CV_32F);
-            delta.at<float>(0,0) = (mBirdviewContour.at<cv::Vec3b>(y,x+1)[0] + mBirdviewContour.at<cv::Vec3b>(y,x+1)[1] + mBirdviewContour.at<cv::Vec3b>(y,x+1)[2])
-                                    - (mBirdviewContour.at<cv::Vec3b>(y,x-1)[0] + mBirdviewContour.at<cv::Vec3b>(y,x-1)[1] + mBirdviewContour.at<cv::Vec3b>(y,x-1)[2]);
-            delta.at<float>(1,0) = (mBirdviewContour.at<cv::Vec3b>(y+1,x)[0] + mBirdviewContour.at<cv::Vec3b>(y+1,x)[1] + mBirdviewContour.at<cv::Vec3b>(y+1,x)[2])
-                                    - (mBirdviewContour.at<cv::Vec3b>(y-1,x)[0] + mBirdviewContour.at<cv::Vec3b>(y-1,x)[1] + mBirdviewContour.at<cv::Vec3b>(y-1,x)[2]);
-            
-            if ( cv::norm(delta) < 50)
-                continue;
- 
-            cv::Mat p3d = Rro * delta + tro;
-            cv::Mat KeysSemCamXYZ = Tcb.rowRange(0,3).colRange(0,3)*p3d+Tcb.rowRange(0,3).col(3);
-
-            float grayscale = float (mBirdviewContour.at<cv::Vec3b>(y,x)[0] + mBirdviewContour.at<cv::Vec3b>(y,x)[1] + mBirdviewContour.at<cv::Vec3b>(y,x)[2]);
-            mvMeasurement_p.push_back(KeysSemCamXYZ);
-            mvMeasurement_g.push_back(grayscale);
+            if (mBirdICP.at<uchar>(row,col) > 10)
+            {
+                float grayscale = float (mBirdviewContour.at<cv::Vec3b>(row,col)[0] + mBirdviewContour.at<cv::Vec3b>(row-1,col+1)[0]
+                                        + mBirdviewContour.at<cv::Vec3b>(row-2,col)[0] + mBirdviewContour.at<cv::Vec3b>(row+2,col)[0] 
+                                        + mBirdviewContour.at<cv::Vec3b>(row,col-2)[0] + mBirdviewContour.at<cv::Vec3b>(row,col+2)[0] 
+                                        + mBirdviewContour.at<cv::Vec3b>(row+1,col+1)[0] + mBirdviewContour.at<cv::Vec3b>(row-1,col-1)[0]);
+                       
+                if (grayscale < 10)
+                    continue;
+                
+                cv::Mat delta = cv::Mat::zeros(3,1,CV_32F);
+                delta.at<float>(0,0) = row;
+                delta.at<float>(1,0) = col;
+                
+                // cout << "row: " << row << "  col:  " << col << "  delta: " << delta << endl;
+                cv::Mat p3d = Rro * delta + tro;
+                cv::Mat KeysSemCamXYZ = Tcb.rowRange(0,3).colRange(0,3)*p3d+Tcb.rowRange(0,3).col(3);
+                
+                mvMeasurement_p.push_back(KeysSemCamXYZ);
+                mvMeasurement_g.push_back(grayscale);
+            }           
         }
     }
+    
+    // for (int x = 10; x < mBirdviewContour.cols-10; x++)
+    // {
+    //     for (int y = 0; y < mBirdviewContour.rows-10; y++)
+    //     {
+    //         cv::Mat delta = cv::Mat::zeros(3,1,CV_32F);
+    //         delta.at<float>(0,0) = (mBirdviewContour.at<cv::Vec3b>(y,x+1)[0] + mBirdviewContour.at<cv::Vec3b>(y,x+1)[1] + mBirdviewContour.at<cv::Vec3b>(y,x+1)[2])
+    //                                 - (mBirdviewContour.at<cv::Vec3b>(y,x-1)[0] + mBirdviewContour.at<cv::Vec3b>(y,x-1)[1] + mBirdviewContour.at<cv::Vec3b>(y,x-1)[2]);
+    //         delta.at<float>(1,0) = (mBirdviewContour.at<cv::Vec3b>(y+1,x)[0] + mBirdviewContour.at<cv::Vec3b>(y+1,x)[1] + mBirdviewContour.at<cv::Vec3b>(y+1,x)[2])
+    //                                 - (mBirdviewContour.at<cv::Vec3b>(y-1,x)[0] + mBirdviewContour.at<cv::Vec3b>(y-1,x)[1] + mBirdviewContour.at<cv::Vec3b>(y-1,x)[2]);
+            
+    //         if ( cv::norm(delta) < 50)
+    //             continue;
+ 
+    //         cv::Mat p3d = Rro * delta + tro;
+    //         cv::Mat KeysSemCamXYZ = Tcb.rowRange(0,3).colRange(0,3)*p3d+Tcb.rowRange(0,3).col(3);
+
+    //         float grayscale = float (mBirdviewContour.at<cv::Vec3b>(y,x)[0] + mBirdviewContour.at<cv::Vec3b>(y,x)[1] + mBirdviewContour.at<cv::Vec3b>(y,x)[2]);
+    //         mvMeasurement_p.push_back(KeysSemCamXYZ);
+    //         mvMeasurement_g.push_back(grayscale);
+    //     }
+    // }
 }
 
 void Frame::getICPEdges()

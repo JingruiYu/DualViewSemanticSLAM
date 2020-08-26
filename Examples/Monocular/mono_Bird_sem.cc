@@ -214,7 +214,7 @@ void LoadDataset(const string &strFile, vector<string> &vstrImageFilenames, vect
             vstrImageFilenames.push_back("image/"+image+".jpg");
             vstrBirdviewFilenames.push_back("birdview/"+image+".jpg");
             vstrBirdviewMaskFilenames.push_back("mask/"+image+".jpg");
-            vstrBirdviewContourFilenames.push_back("contour/"+image+".jpg");
+            vstrBirdviewContourFilenames.push_back("contourICPWrite/"+image+".bmp");
             vstrBirdviewContourICPFilenames.push_back("contourICP/"+image+".jpg");
         }
     }

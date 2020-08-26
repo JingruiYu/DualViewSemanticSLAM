@@ -205,12 +205,16 @@ public:
         // check x,y is in the image
         if ( x-4<0 || ( x+4 ) >image_.cols || ( y-4 ) <0 || ( y+4 ) >image_.rows || std::isnan(x) || std::isnan(y) )
         {
-            _error ( 0,0 ) = 0.0;
+            _error ( 0,0 ) = 0.0 - _measurement;
             this->setLevel ( 1 );
         }
         else
         {
-			_error ( 0,0 ) = getPixelValue ( x,y ) - _measurement;
+			float tmpPixel = getPixelValue ( x,y );
+			if (tmpPixel < 10)
+                this->setLevel ( 1 );
+
+			_error ( 0,0 ) = tmpPixel - _measurement;
         }
     }
 
@@ -224,12 +228,17 @@ protected:
     // get a gray scale value from reference image (bilinear interpolated)
     inline float getPixelValue ( float x, float y )
     {
-        int xx = int(x);
-        int yy = int(y);
+        int col = int(x);
+        int row = int(y);
 		float colorscale = 0.0;
-		if (!image_.empty())
+		if (!image_.empty() && row > 2 && row < image_.rows-3 && col > 2 && col < image_.cols - 3)
 		{
-			colorscale = float (image_.at<cv::Vec3b>(yy,xx)[0] + image_.at<cv::Vec3b>(yy,xx)[1] + image_.at<cv::Vec3b>(yy,xx)[2]);
+			// colorscale = float (image_.at<cv::Vec3b>(yy,xx)[0] + image_.at<cv::Vec3b>(yy,xx)[1] + image_.at<cv::Vec3b>(yy,xx)[2]);
+			colorscale = float (image_.at<cv::Vec3b>(row,col)[0] + image_.at<cv::Vec3b>(row-1,col+1)[0]
+								+ image_.at<cv::Vec3b>(row-2,col)[0] + image_.at<cv::Vec3b>(row+2,col)[0] 
+								+ image_.at<cv::Vec3b>(row,col-2)[0] + image_.at<cv::Vec3b>(row,col+2)[0] 
+								+ image_.at<cv::Vec3b>(row+1,col+1)[0] + image_.at<cv::Vec3b>(row-1,col-1)[0]);
+                 
 		}
 
         return colorscale;
