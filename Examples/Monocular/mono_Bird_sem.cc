@@ -211,11 +211,11 @@ void LoadDataset(const string &strFile, vector<string> &vstrImageFilenames, vect
             ss>>x>>y>>theta;
             vodomPose.push_back(cv::Vec3d(x,y,theta));
             ss >> image;
-            vstrImageFilenames.push_back("image/"+image);
-            vstrBirdviewFilenames.push_back("birdview/"+image);
-            vstrBirdviewMaskFilenames.push_back("mask/"+image);
-            vstrBirdviewContourFilenames.push_back("contour/"+image);
-            vstrBirdviewContourICPFilenames.push_back("contourICP/"+image);
+            vstrImageFilenames.push_back("image/"+image+".jpg");
+            vstrBirdviewFilenames.push_back("birdview/"+image+".jpg");
+            vstrBirdviewMaskFilenames.push_back("mask/"+image+".jpg");
+            vstrBirdviewContourFilenames.push_back("contour/"+image+".jpg");
+            vstrBirdviewContourICPFilenames.push_back("contourICP/"+image+".jpg");
         }
     }
     // double t0=vTimestamps[0];

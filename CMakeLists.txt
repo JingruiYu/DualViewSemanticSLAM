@@ -117,3 +117,7 @@ target_link_libraries(mono_Bird ${PROJECT_NAME})
 add_executable(mono_Bird_sem
 Examples/Monocular/mono_Bird_sem.cc)
 target_link_libraries(mono_Bird_sem ${PROJECT_NAME})
+
+add_executable(semanticDB
+Examples/Direct/semanticDB.cpp)
+target_link_libraries(semanticDB ${PROJECT_NAME})
