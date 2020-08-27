@@ -31,6 +31,12 @@
 #include "MapPointBird.h"
 
 #include <mutex>
+#include <pcl/filters/voxel_grid.h>
+#include <pcl/io/ply_io.h>
+#include <pcl/kdtree/kdtree_flann.h>
+#include <pcl/point_types.h>
+#include <pcl/point_types_conversion.h>
+#include <pcl/visualization/pcl_visualizer.h>
 
 
 namespace ORB_SLAM2
@@ -216,6 +222,7 @@ public:
     vector<cv::Mat> mvMeasurement_p;
     vector<float> mvMeasurement_g;
     
+    pcl::PointCloud<pcl::PointXYZ>::Ptr mKeyCloud;
     // The following variables need to be accessed trough a mutex to be thread safe.
 protected:
 

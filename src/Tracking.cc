@@ -1327,7 +1327,8 @@ bool Tracking::TrackingWithICP(const Eigen::Matrix4f &M)
     ndt_omp->setStepSize(0.1);
     ndt_omp->setResolution(1.0);
 
-    ndt_omp->setInputSource(mLastFrame.mCloud);
+    // ndt_omp->setInputSource(mLastFrame.mCloud);
+    ndt_omp->setInputSource(mpReferenceKF->mKeyCloud);
     ndt_omp->setInputTarget(mCurrentFrame.mCloud);
 
     pcl::PointCloud<pcl::PointXYZ>::Ptr aligned_cloud(new pcl::PointCloud<pcl::PointXYZ>());
@@ -1339,6 +1340,9 @@ bool Tracking::TrackingWithICP(const Eigen::Matrix4f &M)
     double score = ndt_omp->getFitnessScore();
     // cout << "score: " << ndt_omp->getFitnessScore() << endl;
 
+    if (score > 2)
+        finalTransform = M;
+    
     // visualization
     // pcl::visualization::PCLVisualizer vis("viewer");
     vis.removePointCloud("ref_cloud");
