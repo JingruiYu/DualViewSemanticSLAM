@@ -1154,7 +1154,7 @@ int Optimizer::poseOptimizationFull(Frame* pCurFrame, Frame* pRefFrame)
 
     // 4. set solver 
     optimizer.setAlgorithm(solver);
-    optimizer.setVerbose(true); // for output
+    optimizer.setVerbose(false); // for output
 
     // 5. vertex
     g2o::VertexSE3Expmap * vSE3c = new g2o::VertexSE3Expmap();

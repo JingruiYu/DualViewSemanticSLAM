@@ -49,7 +49,7 @@ namespace ORB_SLAM2
 Tracking::Tracking(System *pSys, ORBVocabulary* pVoc, FrameDrawer *pFrameDrawer, MapDrawer *pMapDrawer, Map *pMap, KeyFrameDatabase* pKFDB, const string &strSettingPath, const int sensor):
     mState(NO_IMAGES_YET), mSensor(sensor),  
     ndt_aligner_ptr_(new pclomp::NormalDistributionsTransform<birdseye_odometry::SemanticPoint, birdseye_odometry::SemanticPoint>()),      
-    viewer_ptr_(new pcl::visualization::PCLVisualizer("viewer")),
+    viewer_ptr_(new pcl::visualization::PCLVisualizer("viewer")), localCloud(new birdseye_odometry::SemanticCloud),
     mbOnlyTracking(false), mbVO(false), mpORBVocabulary(pVoc),
     mpKeyFrameDB(pKFDB), mpInitializer(static_cast<Initializer*>(NULL)), mpSystem(pSys), mpViewer(NULL),
     mpFrameDrawer(pFrameDrawer), mpMapDrawer(pMapDrawer), mpMap(pMap), mnLastRelocFrameId(0)
@@ -475,6 +475,7 @@ void Tracking::Track()
 
                     if(!bOK)
                     {
+                        cout << "not right ... " << endl;
                         if (!mVelocity.empty())
                         {
                             bOK = TrackWithMotionModel();
@@ -487,6 +488,10 @@ void Tracking::Track()
                         {
                             bOK = TrackReferenceKeyFrame();
                         }
+                    }
+                    else
+                    {
+                        cout << "right ... " << endl;
                     }  
                 }
                 else
@@ -908,7 +913,10 @@ void Tracking::CreateInitialMapMonocular()
     // Create KeyFrames
     KeyFrame* pKFini = new KeyFrame(mInitialFrame,mpMap,mpKeyFrameDB);
     KeyFrame* pKFcur = new KeyFrame(mCurrentFrame,mpMap,mpKeyFrameDB);
-
+    
+    localCloud = pKFcur->mKeyCloud;
+    localCloudPose = pKFcur->local_cloud_pose_;
+    
     pKFini->ComputeBoW();
     pKFcur->ComputeBoW();
 
@@ -1343,55 +1351,64 @@ bool Tracking::TrackWithMotionModel()
 
 bool Tracking::TrackingWithICP(const Eigen::Matrix4f &M)
 {
-    Eigen::Matrix4f initTransfom = M; 
-    Eigen::Matrix4f initTransform = mpReferenceKF->local_cloud_pose_.inverse() * mLastFrame.current_pose_;
-    // ndt_aligner_ptr_->setInputSource(mpReferenceKF->mKeyCloud);
-    // ndt_aligner_ptr_->setInputTarget(mCurrentFrame.mCloud);
-    
+    Eigen::Matrix4f finalTransform = M;
+    Eigen::Matrix4f initTransform = localCloudPose.inverse() * mLastFrame.current_pose_;
+
     ndt_aligner_ptr_->setInputSource(mCurrentFrame.mCloud);
-    ndt_aligner_ptr_->setInputTarget(mpReferenceKF->mKeyCloud);
+    ndt_aligner_ptr_->setInputTarget(localCloud);
 
     birdseye_odometry::SemanticCloud::Ptr aligned_cloud(new birdseye_odometry::SemanticCloud);
     // -- align and get the results
     ndt_aligner_ptr_->align(*aligned_cloud, initTransform);
     Eigen::Matrix4f relative_pose = ndt_aligner_ptr_->getFinalTransformation();
-    cout << "relative_pose: \n" << relative_pose << endl;
+    // cout << "relative_pose: \n" << relative_pose << endl;
     double score = ndt_aligner_ptr_->getFitnessScore();
     cout << "score: " << score << endl;
 
-    mCurrentFrame.current_pose_ = mpReferenceKF->local_cloud_pose_ * relative_pose;
-    trajectory_.push_back(mCurrentFrame.current_pose_);
+    if (score < 20 && true)
+    {
+        mCurrentFrame.current_pose_ = localCloudPose * relative_pose;
+        trajectory_.push_back(mCurrentFrame.current_pose_);
 
-    Eigen::Vector3f relative_trans = relative_pose.topRightCorner(3, 1);
-    Eigen::AngleAxisf relative_rot;
-    relative_rot = Eigen::Matrix3f(relative_pose.topLeftCorner(3, 3));
+        Eigen::Vector3f relative_trans = relative_pose.topRightCorner(3, 1);
+        Eigen::AngleAxisf relative_rot;
+        relative_rot = Eigen::Matrix3f(relative_pose.topLeftCorner(3, 3));
 
-    // -- threshold for updating the key cloud
-    double key_cloud_range_threshold_ = 0.5;                // m
-    double key_cloud_angle_threshold_ = 5.0 / 180.0 * M_PI; // rad
+        // -- threshold for updating the key cloud
+        // 0.1-0.1-368
+        double key_cloud_range_threshold_ = 2;                // m
+        double key_cloud_angle_threshold_ = 10 / 180.0 * M_PI; // rad
 
-    if (relative_trans.norm() > key_cloud_range_threshold_ || fabs(relative_rot.angle()) > key_cloud_angle_threshold_)
-        updateKfCloud = true;
+        if (relative_trans.norm() > key_cloud_range_threshold_ || fabs(relative_rot.angle()) > key_cloud_angle_threshold_)
+        {
+            localCloud = mCurrentFrame.mCloud;
+            localCloudPose = mCurrentFrame.current_pose_;
+            updateKfCloud = true;
+        }
+            
 
-    {    
-        // -- vehicle model
-        Eigen::Affine3f vehicle_pose;
-        vehicle_pose.matrix() = trajectory_.back();
-        viewer_ptr_->updateShapePose("vehicle", vehicle_pose);
-        viewer_ptr_->updateCoordinateSystemPose("vehicle_frame", vehicle_pose);
+        {    
+            // -- vehicle model
+            Eigen::Affine3f vehicle_pose;
+            vehicle_pose.matrix() = trajectory_.back();
+            viewer_ptr_->updateShapePose("vehicle", vehicle_pose);
+            viewer_ptr_->updateCoordinateSystemPose("vehicle_frame", vehicle_pose);
 
-        // -- trajectory
-        birdseye_odometry::SemanticPoint waypoint;
-        waypoint.x = vehicle_pose.translation()[0];
-        waypoint.y = vehicle_pose.translation()[1];
-        waypoint.z = vehicle_pose.translation()[2];
-        string waypoint_name = "waypoint" + to_string(trajectory_.size());
-        viewer_ptr_->addSphere(waypoint, 0.1, 150, 0, 0, waypoint_name);
+            // -- trajectory
+            birdseye_odometry::SemanticPoint waypoint;
+            waypoint.x = vehicle_pose.translation()[0];
+            waypoint.y = vehicle_pose.translation()[1];
+            waypoint.z = vehicle_pose.translation()[2];
+            string waypoint_name = "waypoint" + to_string(trajectory_.size());
+            viewer_ptr_->addSphere(waypoint, 0.1, 150, 0, 0, waypoint_name);
 
-        viewer_ptr_->spinOnce();
-    }    
+            viewer_ptr_->spinOnce();
+        }    
 
-    return false;
+        finalTransform = mCurrentFrame.current_pose_ * mLastFrame.current_pose_.inverse();
+    }
+    
+
     // // cout << "initial transform: \n" << initTransfom << endl;
     // // using NDT
     // pclomp::NormalDistributionsTransform<pcl::PointXYZ, pcl::PointXYZ>::Ptr ndt_omp(
@@ -1406,14 +1423,10 @@ bool Tracking::TrackingWithICP(const Eigen::Matrix4f &M)
     // pcl::PointCloud<pcl::PointXYZ>::Ptr aligned_cloud(new pcl::PointCloud<pcl::PointXYZ>());
     // ndt_omp->align(*aligned_cloud, initTransfom);
 
-    Eigen::Matrix4f finalTransform = M;
     // // cout << "final transform: \n" << finalTransform << endl;
 
     // double score = ndt_omp->getFitnessScore();
     // // cout << "score: " << ndt_omp->getFitnessScore() << endl;
-
-    if (score > 2)
-        finalTransform = M;
     
     // // visualization
     // // pcl::visualization::PCLVisualizer vis("viewer");
@@ -1521,7 +1534,7 @@ bool Tracking::TrackingWithICP(const Eigen::Matrix4f &M)
         }
     }
 
-    cout<<"After Optimization, "<<nmatches<<" Matches and "<<nmatchesMap<<" Matches in Map."<<endl;
+    // cout<<"After Optimization, "<<nmatches<<" Matches and "<<nmatchesMap<<" Matches in Map."<<endl;
 
     // Discard outliers for birdview
     // cv::Mat Twc = mCurrentFrame.mTcw.inv();
@@ -1543,7 +1556,7 @@ bool Tracking::TrackingWithICP(const Eigen::Matrix4f &M)
             }
         }
     }
-    cout<<"After Optimization, "<<nmatchesBird<<" Birdview Matches."<<endl;    
+    // cout<<"After Optimization, "<<nmatchesBird<<" Birdview Matches."<<endl;    
 
     bool isTrue = true;
     if (nmatches < 50 || nmatchesMap < 50 || nmatchesBird < 50)
@@ -1698,8 +1711,8 @@ bool Tracking::NeedNewKeyFrame()
     if(nKFs<2)
         thRefRatio = 0.4f;
 
-    // if(mSensor==System::MONOCULAR)
-    //     thRefRatio = 0.9f;
+    if(mSensor==System::MONOCULAR)
+        thRefRatio = 0.9f;
 
     // Condition 1a: More than "MaxFrames" have passed from last keyframe insertion
     const bool c1a = mCurrentFrame.mnId>=mnLastKeyFrameId+mMaxFrames;
@@ -1710,9 +1723,7 @@ bool Tracking::NeedNewKeyFrame()
     // Condition 2: Few tracked points compared to reference keyframe. Lots of visual odometry compared to map matches.
     const bool c2 = ((mnMatchesInliers<nRefMatches*thRefRatio|| bNeedToInsertClose) && mnMatchesInliers>15);
 
-    // cout<<"c1a = "<<c1a<<" , c1b = "<<c1b<<" , c1c = "<<c1c<<" , c2 = "<<c2<<", result = "<<((c1a||c1b||c1c)&&c2)<<endl;
-    // ((c1a||c1b||c1c)&&c2) ||
-    if( updateKfCloud )
+    if( (c1a||c1b||c1c)&&c2 )
     {
         // If the mapping accepts keyframes, insert keyframe.
         // Otherwise send a signal to interrupt BA

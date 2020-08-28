@@ -151,6 +151,8 @@ public:
     // viewer
     pcl::visualization::PCLVisualizer::Ptr viewer_ptr_;
     bool updateKfCloud;
+    birdseye_odometry::SemanticCloud::Ptr localCloud;
+    Eigen::Matrix4f localCloudPose;
 
     // True if local mapping is deactivated and we are performing only localization
     bool mbOnlyTracking;

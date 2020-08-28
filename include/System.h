@@ -36,6 +36,7 @@
 #include "KeyFrameDatabase.h"
 #include "ORBVocabulary.h"
 #include "Viewer.h"
+#include "simple_birdseye_odometer.h"
 
 namespace ORB_SLAM2
 {

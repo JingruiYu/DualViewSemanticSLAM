@@ -592,6 +592,7 @@ void System::SaveKeyFrameTrajectoryOdomTUM(const string &filename)
     cout << endl << "Saving keyframe trajectory to " << filename << " ..." << endl;
 
     vector<KeyFrame*> vpKFs = mpMap->GetAllKeyFrames();
+    cout << "vpKFs.size(): " << vpKFs.size() << endl;
     sort(vpKFs.begin(),vpKFs.end(),KeyFrame::lId);
 
     // Transform all keyframes so that the first keyframe is at the origin.
