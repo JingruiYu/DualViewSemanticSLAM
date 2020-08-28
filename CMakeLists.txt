@@ -27,13 +27,7 @@ endif()
 
 LIST(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake_modules)
 
-find_package(OpenCV 3.0 QUIET)
-if(NOT OpenCV_FOUND)
-   find_package(OpenCV 2.4.3 QUIET)
-   if(NOT OpenCV_FOUND)
-      message(FATAL_ERROR "OpenCV > 2.4.3 not found.")
-   endif()
-endif()
+find_package(OpenCV 3.4 REQUIRED)
 
 find_package(Eigen3 3.1.0 REQUIRED)
 find_package(Pangolin REQUIRED)
@@ -93,6 +87,8 @@ src/OdomG2oType.cc
 src/MapPointBird.cc
 src/IcpSolver.cc
 src/OptimizerBirdview.cc
+src/edge_filter_ipm.cpp
+src/simple_birdseye_odometer.cpp
 )
 
 target_link_libraries(${PROJECT_NAME}
@@ -110,14 +106,14 @@ ${PROJECT_SOURCE_DIR}/Thirdparty/g2o/lib/libg2o.so
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/Examples/Monocular)
 
-add_executable(mono_Bird
-Examples/Monocular/mono_Bird.cc)
-target_link_libraries(mono_Bird ${PROJECT_NAME})
+# add_executable(mono_Bird
+# Examples/Monocular/mono_Bird.cc)
+# target_link_libraries(mono_Bird ${PROJECT_NAME})
 
 add_executable(mono_Bird_sem
 Examples/Monocular/mono_Bird_sem.cc)
 target_link_libraries(mono_Bird_sem ${PROJECT_NAME})
 
-add_executable(semanticDB
-Examples/Direct/semanticDB.cpp)
-target_link_libraries(semanticDB ${PROJECT_NAME})
+# add_executable(semanticDB
+# Examples/Direct/semanticDB.cpp)
+# target_link_libraries(semanticDB ${PROJECT_NAME})
