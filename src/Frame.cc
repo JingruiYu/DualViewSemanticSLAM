@@ -21,6 +21,7 @@
 #include "Frame.h"
 #include "Converter.h"
 #include "ORBmatcher.h"
+#include "simple_birdseye_odometer.h"
 #include <thread>
 
 namespace ORB_SLAM2
@@ -65,7 +66,7 @@ Frame::Frame(const Frame &frame)
      mnScaleLevels(frame.mnScaleLevels), mfScaleFactor(frame.mfScaleFactor), mfLogScaleFactor(frame.mfLogScaleFactor),
      mvScaleFactors(frame.mvScaleFactors), mvInvScaleFactors(frame.mvInvScaleFactors),
      mvLevelSigma2(frame.mvLevelSigma2), mvInvLevelSigma2(frame.mvInvLevelSigma2),
-     mvMeasurement_p(frame.mvMeasurement_p), mvMeasurement_g(frame.mvMeasurement_g), mCloud(frame.mCloud)
+     mvMeasurement_p(frame.mvMeasurement_p), mvMeasurement_g(frame.mvMeasurement_g), mCloud(frame.mCloud), current_pose_(frame.current_pose_)
 {
     for(int i=0;i<FRAME_GRID_COLS;i++)
         for(int j=0; j<FRAME_GRID_ROWS; j++)
@@ -373,7 +374,7 @@ Frame::Frame(const cv::Mat &imGray, const cv::Mat &birdviewGray, const cv::Mat &
 
 Frame::Frame(const cv::Mat &imGray, const cv::Mat &birdviewGray, const cv::Mat &birdICP, const cv::Mat &birdviewMask, const cv::Mat &birdviewContour, const cv::Vec3d odomPose, const double &timeStamp, ORBextractor* extractor,ORBVocabulary* voc, cv::Mat &K, cv::Mat &distCoef, const float &bf, const float &thDepth)
     :mpORBvocabulary(voc),mpORBextractorLeft(extractor),mpORBextractorRight(static_cast<ORBextractor*>(NULL)), mTimeStamp(timeStamp), mK(K.clone()),
-     mDistCoef(distCoef.clone()), mbf(bf), mThDepth(thDepth),mbHaveBirdview(true),mpReferenceKFBird(static_cast<KeyFrame*>(NULL)),mOdomPose(odomPose)
+     mDistCoef(distCoef.clone()), mbf(bf), mThDepth(thDepth),mbHaveBirdview(true),mpReferenceKFBird(static_cast<KeyFrame*>(NULL)),mOdomPose(odomPose), mCloud(new birdseye_odometry::SemanticCloud)
 {
     // Frame ID
     mnId=nNextId++;
@@ -456,9 +457,11 @@ Frame::Frame(const cv::Mat &imGray, const cv::Mat &birdviewGray, const cv::Mat &
 
     getContourPixels();
 
-    mCloud = pcl::PointCloud<pcl::PointXYZ>::Ptr(new pcl::PointCloud<pcl::PointXYZ>);
+    // mCloud = pcl::PointCloud<pcl::PointXYZ>::Ptr(new pcl::PointCloud<pcl::PointXYZ>);
     
     getICPEdges();
+
+    current_pose_ = Eigen::Matrix4f::Identity();
 
     UndistortKeyPoints();
 
@@ -1201,15 +1204,21 @@ void Frame::getICPEdges()
     {
         for (int col = 0; col < frame_width; col++)
         {
-            if (mBirdICP.at<uchar>(row,col) > 10)
-            {
-                pcl::PointXYZ point;
-                point.x = (frame_height / 2 - row) * pixel2meter + rear_axle_to_center;
-                point.y = (frame_width / 2 - col) * pixel2meter;
-                point.z = 0.0;
-
-                mCloud->points.push_back(point);
-            }
+            int label = -1;
+            if (mBirdICP.at<uchar>(row,col) < 10)
+                continue;// free
+            else if (mBirdICP.at<uchar>(row,col) < 129)
+                label = 0; // edge
+            else
+                label = 1; // freespace
+            
+            birdseye_odometry::SemanticPoint point;
+            point.x = (frame_height / 2 - row) * pixel2meter + rear_axle_to_center;
+            point.y = (frame_width / 2 - col) * pixel2meter;
+            point.z = 0.0;
+            point.label = label;
+            
+            mCloud->points.push_back(point);
         }
     }
 

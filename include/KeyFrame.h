@@ -29,6 +29,7 @@
 #include "Frame.h"
 #include "KeyFrameDatabase.h"
 #include "MapPointBird.h"
+#include "simple_birdseye_odometer.h"
 
 #include <mutex>
 #include <pcl/filters/voxel_grid.h>
@@ -222,7 +223,9 @@ public:
     vector<cv::Mat> mvMeasurement_p;
     vector<float> mvMeasurement_g;
     
-    pcl::PointCloud<pcl::PointXYZ>::Ptr mKeyCloud;
+    birdseye_odometry::SemanticCloud::Ptr mKeyCloud;
+    Eigen::Matrix4f local_cloud_pose_;
+    // pcl::PointCloud<pcl::PointXYZ>::Ptr mKeyCloud;
     // The following variables need to be accessed trough a mutex to be thread safe.
 protected:
 

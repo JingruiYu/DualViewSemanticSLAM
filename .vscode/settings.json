@@ -59,7 +59,12 @@
         "valarray": "cpp",
         "numericaldiff": "cpp",
         "*.txx": "cpp",
-        "*.ipp": "cpp"
+        "*.ipp": "cpp",
+        "iterator": "cpp",
+        "map": "cpp",
+        "queue": "cpp",
+        "set": "cpp",
+        "stack": "cpp"
     },
     "git.ignoreLimitWarning": true
 }

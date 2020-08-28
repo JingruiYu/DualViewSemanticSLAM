@@ -42,7 +42,8 @@ KeyFrame::KeyFrame(Frame &F, Map *pMap, KeyFrameDatabase *pKFDB):
     mfScaleFactor(F.mfScaleFactor), mfLogScaleFactor(F.mfLogScaleFactor), mvScaleFactors(F.mvScaleFactors), 
     mvLevelSigma2(F.mvLevelSigma2), mvInvLevelSigma2(F.mvInvLevelSigma2), mnMinX(F.mnMinX), 
     mnMinY(F.mnMinY), mnMaxX(F.mnMaxX), mnMaxY(F.mnMaxY), mK(F.mK), mBirdviewContour(F.mBirdviewContour.clone()), 
-    mvMeasurement_p(F.mvMeasurement_p), mvMeasurement_g(F.mvMeasurement_g), mKeyCloud(F.mCloud), mvpMapPoints(F.mvpMapPoints), 
+    mvMeasurement_p(F.mvMeasurement_p), mvMeasurement_g(F.mvMeasurement_g), mKeyCloud(F.mCloud), local_cloud_pose_(F.current_pose_),
+    mvpMapPoints(F.mvpMapPoints), 
     mpKeyFrameDB(pKFDB), mpORBvocabulary(F.mpORBvocabulary), mbFirstConnection(true), mpParent(NULL),
     mbNotErase(false), mbToBeErased(false), mbBad(false), mHalfBaseline(F.mb/2), mpMap(pMap) 
 {

@@ -48,6 +48,7 @@
 #include "MapDrawer.h"
 #include "System.h"
 #include "IcpSolver.h"
+#include "simple_birdseye_odometer.h"
 
 #include <mutex>
 #include <unistd.h>
@@ -144,6 +145,11 @@ public:
     list<KeyFrame*> mlpReferences;
     list<double> mlFrameTimes;
     list<bool> mlbLost;
+
+    pclomp::NormalDistributionsTransform<birdseye_odometry::SemanticPoint, birdseye_odometry::SemanticPoint>::Ptr ndt_aligner_ptr_;
+    std::vector<Eigen::Matrix4f> trajectory_;
+    // viewer
+    pcl::visualization::PCLVisualizer::Ptr viewer_ptr_;
 
     // True if local mapping is deactivated and we are performing only localization
     bool mbOnlyTracking;

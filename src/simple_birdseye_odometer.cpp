@@ -262,32 +262,32 @@ void SimpleBirdseyeOdometer::update_local_cloud(
     // set new local cloud
     if (with_local_update && false) {
 
-      // update local cloud with new key cloud
-      *local_cloud_ += *aligned_cloud;
+      // // update local cloud with new key cloud
+      // *local_cloud_ += *aligned_cloud;
 
-      // tranform local cloud to current key pose
-      Matrix4f transform = trajectory_.back().inverse() * local_cloud_pose_;
-      SemanticCloud::Ptr new_local_cloud(new SemanticCloud);
-      transformPointCloud(*local_cloud_, *new_local_cloud, transform);
+      // // tranform local cloud to current key pose
+      // Matrix4f transform = trajectory_.back().inverse() * local_cloud_pose_;
+      // SemanticCloud::Ptr new_local_cloud(new SemanticCloud);
+      // transformPointCloud(*local_cloud_, *new_local_cloud, transform);
 
-      // remove those points out of the view
-      float view_range = 7.7; // m
+      // // remove those points out of the view
+      // float view_range = 7.7; // m
 
-      pcl::PassThrough<SemanticPoint> pass;
-      pass.setInputCloud(new_local_cloud);
+      // pcl::PassThrough<SemanticPoint> pass;
+      // pass.setInputCloud(new_local_cloud);
 
-      SemanticCloud::Ptr filtered_local_cloud(new SemanticCloud);
+      // SemanticCloud::Ptr filtered_local_cloud(new SemanticCloud);
 
-      pass.setFilterFieldName("x");
-      pass.setFilterLimits(-view_range, view_range);
-      pass.filter(*filtered_local_cloud);
+      // pass.setFilterFieldName("x");
+      // pass.setFilterLimits(-view_range, view_range);
+      // pass.filter(*filtered_local_cloud);
 
-      pass.setInputCloud(filtered_local_cloud);
-      pass.setFilterFieldName("y");
-      pass.setFilterLimits(-view_range, view_range);
-      pass.filter(*filtered_local_cloud);
+      // pass.setInputCloud(filtered_local_cloud);
+      // pass.setFilterFieldName("y");
+      // pass.setFilterLimits(-view_range, view_range);
+      // pass.filter(*filtered_local_cloud);
 
-      local_cloud_ = filtered_local_cloud;
+      // local_cloud_ = filtered_local_cloud;
     } else {
 
       // direct use the new key cloud

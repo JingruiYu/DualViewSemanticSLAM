@@ -32,6 +32,7 @@
 #include"Converter.h"
 #include"Optimizer.h"
 #include"PnPsolver.h"
+#include "simple_birdseye_odometer.h"
 
 #include<iostream>
 #include<fstream>
@@ -46,7 +47,10 @@ namespace ORB_SLAM2
 {
 
 Tracking::Tracking(System *pSys, ORBVocabulary* pVoc, FrameDrawer *pFrameDrawer, MapDrawer *pMapDrawer, Map *pMap, KeyFrameDatabase* pKFDB, const string &strSettingPath, const int sensor):
-    mState(NO_IMAGES_YET), mSensor(sensor), mbOnlyTracking(false), mbVO(false), mpORBVocabulary(pVoc),
+    mState(NO_IMAGES_YET), mSensor(sensor),  
+    ndt_aligner_ptr_(new pclomp::NormalDistributionsTransform<birdseye_odometry::SemanticPoint, birdseye_odometry::SemanticPoint>()),      
+    viewer_ptr_(new pcl::visualization::PCLVisualizer("viewer")),
+    mbOnlyTracking(false), mbVO(false), mpORBVocabulary(pVoc),
     mpKeyFrameDB(pKFDB), mpInitializer(static_cast<Initializer*>(NULL)), mpSystem(pSys), mpViewer(NULL),
     mpFrameDrawer(pFrameDrawer), mpMapDrawer(pMapDrawer), mpMap(pMap), mnLastRelocFrameId(0)
 {
@@ -148,6 +152,21 @@ Tracking::Tracking(System *pSys, ORBVocabulary* pVoc, FrameDrawer *pFrameDrawer,
             mDepthMapFactor = 1.0f/mDepthMapFactor;
     }
 
+    ndt_aligner_ptr_->setStepSize(0.1);
+    ndt_aligner_ptr_->setResolution(1.0);
+    ndt_aligner_ptr_->setNeighborhoodSearchMethod(pclomp::DIRECT7);
+    ndt_aligner_ptr_->setNumThreads(2);
+
+    int v1(0);
+    viewer_ptr_->createViewPort(0.0, 0.0, 1.0, 1.0, v1);
+    viewer_ptr_->createViewPortCamera(v1);
+    viewer_ptr_->setBackgroundColor(0, 0, 0, v1);
+    viewer_ptr_->addCube(-(Frame::vehicle_length / 2 - Frame::rear_axle_to_center),
+                         Frame::vehicle_length / 2 + Frame::rear_axle_to_center,
+                         -Frame::vehicle_width / 2, Frame::vehicle_width / 2, 0.0, 0.2, 128.0,
+                         69.0, 0.0, "vehicle", v1);
+    viewer_ptr_->addCoordinateSystem(1.0, 0.0, 0.0, 0.3, "vehicle_frame", v1);
+    viewer_ptr_->addCoordinateSystem(1.0, 0.0, 0.0, 0.0, "map_frame", v1);
 }
 
 void Tracking::SetLocalMapper(LocalMapping *pLocalMapper)
@@ -867,6 +886,9 @@ void Tracking::MonocularInitialization(bool mSemDirect)
             }
             
             mCurrentFrame.SetPose(Tcw);
+            
+            // add inital pose
+            trajectory_.push_back(Eigen::Matrix4f::Identity());
 
             CreateInitialMapMonocular();
 
@@ -1320,61 +1342,96 @@ bool Tracking::TrackWithMotionModel()
 bool Tracking::TrackingWithICP(const Eigen::Matrix4f &M)
 {
     Eigen::Matrix4f initTransfom = M; 
-    // cout << "initial transform: \n" << initTransfom << endl;
-    // using NDT
-    pclomp::NormalDistributionsTransform<pcl::PointXYZ, pcl::PointXYZ>::Ptr ndt_omp(
-      new pclomp::NormalDistributionsTransform<pcl::PointXYZ, pcl::PointXYZ>());
-    ndt_omp->setStepSize(0.1);
-    ndt_omp->setResolution(1.0);
+    Eigen::Matrix4f initTransform = mpReferenceKF->local_cloud_pose_.inverse() * mLastFrame.current_pose_;
+    // ndt_aligner_ptr_->setInputSource(mpReferenceKF->mKeyCloud);
+    // ndt_aligner_ptr_->setInputTarget(mCurrentFrame.mCloud);
+    
+    ndt_aligner_ptr_->setInputSource(mCurrentFrame.mCloud);
+    ndt_aligner_ptr_->setInputTarget(mpReferenceKF->mKeyCloud);
 
-    // ndt_omp->setInputSource(mLastFrame.mCloud);
-    ndt_omp->setInputSource(mpReferenceKF->mKeyCloud);
-    ndt_omp->setInputTarget(mCurrentFrame.mCloud);
+    birdseye_odometry::SemanticCloud::Ptr aligned_cloud(new birdseye_odometry::SemanticCloud);
+    // -- align and get the results
+    ndt_aligner_ptr_->align(*aligned_cloud, initTransform);
+    Eigen::Matrix4f relative_pose = ndt_aligner_ptr_->getFinalTransformation();
+    cout << "relative_pose: \n" << relative_pose << endl;
+    double score = ndt_aligner_ptr_->getFitnessScore();
+    cout << "score: " << score << endl;
 
-    pcl::PointCloud<pcl::PointXYZ>::Ptr aligned_cloud(new pcl::PointCloud<pcl::PointXYZ>());
-    ndt_omp->align(*aligned_cloud, initTransfom);
+    mCurrentFrame.current_pose_ = mpReferenceKF->local_cloud_pose_ * relative_pose;
+    trajectory_.push_back(mCurrentFrame.current_pose_);
 
-    Eigen::Matrix4f finalTransform = ndt_omp->getFinalTransformation();
-    // cout << "final transform: \n" << finalTransform << endl;
+    {    
+        // -- vehicle model
+        Eigen::Affine3f vehicle_pose;
+        vehicle_pose.matrix() = trajectory_.back();
+        viewer_ptr_->updateShapePose("vehicle", vehicle_pose);
+        viewer_ptr_->updateCoordinateSystemPose("vehicle_frame", vehicle_pose);
 
-    double score = ndt_omp->getFitnessScore();
-    // cout << "score: " << ndt_omp->getFitnessScore() << endl;
+        // -- trajectory
+        birdseye_odometry::SemanticPoint waypoint;
+        waypoint.x = vehicle_pose.translation()[0];
+        waypoint.y = vehicle_pose.translation()[1];
+        waypoint.z = vehicle_pose.translation()[2];
+        string waypoint_name = "waypoint" + to_string(trajectory_.size());
+        viewer_ptr_->addSphere(waypoint, 0.1, 150, 0, 0, waypoint_name);
+
+        viewer_ptr_->spinOnce();
+    }    
+    // // cout << "initial transform: \n" << initTransfom << endl;
+    // // using NDT
+    // pclomp::NormalDistributionsTransform<pcl::PointXYZ, pcl::PointXYZ>::Ptr ndt_omp(
+    //   new pclomp::NormalDistributionsTransform<pcl::PointXYZ, pcl::PointXYZ>());
+    // ndt_omp->setStepSize(0.1);
+    // ndt_omp->setResolution(1.0);
+
+    // // ndt_omp->setInputSource(mLastFrame.mCloud);
+    // ndt_omp->setInputSource(mpReferenceKF->mKeyCloud);
+    // ndt_omp->setInputTarget(mCurrentFrame.mCloud);
+
+    // pcl::PointCloud<pcl::PointXYZ>::Ptr aligned_cloud(new pcl::PointCloud<pcl::PointXYZ>());
+    // ndt_omp->align(*aligned_cloud, initTransfom);
+
+    Eigen::Matrix4f finalTransform = M;
+    // // cout << "final transform: \n" << finalTransform << endl;
+
+    // double score = ndt_omp->getFitnessScore();
+    // // cout << "score: " << ndt_omp->getFitnessScore() << endl;
 
     if (score > 2)
         finalTransform = M;
     
-    // visualization
-    // pcl::visualization::PCLVisualizer vis("viewer");
-    vis.removePointCloud("ref_cloud");
-    vis.removePointCloud("aligned_cloud");
-    vis.removeShape("vehicle");
-    pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZ> ref_handler(mLastFrame.mCloud, 0.0, 255.0, 0.0);
-    pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZ> aligned_handler(mCurrentFrame.mCloud, 255.0, 0.0, 0.0);
+    // // visualization
+    // // pcl::visualization::PCLVisualizer vis("viewer");
+    // vis.removePointCloud("ref_cloud");
+    // vis.removePointCloud("aligned_cloud");
+    // vis.removeShape("vehicle");
+    // pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZ> ref_handler(mLastFrame.mCloud, 0.0, 255.0, 0.0);
+    // pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZ> aligned_handler(mCurrentFrame.mCloud, 255.0, 0.0, 0.0);
 
-    vis.addPointCloud(mLastFrame.mCloud, ref_handler, "ref_cloud");
-    vis.addPointCloud(aligned_cloud, aligned_handler, "aligned_cloud");
-    vis.addCube(-(Frame::vehicle_length / 2 - Frame::rear_axle_to_center),
-                Frame::vehicle_length / 2 + Frame::rear_axle_to_center, -Frame::vehicle_width / 2,
-                Frame::vehicle_width / 2, 0.0, 0.2, 255.0, 140.0, 0.0, "vehicle");
-    vis.addCoordinateSystem(1.0, 0.0, 0.0, 0.3);
-    vis.spinOnce(100);
-    vis.wasStopped();
+    // vis.addPointCloud(mLastFrame.mCloud, ref_handler, "ref_cloud");
+    // vis.addPointCloud(aligned_cloud, aligned_handler, "aligned_cloud");
+    // vis.addCube(-(Frame::vehicle_length / 2 - Frame::rear_axle_to_center),
+    //             Frame::vehicle_length / 2 + Frame::rear_axle_to_center, -Frame::vehicle_width / 2,
+    //             Frame::vehicle_width / 2, 0.0, 0.2, 255.0, 140.0, 0.0, "vehicle");
+    // vis.addCoordinateSystem(1.0, 0.0, 0.0, 0.3);
+    // vis.spinOnce(100);
+    // vis.wasStopped();
 
-    // // using original
-    // pcl::IterativeClosestPoint<pcl::PointXYZ, pcl::PointXYZ> icp;
-    // icp.setInputCloud(mLastFrame.mCloud);
-    // icp.setInputTarget(mCurrentFrame.mCloud);
+    // // // using original
+    // // pcl::IterativeClosestPoint<pcl::PointXYZ, pcl::PointXYZ> icp;
+    // // icp.setInputCloud(mLastFrame.mCloud);
+    // // icp.setInputTarget(mCurrentFrame.mCloud);
 
-    // pcl::PointCloud<pcl::PointXYZ> Final;
-    // icp.align(Final);
-    // std::cout << "has converged: " << icp.hasConverged() <<std::endl;
+    // // pcl::PointCloud<pcl::PointXYZ> Final;
+    // // icp.align(Final);
+    // // std::cout << "has converged: " << icp.hasConverged() <<std::endl;
 
-    // //Obtain the Euclidean fitness score (e.g., sum of squared distances from the source to the target) 
-    // std::cout << "score: " <<icp.getFitnessScore() << std::endl; 
-    // std::cout << "----------------------------------------------------------"<< std::endl;
+    // // //Obtain the Euclidean fitness score (e.g., sum of squared distances from the source to the target) 
+    // // std::cout << "score: " <<icp.getFitnessScore() << std::endl; 
+    // // std::cout << "----------------------------------------------------------"<< std::endl;
 
-    // //Get the final transformation matrix estimated by the registration method. 
-    // std::cout << icp.getFinalTransformation() << std::endl;
+    // // //Get the final transformation matrix estimated by the registration method. 
+    // // std::cout << icp.getFinalTransformation() << std::endl;
 
     ORBmatcher matcher(0.9,true);
 

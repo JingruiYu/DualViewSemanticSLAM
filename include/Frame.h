@@ -31,6 +31,7 @@
 #include "ORBextractor.h"
 /********************* Modified Here *********************/
 #include "MapPointBird.h"
+#include "simple_birdseye_odometer.h"
 
 #include<iostream>
 #include <opencv2/opencv.hpp>
@@ -267,8 +268,9 @@ public:
     vector<cv::Mat> mvMeasurement_p;
     vector<float> mvMeasurement_g;
 
-    pcl::PointCloud<pcl::PointXYZ>::Ptr mCloud;//(new pcl::PointCloud<pcl::PointXYZ>);
-
+    // pcl::PointCloud<pcl::PointXYZ>::Ptr mCloud;
+    birdseye_odometry::SemanticCloud::Ptr mCloud;
+    Eigen::Matrix4f current_pose_;
 private:
 
     // Undistort keypoints given OpenCV distortion parameters.
