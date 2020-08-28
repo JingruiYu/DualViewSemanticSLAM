@@ -1212,6 +1212,9 @@ void Frame::getICPEdges()
             else
                 label = 1; // freespace
             
+            if (label == 1)
+                continue;
+            
             birdseye_odometry::SemanticPoint point;
             point.x = (frame_height / 2 - row) * pixel2meter + rear_axle_to_center;
             point.y = (frame_width / 2 - col) * pixel2meter;

@@ -167,6 +167,8 @@ Tracking::Tracking(System *pSys, ORBVocabulary* pVoc, FrameDrawer *pFrameDrawer,
                          69.0, 0.0, "vehicle", v1);
     viewer_ptr_->addCoordinateSystem(1.0, 0.0, 0.0, 0.3, "vehicle_frame", v1);
     viewer_ptr_->addCoordinateSystem(1.0, 0.0, 0.0, 0.0, "map_frame", v1);
+
+    updateKfCloud = false;
 }
 
 void Tracking::SetLocalMapper(LocalMapping *pLocalMapper)
@@ -1360,6 +1362,17 @@ bool Tracking::TrackingWithICP(const Eigen::Matrix4f &M)
     mCurrentFrame.current_pose_ = mpReferenceKF->local_cloud_pose_ * relative_pose;
     trajectory_.push_back(mCurrentFrame.current_pose_);
 
+    Eigen::Vector3f relative_trans = relative_pose.topRightCorner(3, 1);
+    Eigen::AngleAxisf relative_rot;
+    relative_rot = Eigen::Matrix3f(relative_pose.topLeftCorner(3, 3));
+
+    // -- threshold for updating the key cloud
+    double key_cloud_range_threshold_ = 0.5;                // m
+    double key_cloud_angle_threshold_ = 5.0 / 180.0 * M_PI; // rad
+
+    if (relative_trans.norm() > key_cloud_range_threshold_ || fabs(relative_rot.angle()) > key_cloud_angle_threshold_)
+        updateKfCloud = true;
+
     {    
         // -- vehicle model
         Eigen::Affine3f vehicle_pose;
@@ -1377,6 +1390,8 @@ bool Tracking::TrackingWithICP(const Eigen::Matrix4f &M)
 
         viewer_ptr_->spinOnce();
     }    
+
+    return false;
     // // cout << "initial transform: \n" << initTransfom << endl;
     // // using NDT
     // pclomp::NormalDistributionsTransform<pcl::PointXYZ, pcl::PointXYZ>::Ptr ndt_omp(
@@ -1696,8 +1711,8 @@ bool Tracking::NeedNewKeyFrame()
     const bool c2 = ((mnMatchesInliers<nRefMatches*thRefRatio|| bNeedToInsertClose) && mnMatchesInliers>15);
 
     // cout<<"c1a = "<<c1a<<" , c1b = "<<c1b<<" , c1c = "<<c1c<<" , c2 = "<<c2<<", result = "<<((c1a||c1b||c1c)&&c2)<<endl;
-
-    if((c1a||c1b||c1c)&&c2)
+    // ((c1a||c1b||c1c)&&c2) ||
+    if( updateKfCloud )
     {
         // If the mapping accepts keyframes, insert keyframe.
         // Otherwise send a signal to interrupt BA

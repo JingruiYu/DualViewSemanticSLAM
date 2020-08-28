@@ -150,6 +150,7 @@ public:
     std::vector<Eigen::Matrix4f> trajectory_;
     // viewer
     pcl::visualization::PCLVisualizer::Ptr viewer_ptr_;
+    bool updateKfCloud;
 
     // True if local mapping is deactivated and we are performing only localization
     bool mbOnlyTracking;
