@@ -523,96 +523,13 @@ void Tracking::Track()
                 bOK = Relocalization();
             }
         }
-        else
-        {
-            // Localization Mode: Local Mapping is deactivated
-
-            if(mState==LOST)
-            {
-                bOK = Relocalization();
-            }
-            else
-            {
-                if(!mbVO)
-                {
-                    // In last frame we tracked enough MapPoints in the map
-
-                    if(!mVelocity.empty())
-                    {
-                        bOK = TrackWithMotionModel();
-                    }
-                    else
-                    {
-                        bOK = TrackReferenceKeyFrame();
-                    }
-                }
-                else
-                {
-                    // In last frame we tracked mainly "visual odometry" points.
-
-                    // We compute two camera poses, one from motion model and one doing relocalization.
-                    // If relocalization is sucessfull we choose that solution, otherwise we retain
-                    // the "visual odometry" solution.
-
-                    bool bOKMM = false;
-                    bool bOKReloc = false;
-                    vector<MapPoint*> vpMPsMM;
-                    vector<bool> vbOutMM;
-                    cv::Mat TcwMM;
-                    if(!mVelocity.empty())
-                    {
-                        bOKMM = TrackWithMotionModel();
-                        vpMPsMM = mCurrentFrame.mvpMapPoints;
-                        vbOutMM = mCurrentFrame.mvbOutlier;
-                        TcwMM = mCurrentFrame.mTcw.clone();
-                    }
-                    bOKReloc = Relocalization();
-
-                    if(bOKMM && !bOKReloc)
-                    {
-                        mCurrentFrame.SetPose(TcwMM);
-                        mCurrentFrame.mvpMapPoints = vpMPsMM;
-                        mCurrentFrame.mvbOutlier = vbOutMM;
-
-                        if(mbVO)
-                        {
-                            for(int i =0; i<mCurrentFrame.N; i++)
-                            {
-                                if(mCurrentFrame.mvpMapPoints[i] && !mCurrentFrame.mvbOutlier[i])
-                                {
-                                    mCurrentFrame.mvpMapPoints[i]->IncreaseFound();
-                                }
-                            }
-                        }
-                    }
-                    else if(bOKReloc)
-                    {
-                        mbVO = false;
-                    }
-
-                    bOK = bOKReloc || bOKMM;
-                }
-            }
-        }
 
         mCurrentFrame.mpReferenceKF = mpReferenceKF;
 
         // If we have an initial estimation of the camera pose and matching. Track the local map.
-        if(!mbOnlyTracking)
-        {
-            if(bOK)
-                bOK = TrackLocalMap();
-        }
-        else
-        {
-            // mbVO true means that there are few matches to MapPoints in the map. We cannot retrieve
-            // a local map and therefore we do not perform TrackLocalMap(). Once the system relocalizes
-            // the camera we will use the local map again.
-            if(bOK && !mbVO)
-                bOK = TrackLocalMap();
-        }
-
-
+        if(bOK)
+            bOK = TrackLocalMap();
+        
         if(bOK)
             mState = OK;
         else
@@ -1361,12 +1278,12 @@ bool Tracking::TrackWithMotionModel()
     }
     
 
-    if(mbOnlyTracking)
-    {
-        cout << "Is only Tracking ??????? " << endl;
-        mbVO = nmatchesMap<10;
-        return nmatches>20;
-    }
+    // if(mbOnlyTracking)
+    // {
+    //     cout << "Is only Tracking ??????? " << endl;
+    //     mbVO = nmatchesMap<10;
+    //     return nmatches>20;
+    // }
 
     return nmatchesMap>=10;
 }
@@ -1605,8 +1522,8 @@ bool Tracking::TrackLocalMap()
     {
         // generate more birdview mappoints
         MatchAndRetriveBirdMP();
-        // Optimizer::PoseOptimizationWithBirdview(&mCurrentFrame);
-        Optimizer::poseOptimizationFull(&mCurrentFrame, &mLastFrame);
+        Optimizer::PoseOptimizationWithBirdview(&mCurrentFrame);
+        // Optimizer::poseOptimizationFull(&mCurrentFrame, &mLastFrame);
         // Optimizer::PoseOptimization(&mCurrentFrame);
     }
     else
@@ -1630,8 +1547,8 @@ bool Tracking::TrackLocalMap()
                     if(mCurrentFrame.mvpMapPoints[i]->Observations()>0)
                         mnMatchesInliers++;
                 }
-                else
-                    mnMatchesInliers++;
+                // else
+                    // mnMatchesInliers++;
             }
             else if(mSensor==System::STEREO)
                 mCurrentFrame.mvpMapPoints[i] = static_cast<MapPoint*>(NULL);
@@ -1688,8 +1605,8 @@ bool Tracking::TrackLocalMap()
 
 bool Tracking::NeedNewKeyFrame()
 {
-    if(mbOnlyTracking)
-        return false;
+    // if(mbOnlyTracking)
+        // return false;
 
     // If Local Mapping is freezed by a Loop Closure do not insert keyframes
     if(mpLocalMapper->isStopped() || mpLocalMapper->stopRequested())
