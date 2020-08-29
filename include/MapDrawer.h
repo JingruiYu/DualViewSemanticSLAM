@@ -24,6 +24,7 @@
 #include"Map.h"
 #include"MapPoint.h"
 #include"KeyFrame.h"
+#include"simple_birdseye_odometer.h"
 #include<pangolin/pangolin.h>
 
 #include<mutex>
@@ -37,8 +38,10 @@ public:
     MapDrawer(Map* pMap, const string &strSettingPath);
 
     Map* mpMap;
+    birdseye_odometry::SemanticCloud::Ptr drawCloud;
 
     void DrawMapPoints();
+    void DrawCloud();
     void DrawKeyFrames(const bool bDrawKF, const bool bDrawGraph);
     void DrawCurrentCamera(pangolin::OpenGlMatrix &Twc);
     void SetCurrentCameraPose(const cv::Mat &Tcw);

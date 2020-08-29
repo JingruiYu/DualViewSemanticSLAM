@@ -1163,11 +1163,11 @@ int Optimizer::poseOptimizationFull(Frame* pCurFrame, Frame* pRefFrame)
     vSE3c->setFixed(false);
     optimizer.addVertex(vSE3c);
 
-    g2o::VertexSE3Expmap * vSE3r = new g2o::VertexSE3Expmap();
-    vSE3r->setId(1);
-    vSE3r->setEstimate(Converter::toSE3Quat(pRefFrame->mTcw));
-    vSE3r->setFixed(false);
-    optimizer.addVertex(vSE3r); 
+    // g2o::VertexSE3Expmap * vSE3r = new g2o::VertexSE3Expmap();
+    // vSE3r->setId(1);
+    // vSE3r->setEstimate(Converter::toSE3Quat(pRefFrame->mTcw));
+    // vSE3r->setFixed(false);
+    // optimizer.addVertex(vSE3r); 
 
     // 6. edge
     const int Nf = pCurFrame->N;
@@ -1184,7 +1184,7 @@ int Optimizer::poseOptimizationFull(Frame* pCurFrame, Frame* pRefFrame)
     vnIndexEdgeBird.reserve(Nb);
     int nBirdInitialCorrespondences = 0;
     
-    const int Nd = 50; // pRefFrame->mvMeasurement_p.size(); // the number of these edge should be controlled
+    const int Nd = 10; // pRefFrame->mvMeasurement_p.size(); // the number of these edge should be controlled
     vector<EdgeSE3ProjectDirect*> vpEdgesDirect;
     vector<size_t> vnIndexEdgeDirect;
     vector<bool> vOutlierDirect;
@@ -1280,7 +1280,7 @@ int Optimizer::poseOptimizationFull(Frame* pCurFrame, Frame* pRefFrame)
         );
         edge->setVertex(0,dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertex(0)));
         edge->setMeasurement(pRefFrame->mvMeasurement_g[i]);
-        edge->setInformation(Eigen::Matrix<double,1,1>::Identity());
+        edge->setInformation(Eigen::Matrix<double,1,1>::Identity()*5);
 
         g2o::RobustKernelHuber * rk = new g2o::RobustKernelHuber;
         edge->setRobustKernel(rk);

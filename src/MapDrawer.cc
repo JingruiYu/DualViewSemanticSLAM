@@ -21,6 +21,8 @@
 #include "MapDrawer.h"
 #include "MapPoint.h"
 #include "KeyFrame.h"
+#include "simple_birdseye_odometer.h"
+#include "Frame.h"
 #include <pangolin/pangolin.h>
 #include <mutex>
 
@@ -28,7 +30,7 @@ namespace ORB_SLAM2
 {
 
 
-MapDrawer::MapDrawer(Map* pMap, const string &strSettingPath):mpMap(pMap)
+MapDrawer::MapDrawer(Map* pMap, const string &strSettingPath):mpMap(pMap), drawCloud(new birdseye_odometry::SemanticCloud)
 {
     cv::FileStorage fSettings(strSettingPath, cv::FileStorage::READ);
 
@@ -80,6 +82,77 @@ void MapDrawer::DrawMapPoints()
     glEnd();
 }
 
+void MapDrawer::DrawCloud()
+{
+    glPointSize(mPointSize);
+    glBegin(GL_POINTS);
+    glColor3f(0.0,1.0,1.0);
+
+    const vector<KeyFrame*> vpKFs = mpMap->GetAllKeyFrames();
+    int vpksize = vpKFs.size();
+    if (vpksize<2)
+        return;
+    
+    for (int i = 0; i < vpksize-1; i++)
+    {
+        KeyFrame* pKF = vpKFs[i];
+        drawCloud = pKF->mKeyCloud;
+        for (auto p : drawCloud->points)
+        {
+            cv::Mat pb = cv::Mat::zeros(3,1,CV_32F);
+            pb.at<float>(0,0) = p.x;
+            pb.at<float>(1,0) = p.y;
+            pb.at<float>(2,0) = p.z;
+            
+            cv::Mat pc = Frame::Tcb.rowRange(0,3).colRange(0,3) * pb + Frame::Tcb.rowRange(0,3).col(3);
+            
+            cv::Mat Twc = pKF->GetPoseInverse();
+            cv::Mat pwc = Twc.rowRange(0,3).colRange(0,3) * pc + Twc.rowRange(0,3).col(3);
+
+            cv::Mat Twb = Frame::Tcb * Twc;
+            // Twb = Twb.t();
+            cv::Mat pwb = Twb.rowRange(0,3).colRange(0,3) * pb + Twb.rowRange(0,3).col(3);
+            
+            cv::Mat p_o = pwc;
+
+            glVertex3f(p_o.at<float>(0,0),p_o.at<float>(1,0),p_o.at<float>(2,0));
+        }
+    }
+    glEnd();
+
+
+    glPointSize(mPointSize);
+    glBegin(GL_POINTS);
+    glColor3f(1.0,0.0,0.0);
+
+    int i = vpksize-1;
+    KeyFrame* pKF = vpKFs[i];
+    drawCloud = pKF->mKeyCloud;
+    for (auto p : drawCloud->points)
+    {
+        cv::Mat pb = cv::Mat::zeros(3,1,CV_32F);
+        pb.at<float>(0,0) = p.x;
+        pb.at<float>(1,0) = p.y;
+        pb.at<float>(2,0) = p.z;
+        
+        cv::Mat pc = Frame::Tcb.rowRange(0,3).colRange(0,3) * pb + Frame::Tcb.rowRange(0,3).col(3);
+        
+        cv::Mat Twc = pKF->GetPoseInverse();
+        cv::Mat pwc = Twc.rowRange(0,3).colRange(0,3) * pc + Twc.rowRange(0,3).col(3);
+
+        cv::Mat Twb = Frame::Tcb * Twc;
+        // Twb = Twb.t();
+        cv::Mat pwb = Twb.rowRange(0,3).colRange(0,3) * pb + Twb.rowRange(0,3).col(3);
+        
+        cv::Mat p_o = pwc;
+
+        glVertex3f(p_o.at<float>(0,0),p_o.at<float>(1,0),p_o.at<float>(2,0));
+    }
+    
+    glEnd();
+    
+}
+
 void MapDrawer::DrawKeyFrames(const bool bDrawKF, const bool bDrawGraph)
 {
     const float &w = mKeyFrameSize;
@@ -93,11 +166,12 @@ void MapDrawer::DrawKeyFrames(const bool bDrawKF, const bool bDrawGraph)
         for(size_t i=0; i<vpKFs.size(); i++)
         {
             KeyFrame* pKF = vpKFs[i];
-            cv::Mat Twc = pKF->GetPoseInverse().t();
-
+            cv::Mat Twc = pKF->GetPoseInverse();
+            cv::Mat Twb = Frame::Tcb * Twc;
+            cv::Mat Tr = Twc.t();
             glPushMatrix();
 
-            glMultMatrixf(Twc.ptr<GLfloat>(0));
+            glMultMatrixf(Tr.ptr<GLfloat>(0));
 
             glLineWidth(mKeyFrameLineWidth);
             glColor3f(0.0f,0.0f,1.0f);

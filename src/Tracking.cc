@@ -624,6 +624,28 @@ void Tracking::Track()
         // If tracking were good, check if we insert a keyframe
         if(bOK)
         {
+            {
+                cv::Mat Two = Frame::Tcb;
+                cv::Mat Tbw= Frame::Tbc * mCurrentFrame.mTcw * Two;
+
+                cv::Mat Rwb = Tbw.rowRange(0,3).colRange(0,3).t();
+                cv::Mat twb = -Rwb*Tbw.rowRange(0,3).col(3);
+
+                cv::Mat Twb = cv::Mat::eye(4,4,CV_32F);
+                Rwb.copyTo(Twb.rowRange(0,3).colRange(0,3));
+                twb.copyTo(Twb.rowRange(0,3).col(3));
+
+                Eigen::Affine3f vehicle_pose;
+                vehicle_pose.matrix() = Converter::toMatrix4f(Twb);
+                birdseye_odometry::SemanticPoint waypoint;
+                waypoint.x = vehicle_pose.translation()[0];
+                waypoint.y = vehicle_pose.translation()[1];
+                waypoint.z = vehicle_pose.translation()[2];
+                string waypoint_name = "campoint" + to_string(mCurrentFrame.mnId);
+                viewer_ptr_->addSphere(waypoint, 0.1, 0, 150, 0, waypoint_name);
+                viewer_ptr_->spinOnce();
+
+            }
             // Update motion model
             if(!mLastFrame.mTcw.empty())
             {
@@ -1583,7 +1605,8 @@ bool Tracking::TrackLocalMap()
     {
         // generate more birdview mappoints
         MatchAndRetriveBirdMP();
-        Optimizer::PoseOptimizationWithBirdview(&mCurrentFrame);
+        // Optimizer::PoseOptimizationWithBirdview(&mCurrentFrame);
+        Optimizer::poseOptimizationFull(&mCurrentFrame, &mLastFrame);
         // Optimizer::PoseOptimization(&mCurrentFrame);
     }
     else
