@@ -1293,9 +1293,9 @@ int Optimizer::poseOptimizationFull(Frame* pCurFrame, Frame* pRefFrame)
         
     }
 
-    cout << "the feature of front: ... " << vnIndexEdgeFront.size() << endl;
-    cout << "the feature of bird : ... " << vnIndexEdgeBird.size() << endl;
-    cout << "the directio of bird: ... " << vnIndexEdgeDirect.size() << endl << endl;
+    // cout << "the feature of front: ... " << vnIndexEdgeFront.size() << endl;
+    // cout << "the feature of bird : ... " << vnIndexEdgeBird.size() << endl;
+    // cout << "the directio of bird: ... " << vnIndexEdgeDirect.size() << endl << endl;
 
     if (nFrontInitialCorrespondences < 3 && nBirdInitialCorrespondences < 3)
         return 0;

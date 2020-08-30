@@ -453,22 +453,23 @@ void Tracking::Track()
 
                     // Get the initial transform
                     Eigen::Matrix4f initTransform = Eigen::Matrix4f::Identity();
-
-                    cv::Mat encPose = GetEncoderPose();
-                    if (!encPose.empty())
                     {
-                        initTransform = Converter::toMatrix4f(encPose);
-                    }
-                    else if (!mVelocity.empty())
-                    {
-                        cv::Mat tmpMat = Frame::Tbc * mVelocity * Frame::Tcb;
-                        initTransform = Converter::toMatrix4f(tmpMat);
-                    }
-                    else
-                    {
-                        cv::Mat birdICP = GetBirdICP();
-                        if (!birdICP.empty())
-                            initTransform = Converter::toMatrix4f(birdICP);  
+                        // cv::Mat encPose = GetEncoderPose();
+                        // if (!encPose.empty())
+                        // {
+                        //     initTransform = Converter::toMatrix4f(encPose);
+                        // }
+                        // else if (!mVelocity.empty())
+                        // {
+                        //     cv::Mat tmpMat = Frame::Tbc * mVelocity * Frame::Tcb;
+                        //     initTransform = Converter::toMatrix4f(tmpMat);
+                        // }
+                        // else
+                        // {
+                        //     cv::Mat birdICP = GetBirdICP();
+                        //     if (!birdICP.empty())
+                        //         initTransform = Converter::toMatrix4f(birdICP);  
+                        // }
                     }
                     
                     bOK = TrackingWithICP(initTransform);
@@ -538,31 +539,44 @@ void Tracking::Track()
         // Update drawer
         mpFrameDrawer->Update(this);
 
+        cv::Mat Two = Frame::Tcb;
+        cv::Mat Tbw= Frame::Tbc * mCurrentFrame.mTcw * Two;
+        cv::Mat Tbwr= Frame::Tbc * mLastFrame.mTcw * Two;
+
+        cv::Mat Rwb = Tbw.rowRange(0,3).colRange(0,3).t();
+        cv::Mat twb = -Rwb*Tbw.rowRange(0,3).col(3);
+        cv::Mat Rwbr = Tbwr.rowRange(0,3).colRange(0,3).t();
+        cv::Mat twbr = -Rwbr*Tbwr.rowRange(0,3).col(3);
+
+        cv::Mat Twb = cv::Mat::eye(4,4,CV_32F);
+        Rwb.copyTo(Twb.rowRange(0,3).colRange(0,3));
+        twb.copyTo(Twb.rowRange(0,3).col(3));
+        cv::Mat Twbr = cv::Mat::eye(4,4,CV_32F);
+        Rwbr.copyTo(Twbr.rowRange(0,3).colRange(0,3));
+        twbr.copyTo(Twbr.rowRange(0,3).col(3));
+
+
+        Eigen::Matrix4f Tc = Converter::toMatrix4f(Twb);
+        Eigen::Matrix4f Tr = Converter::toMatrix4f(Twbr);
+        
+        Eigen::Affine3f vehicle_pose;
+        vehicle_pose.matrix() = Tc;
+        birdseye_odometry::SemanticPoint waypoint;
+        waypoint.x = vehicle_pose.translation()[0];
+        waypoint.y = vehicle_pose.translation()[1];
+        waypoint.z = vehicle_pose.translation()[2];
+        string waypoint_name = "campoint" + to_string(mCurrentFrame.mnId);
+        viewer_ptr_->addSphere(waypoint, 0.1, 0, 150, 0, waypoint_name);
+        viewer_ptr_->spinOnce();
+
+        Eigen::Matrix4f Tc12 = Tr.inverse() * Tc;
+        Eigen::Vector3f Tc12t = Tc12.topRightCorner(3, 1);
+        // cout << "Camera trans: " << Tc12t.norm() << endl;
+        // cout << "Camera T's trans: " << Tc.topRightCorner(3, 1).norm() << endl << endl;
+
         // If tracking were good, check if we insert a keyframe
         if(bOK)
         {
-            {
-                cv::Mat Two = Frame::Tcb;
-                cv::Mat Tbw= Frame::Tbc * mCurrentFrame.mTcw * Two;
-
-                cv::Mat Rwb = Tbw.rowRange(0,3).colRange(0,3).t();
-                cv::Mat twb = -Rwb*Tbw.rowRange(0,3).col(3);
-
-                cv::Mat Twb = cv::Mat::eye(4,4,CV_32F);
-                Rwb.copyTo(Twb.rowRange(0,3).colRange(0,3));
-                twb.copyTo(Twb.rowRange(0,3).col(3));
-
-                Eigen::Affine3f vehicle_pose;
-                vehicle_pose.matrix() = Converter::toMatrix4f(Twb);
-                birdseye_odometry::SemanticPoint waypoint;
-                waypoint.x = vehicle_pose.translation()[0];
-                waypoint.y = vehicle_pose.translation()[1];
-                waypoint.z = vehicle_pose.translation()[2];
-                string waypoint_name = "campoint" + to_string(mCurrentFrame.mnId);
-                viewer_ptr_->addSphere(waypoint, 0.1, 0, 150, 0, waypoint_name);
-                viewer_ptr_->spinOnce();
-
-            }
             // Update motion model
             if(!mLastFrame.mTcw.empty())
             {
@@ -1297,109 +1311,60 @@ bool Tracking::TrackingWithICP(const Eigen::Matrix4f &M)
     ndt_aligner_ptr_->setInputTarget(localCloud);
 
     birdseye_odometry::SemanticCloud::Ptr aligned_cloud(new birdseye_odometry::SemanticCloud);
-    // -- align and get the results
     ndt_aligner_ptr_->align(*aligned_cloud, initTransform);
     Eigen::Matrix4f relative_pose = ndt_aligner_ptr_->getFinalTransformation();
-    // cout << "relative_pose: \n" << relative_pose << endl;
     double score = ndt_aligner_ptr_->getFitnessScore();
     cout << "score: " << score << endl;
 
-    if (score < 20 && true)
+    mCurrentFrame.current_pose_ = localCloudPose * relative_pose;
+    trajectory_.push_back(mCurrentFrame.current_pose_);
+
+    Eigen::Vector3f relative_trans = relative_pose.topRightCorner(3, 1);
+    Eigen::AngleAxisf relative_rot;
+    relative_rot = Eigen::Matrix3f(relative_pose.topLeftCorner(3, 3));
+
+    Eigen::Matrix4f Tb12 = mLastFrame.current_pose_.inverse() * mCurrentFrame.current_pose_;
+    Eigen::Vector3f Tb12t = Tb12.topRightCorner(3, 1);
+    cout << "ICP trans: " << Tb12t.norm() << endl;
+    // cout << "ICP T's trans: " << mCurrentFrame.current_pose_.topRightCorner(3, 1).norm() << endl;
+
+    // -- threshold for updating the key cloud
+    // 0.1-0.1-368
+    double key_cloud_range_threshold_ = 0.5;                // m
+    double key_cloud_angle_threshold_ = 5 / 180.0 * M_PI; // rad
+
+    if (relative_trans.norm() > key_cloud_range_threshold_ || fabs(relative_rot.angle()) > key_cloud_angle_threshold_)
     {
-        mCurrentFrame.current_pose_ = localCloudPose * relative_pose;
-        trajectory_.push_back(mCurrentFrame.current_pose_);
-
-        Eigen::Vector3f relative_trans = relative_pose.topRightCorner(3, 1);
-        Eigen::AngleAxisf relative_rot;
-        relative_rot = Eigen::Matrix3f(relative_pose.topLeftCorner(3, 3));
-
-        // -- threshold for updating the key cloud
-        // 0.1-0.1-368
-        double key_cloud_range_threshold_ = 2;                // m
-        double key_cloud_angle_threshold_ = 10 / 180.0 * M_PI; // rad
-
-        if (relative_trans.norm() > key_cloud_range_threshold_ || fabs(relative_rot.angle()) > key_cloud_angle_threshold_)
-        {
-            localCloud = mCurrentFrame.mCloud;
-            localCloudPose = mCurrentFrame.current_pose_;
-            updateKfCloud = true;
-        }
-            
-
-        {    
-            // -- vehicle model
-            Eigen::Affine3f vehicle_pose;
-            vehicle_pose.matrix() = trajectory_.back();
-            viewer_ptr_->updateShapePose("vehicle", vehicle_pose);
-            viewer_ptr_->updateCoordinateSystemPose("vehicle_frame", vehicle_pose);
-
-            // -- trajectory
-            birdseye_odometry::SemanticPoint waypoint;
-            waypoint.x = vehicle_pose.translation()[0];
-            waypoint.y = vehicle_pose.translation()[1];
-            waypoint.z = vehicle_pose.translation()[2];
-            string waypoint_name = "waypoint" + to_string(trajectory_.size());
-            viewer_ptr_->addSphere(waypoint, 0.1, 150, 0, 0, waypoint_name);
-
-            viewer_ptr_->spinOnce();
-        }    
-
-        finalTransform = mCurrentFrame.current_pose_ * mLastFrame.current_pose_.inverse();
+        localCloud = mCurrentFrame.mCloud;
+        localCloudPose = mCurrentFrame.current_pose_;
+        updateKfCloud = true;
     }
+        
+
+    {    
+        // -- vehicle model
+        Eigen::Affine3f vehicle_pose;
+        vehicle_pose.matrix() = trajectory_.back();
+        viewer_ptr_->updateShapePose("vehicle", vehicle_pose);
+        viewer_ptr_->updateCoordinateSystemPose("vehicle_frame", vehicle_pose);
+
+        // -- trajectory
+        birdseye_odometry::SemanticPoint waypoint;
+        waypoint.x = vehicle_pose.translation()[0];
+        waypoint.y = vehicle_pose.translation()[1];
+        waypoint.z = vehicle_pose.translation()[2];
+        string waypoint_name = "waypoint" + to_string(trajectory_.size());
+        viewer_ptr_->addSphere(waypoint, 0.1, 150, 0, 0, waypoint_name);
+
+        viewer_ptr_->spinOnce();
+    }    
+
+    if (score > 0.35)
+        return false;
     
+    finalTransform = mCurrentFrame.current_pose_ * mLastFrame.current_pose_.inverse();
 
-    // // cout << "initial transform: \n" << initTransfom << endl;
-    // // using NDT
-    // pclomp::NormalDistributionsTransform<pcl::PointXYZ, pcl::PointXYZ>::Ptr ndt_omp(
-    //   new pclomp::NormalDistributionsTransform<pcl::PointXYZ, pcl::PointXYZ>());
-    // ndt_omp->setStepSize(0.1);
-    // ndt_omp->setResolution(1.0);
-
-    // // ndt_omp->setInputSource(mLastFrame.mCloud);
-    // ndt_omp->setInputSource(mpReferenceKF->mKeyCloud);
-    // ndt_omp->setInputTarget(mCurrentFrame.mCloud);
-
-    // pcl::PointCloud<pcl::PointXYZ>::Ptr aligned_cloud(new pcl::PointCloud<pcl::PointXYZ>());
-    // ndt_omp->align(*aligned_cloud, initTransfom);
-
-    // // cout << "final transform: \n" << finalTransform << endl;
-
-    // double score = ndt_omp->getFitnessScore();
-    // // cout << "score: " << ndt_omp->getFitnessScore() << endl;
     
-    // // visualization
-    // // pcl::visualization::PCLVisualizer vis("viewer");
-    // vis.removePointCloud("ref_cloud");
-    // vis.removePointCloud("aligned_cloud");
-    // vis.removeShape("vehicle");
-    // pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZ> ref_handler(mLastFrame.mCloud, 0.0, 255.0, 0.0);
-    // pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZ> aligned_handler(mCurrentFrame.mCloud, 255.0, 0.0, 0.0);
-
-    // vis.addPointCloud(mLastFrame.mCloud, ref_handler, "ref_cloud");
-    // vis.addPointCloud(aligned_cloud, aligned_handler, "aligned_cloud");
-    // vis.addCube(-(Frame::vehicle_length / 2 - Frame::rear_axle_to_center),
-    //             Frame::vehicle_length / 2 + Frame::rear_axle_to_center, -Frame::vehicle_width / 2,
-    //             Frame::vehicle_width / 2, 0.0, 0.2, 255.0, 140.0, 0.0, "vehicle");
-    // vis.addCoordinateSystem(1.0, 0.0, 0.0, 0.3);
-    // vis.spinOnce(100);
-    // vis.wasStopped();
-
-    // // // using original
-    // // pcl::IterativeClosestPoint<pcl::PointXYZ, pcl::PointXYZ> icp;
-    // // icp.setInputCloud(mLastFrame.mCloud);
-    // // icp.setInputTarget(mCurrentFrame.mCloud);
-
-    // // pcl::PointCloud<pcl::PointXYZ> Final;
-    // // icp.align(Final);
-    // // std::cout << "has converged: " << icp.hasConverged() <<std::endl;
-
-    // // //Obtain the Euclidean fitness score (e.g., sum of squared distances from the source to the target) 
-    // // std::cout << "score: " <<icp.getFitnessScore() << std::endl; 
-    // // std::cout << "----------------------------------------------------------"<< std::endl;
-
-    // // //Get the final transformation matrix estimated by the registration method. 
-    // // std::cout << icp.getFinalTransformation() << std::endl;
-
     ORBmatcher matcher(0.9,true);
 
     UpdateLastFrame();
@@ -1411,7 +1376,6 @@ bool Tracking::TrackingWithICP(const Eigen::Matrix4f &M)
     // cout << "T12c: \n" << T12c << endl;
 
     mCurrentFrame.SetPose(T12c*mLastFrame.mTcw);
-    mpMapDrawer->SetCurrentCameraPose(mCurrentFrame.mTcw);
 
     fill(mCurrentFrame.mvpMapPoints.begin(),mCurrentFrame.mvpMapPoints.end(),static_cast<MapPoint*>(NULL));
     // Project points seen in previous frame
@@ -1432,25 +1396,27 @@ bool Tracking::TrackingWithICP(const Eigen::Matrix4f &M)
         fill(mCurrentFrame.mvpMapPointsBird.begin(),mCurrentFrame.mvpMapPointsBird.end(),static_cast<MapPointBird*>(NULL));
         nmatchesBird = mpmatcherBirdview->SearchByMatchBird(mCurrentFrame,mLastFrame,20);
     }
-        
-    if(nmatches<20)
+
+    cout << "before optimization 1 : " << " -nmatches: " << nmatches << " -nmatchesBird: " << nmatchesBird << endl;
+
+    if(nmatches<20 || nmatchesBird < 20)
         return false;
 
-    if (0)
-    {
-        /***** Yujr TODO Add another Direct optimization *****/
-        cv::Mat tmpTcw = mCurrentFrame.mTcw;
-        // cout << "Tcw MotionModel before: " << endl << tmpTcw << endl;
-        chrono::steady_clock::time_point t1 = chrono::steady_clock::now();
-        Optimizer::poseDirectEstimation( mLastFrame, mCurrentFrame, tmpTcw ); 
-        chrono::steady_clock::time_point t2 = chrono::steady_clock::now();
-        chrono::duration<double> time_used = chrono::duration_cast<chrono::duration<double>> ( t2-t1 );
-        // cout << "Tcw after: " << endl << tmpTcw << endl;
-        // cout << "time_used : " << time_used.count() << endl;
-        mCurrentFrame.SetPose(tmpTcw);
-    }
-    //Optimizer::PoseOptimizationWithBirdview(&mCurrentFrame);
+    cv::Mat TcwB = mCurrentFrame.mTcw.clone();
+
+    cv::Mat LastTwc = cv::Mat::eye(4,4,CV_32F);
+    mLastFrame.GetRotationInverse().copyTo(LastTwc.rowRange(0,3).colRange(0,3));
+    mLastFrame.GetCameraCenter().copyTo(LastTwc.rowRange(0,3).col(3));
+    cv::Mat Tc12 = TcwB*LastTwc;
+    cout << "before optimizat Tc12 is: " << norm(Tc12.rowRange(0,3).col(3)) << endl;
+
     Optimizer::poseOptimizationFull(&mCurrentFrame, &mLastFrame);
+
+    cv::Mat TcwA = mCurrentFrame.mTcw.clone();
+
+    Tc12 = TcwA*LastTwc;
+    cout << "after optimizat Tc12 is: " << norm(Tc12.rowRange(0,3).col(3)) << endl;
+
 
     // Discard outliers
     int nmatchesMap = 0;
@@ -1473,32 +1439,23 @@ bool Tracking::TrackingWithICP(const Eigen::Matrix4f &M)
         }
     }
 
-    // cout<<"After Optimization, "<<nmatches<<" Matches and "<<nmatchesMap<<" Matches in Map."<<endl;
-
-    // Discard outliers for birdview
-    // cv::Mat Twc = mCurrentFrame.mTcw.inv();
     for(size_t k=0;k<mCurrentFrame.mvKeysBird.size();k++)
     {
         if(mCurrentFrame.mvpMapPointsBird[k])
         {
             if(!mCurrentFrame.mvbBirdviewInliers[k])
             {
-                // cv::Mat localPos = cv::Mat(mCurrentFrame.mvKeysBirdCamXYZ[k]);
-                // cv::Mat worldPos = Twc.rowRange(0,3).colRange(0,3)*localPos+Twc.rowRange(0,3).col(3);
-                // MapPointBird *pMPBird = new MapPointBird(worldPos,&mCurrentFrame,mpMap,k);
-                // mpMap->AddMapPointBird(pMPBird);
-                // mCurrentFrame.mvpMapPointsBird[k] = pMPBird;
-
                 mCurrentFrame.mvpMapPointsBird[k] = static_cast<MapPointBird*>(NULL);
                 mCurrentFrame.mvbBirdviewInliers[k]=true;
                 nmatchesBird--;
             }
         }
     }
-    // cout<<"After Optimization, "<<nmatchesBird<<" Birdview Matches."<<endl;    
+
+    cout << "after optimization 1 : " << " -nmatches: " << nmatches << " -nmatchesBird: " << nmatchesBird << endl;
 
     bool isTrue = true;
-    if (nmatches < 50 || nmatchesMap < 50 || nmatchesBird < 50)
+    if (nmatchesMap < 20 || nmatchesBird < 20)
     {
         isTrue = false;
     }
