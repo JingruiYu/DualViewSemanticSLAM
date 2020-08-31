@@ -262,6 +262,13 @@ void ConvertMaskBirdview(const cv::Mat& src, cv::Mat& dst)
                 dst_out.at<uchar>(i, j) = 250;
         }
 
+    dst_out = dst_out > 50;
+    int erosion_size = 5;
+    Mat element = getStructuringElement(
+        MORPH_RECT, Size(2 * erosion_size + 1, 2 * erosion_size + 1),
+        Point(erosion_size, erosion_size));
+    cv::erode(dst_out, dst_out, element);
+
     // preprocess mask, ignore footprint
     int birdviewCols=src.cols;
     int birdviewRows=src.rows;

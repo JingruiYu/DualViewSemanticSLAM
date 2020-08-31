@@ -20,6 +20,66 @@ using namespace Eigen;
 typedef Eigen::Matrix<double, 6, 1> Vector6d;
 typedef Eigen::Matrix<double, 6, 6> Matrix6d;
 
+
+class VertexRotation : public g2o::BaseVertex<3, Quaterniond>
+{
+
+public:
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+    VertexRotation();
+    virtual bool read(std::istream& is){}
+    virtual bool write(std::ostream& os) const{}
+
+    virtual void setToOriginImpl() {
+      _estimate.setIdentity();
+    }
+
+    virtual void oplusImpl(const double* update_)
+    {
+      Eigen::Map<const Eigen::Vector3d> update(update_);
+	  _estimate = exp(update)*_estimate;
+    }
+private:
+	static Matrix3d skew(const Vector3d&v)
+	{
+		Matrix3d m;
+		m.fill(0.);
+		m(0,1)  = -v(2);
+		m(0,2)  =  v(1);
+		m(1,2)  = -v(0);
+		m(1,0)  =  v(2);
+		m(2,0) = -v(1);
+		m(2,1) = v(0);
+		return m;
+	}
+
+	static Quaterniond exp(const Vector3d & update)
+	{
+		const Vector3d& omega=update;
+
+		double theta = omega.norm();
+		Matrix3d Omega = skew(omega);
+
+		Matrix3d R;
+		if (theta<0.00001)
+		{
+			//TODO: CHECK WHETHER THIS IS CORRECT!!!
+			R = (Matrix3d::Identity() + Omega + Omega*Omega);
+		}
+		else
+		{
+			Matrix3d Omega2 = Omega*Omega;
+
+			R = (Matrix3d::Identity()
+				+ sin(theta)/theta *Omega
+				+ (1-cos(theta))/(theta*theta)*Omega2);
+		}
+		return Quaterniond(R);
+	}
+	  
+
+};
+
 class VertexSE3Quat : public g2o::BaseVertex<6, g2o::SE3Quat>
 {
 public:
@@ -66,6 +126,63 @@ public:
 	Vector3d Xw;
 	double fx, fy, cx, cy;
 };
+
+
+class  EdgeSE3ProjectXYZOnlyWeightPose: public g2o::BaseUnaryEdge<2, Vector2d, g2o::VertexSE3Expmap>{
+public:
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
+  EdgeSE3ProjectXYZOnlyWeightPose(){}
+
+  bool read(std::istream& is);
+
+  bool write(std::ostream& os) const;
+
+  void computeError()  {
+    const g2o::VertexSE3Expmap* v1 = static_cast<const g2o::VertexSE3Expmap*>(_vertices[0]);
+    Vector2d obs(_measurement);
+    _error = obs-cam_project(v1->estimate().map(Xw));
+  }
+
+  bool isDepthPositive() {
+    const g2o::VertexSE3Expmap* v1 = static_cast<const g2o::VertexSE3Expmap*>(_vertices[0]);
+    return (v1->estimate().map(Xw))(2)>0.0;
+  }
+
+  virtual void linearizeOplus();
+
+  Vector2d cam_project(const Vector3d & trans_xyz) const;
+
+  Vector3d Xw;
+  double fx, fy, cx, cy;
+};
+
+
+
+// class  EdgeSO3ProjectXYZOnlyRotation: public g2o::BaseUnaryEdge<2, Vector2d, VertexRotation>{
+// public:
+//   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
+//   EdgeSO3ProjectXYZOnlyRotation(){}
+
+//   bool read(std::istream& is){return false;}
+
+//   bool write(std::ostream& os) const{return false;}
+
+//   void computeError()  {
+//     const VertexRotation* v1 = static_cast<const VertexRotation*>(_vertices[0]);
+//     Vector2d obs(_measurement);
+//     _error = obs-cam_project(v1->estimate());
+//   }
+
+//   virtual void linearizeOplus();
+
+//   Vector2d cam_project(const Eigen::Quaterniond & q) const;
+
+//   Vector3d Xw,tcw;
+//   double fx, fy, cx, cy;
+// };
+
 
 class EdgeSE3ProjectXYZ2XYZOnlyPoseQuat: public g2o::BaseUnaryEdge<3, Vector3d, VertexSE3Quat>
 {
@@ -248,6 +365,8 @@ public:
     cv::Mat Rro_,tro_,Ror_,tor_,Rcb_,tcb_;
 	cv::Mat image_;    // reference image
 };
+
+
 
 
 }  //namespace ORB_SLAM2

@@ -539,38 +539,49 @@ void Tracking::Track()
         // Update drawer
         mpFrameDrawer->Update(this);
 
-        cv::Mat Two = Frame::Tcb;
-        cv::Mat Tbw= Frame::Tbc * mCurrentFrame.mTcw * Two;
-        cv::Mat Tbwr= Frame::Tbc * mLastFrame.mTcw * Two;
+        // cv::Mat Two = Frame::Tcb;
+        // cv::Mat Tbw= Frame::Tbc * mCurrentFrame.mTcw * Two;
+        // cv::Mat Tbwr= Frame::Tbc * mLastFrame.mTcw * Two;
 
-        cv::Mat Rwb = Tbw.rowRange(0,3).colRange(0,3).t();
-        cv::Mat twb = -Rwb*Tbw.rowRange(0,3).col(3);
-        cv::Mat Rwbr = Tbwr.rowRange(0,3).colRange(0,3).t();
-        cv::Mat twbr = -Rwbr*Tbwr.rowRange(0,3).col(3);
+        // cv::Mat Rwb = Tbw.rowRange(0,3).colRange(0,3).t();
+        // cv::Mat twb = -Rwb*Tbw.rowRange(0,3).col(3);
+        // cv::Mat Rwbr = Tbwr.rowRange(0,3).colRange(0,3).t();
+        // cv::Mat twbr = -Rwbr*Tbwr.rowRange(0,3).col(3);
 
-        cv::Mat Twb = cv::Mat::eye(4,4,CV_32F);
-        Rwb.copyTo(Twb.rowRange(0,3).colRange(0,3));
-        twb.copyTo(Twb.rowRange(0,3).col(3));
-        cv::Mat Twbr = cv::Mat::eye(4,4,CV_32F);
-        Rwbr.copyTo(Twbr.rowRange(0,3).colRange(0,3));
-        twbr.copyTo(Twbr.rowRange(0,3).col(3));
+        // cv::Mat Twb = cv::Mat::eye(4,4,CV_32F);
+        // Rwb.copyTo(Twb.rowRange(0,3).colRange(0,3));
+        // twb.copyTo(Twb.rowRange(0,3).col(3));
+        // cv::Mat Twbr = cv::Mat::eye(4,4,CV_32F);
+        // Rwbr.copyTo(Twbr.rowRange(0,3).colRange(0,3));
+        // twbr.copyTo(Twbr.rowRange(0,3).col(3));
 
 
-        Eigen::Matrix4f Tc = Converter::toMatrix4f(Twb);
-        Eigen::Matrix4f Tr = Converter::toMatrix4f(Twbr);
-        
-        Eigen::Affine3f vehicle_pose;
-        vehicle_pose.matrix() = Tc;
-        birdseye_odometry::SemanticPoint waypoint;
-        waypoint.x = vehicle_pose.translation()[0];
-        waypoint.y = vehicle_pose.translation()[1];
-        waypoint.z = vehicle_pose.translation()[2];
-        string waypoint_name = "campoint" + to_string(mCurrentFrame.mnId);
-        viewer_ptr_->addSphere(waypoint, 0.1, 0, 150, 0, waypoint_name);
-        viewer_ptr_->spinOnce();
+        // Eigen::Matrix4f Tc = Converter::toMatrix4f(Twb);
+        // Eigen::Matrix4f Tr = Converter::toMatrix4f(Twbr);
+        if (!mCurrentFrame.mTcw.empty())
+        {        
+            cv::Mat Rwc = mCurrentFrame.mTcw.rowRange(0,3).colRange(0,3).t();
+            cv::Mat twc = -Rwc*mCurrentFrame.mTcw.rowRange(0,3).col(3);
+            cv::Mat Twc = cv::Mat::eye(4,4,CV_32F);
+            Rwc.copyTo(Twc.rowRange(0,3).colRange(0,3));
+            twc.copyTo(Twc.rowRange(0,3).col(3));
+            cv::Mat T_b_wb = Frame::Tbc * Twc * Frame::Tcb;
+            Eigen::Matrix4f Tc = Converter::toMatrix4f(T_b_wb);
 
-        Eigen::Matrix4f Tc12 = Tr.inverse() * Tc;
-        Eigen::Vector3f Tc12t = Tc12.topRightCorner(3, 1);
+            Eigen::Affine3f vehicle_pose;
+            vehicle_pose.matrix() = Tc;
+            birdseye_odometry::SemanticPoint waypoint;
+            waypoint.x = vehicle_pose.translation()[0];
+            waypoint.y = vehicle_pose.translation()[1];
+            waypoint.z = vehicle_pose.translation()[2];
+            string waypoint_name = "campoint" + to_string(mCurrentFrame.mnId);
+            viewer_ptr_->addSphere(waypoint, 0.1, 0, 150, 0, waypoint_name);
+            viewer_ptr_->spinOnce();
+            
+        }
+
+        // Eigen::Matrix4f Tc12 = Tr.inverse() * Tc;
+        // Eigen::Vector3f Tc12t = Tc12.topRightCorner(3, 1);
         // cout << "Camera trans: " << Tc12t.norm() << endl;
         // cout << "Camera T's trans: " << Tc.topRightCorner(3, 1).norm() << endl << endl;
 
@@ -1362,7 +1373,7 @@ bool Tracking::TrackingWithICP(const Eigen::Matrix4f &M)
     if (score > 0.35)
         return false;
     
-    finalTransform = mCurrentFrame.current_pose_ * mLastFrame.current_pose_.inverse();
+    finalTransform = mLastFrame.current_pose_ * mCurrentFrame.current_pose_.inverse();
 
     
     ORBmatcher matcher(0.9,true);
@@ -1410,7 +1421,8 @@ bool Tracking::TrackingWithICP(const Eigen::Matrix4f &M)
     cv::Mat Tc12 = TcwB*LastTwc;
     cout << "before optimizat Tc12 is: " << norm(Tc12.rowRange(0,3).col(3)) << endl;
 
-    Optimizer::poseOptimizationFull(&mCurrentFrame, &mLastFrame);
+    // Optimizer::poseOptimizationFull(&mCurrentFrame, &mLastFrame);
+    Optimizer::poseOptimizationWeight(&mCurrentFrame, &mLastFrame);
 
     cv::Mat TcwA = mCurrentFrame.mTcw.clone();
 
@@ -1479,8 +1491,24 @@ bool Tracking::TrackLocalMap()
     {
         // generate more birdview mappoints
         MatchAndRetriveBirdMP();
-        Optimizer::PoseOptimizationWithBirdview(&mCurrentFrame);
-        // Optimizer::poseOptimizationFull(&mCurrentFrame, &mLastFrame);
+
+
+        cv::Mat TcwB = mCurrentFrame.mTcw.clone();
+
+        cv::Mat LastTwc = cv::Mat::eye(4,4,CV_32F);
+        mLastFrame.GetRotationInverse().copyTo(LastTwc.rowRange(0,3).colRange(0,3));
+        mLastFrame.GetCameraCenter().copyTo(LastTwc.rowRange(0,3).col(3));
+        cv::Mat Tc12 = TcwB*LastTwc;
+        cout << "before TrackMap Tc12 is: " << norm(Tc12.rowRange(0,3).col(3)) << endl;
+
+        //Optimizer::PoseOptimizationWithBirdview(&mCurrentFrame);
+        Optimizer::poseOptimizationWeight(&mCurrentFrame, &mLastFrame);
+
+        cv::Mat TcwA = mCurrentFrame.mTcw.clone();
+
+        Tc12 = TcwA*LastTwc;
+        cout << "after TrackMap Tc12 is: " << norm(Tc12.rowRange(0,3).col(3)) << endl;
+
         // Optimizer::PoseOptimization(&mCurrentFrame);
     }
     else
@@ -2413,13 +2441,13 @@ void Tracking::GetMatchesInliersBird(vector<cv::DMatch> &vMatchesInliers12)
         
         if(mCurrentFrame.mvbBirdviewInliers[idx2])
         {
-            if (k > mLastFrame.mDescriptorsBird.rows)
+            if (k >= mLastFrame.mDescriptorsBird.rows)
             {
                 cout << "k: " << k << " -mLastFrame.mDescriptorsBird.rows: " << mLastFrame.mDescriptorsBird.rows << " - mLastFrame.mvKeysBird: " << mLastFrame.mvKeysBird.size() << endl;
                 continue;
             }
             
-            if (idx2 > mCurrentFrame.mDescriptorsBird.rows)
+            if (idx2 >= mCurrentFrame.mDescriptorsBird.rows)
             {
                 cout << "idx2: " << idx2 << " -mCurrentFrame.mDescriptorsBird.rows: " << mCurrentFrame.mDescriptorsBird.rows << " - mCurrentFrame.mvKeysBird: " << mCurrentFrame.mvKeysBird.size() << endl;
                 continue;

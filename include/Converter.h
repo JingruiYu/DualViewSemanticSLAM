@@ -37,6 +37,7 @@ public:
 
     static g2o::SE3Quat toSE3Quat(const cv::Mat &cvT);
     static g2o::SE3Quat toSE3Quat(const g2o::Sim3 &gSim3);
+    static g2o::Quaterniond toQuaterniond(const cv::Mat &M);
 
     static cv::Mat toCvMat(const g2o::SE3Quat &SE3);
     static cv::Mat toCvMat(const g2o::Sim3 &Sim3);

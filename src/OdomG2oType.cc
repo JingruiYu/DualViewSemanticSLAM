@@ -3,6 +3,87 @@
 namespace ORB_SLAM2
 {
 
+
+bool EdgeSE3ProjectXYZOnlyWeightPose::read(std::istream& is){
+  for (int i=0; i<2; i++){
+    is >> _measurement[i];
+  }
+  for (int i=0; i<2; i++)
+    for (int j=i; j<2; j++) {
+      is >> information()(i,j);
+      if (i!=j)
+        information()(j,i)=information()(i,j);
+    }
+  return true;
+}
+
+bool EdgeSE3ProjectXYZOnlyWeightPose::write(std::ostream& os) const {
+
+  for (int i=0; i<2; i++){
+    os << measurement()[i] << " ";
+  }
+
+  for (int i=0; i<2; i++)
+    for (int j=i; j<2; j++){
+      os << " " <<  information()(i,j);
+    }
+  return os.good();
+}
+
+void EdgeSE3ProjectXYZOnlyWeightPose::linearizeOplus() {
+  g2o::VertexSE3Expmap * vi = static_cast<g2o::VertexSE3Expmap *>(_vertices[0]);
+  Vector3d xyz_trans = vi->estimate().map(Xw);
+
+  double x = xyz_trans[0];
+  double y = xyz_trans[1];
+  double invz = 1.0/xyz_trans[2];
+  double invz_2 = invz*invz;
+  double w = 1;
+
+  _jacobianOplusXi(0,0) = x*y*invz_2 *fx;
+  _jacobianOplusXi(0,1) = -(1+(x*x*invz_2)) *fx;
+  _jacobianOplusXi(0,2) = y*invz *fx;
+  _jacobianOplusXi(0,3) = -invz *fx;
+  _jacobianOplusXi(0,4) = 0;
+  _jacobianOplusXi(0,5) = x*invz_2 *fx;
+
+  _jacobianOplusXi(1,0) = (1+y*y*invz_2) *fy;
+  _jacobianOplusXi(1,1) = -x*y*invz_2 *fy;
+  _jacobianOplusXi(1,2) = -x*invz *fy;
+  _jacobianOplusXi(1,3) = 0;
+  _jacobianOplusXi(1,4) = -invz *fy;
+  _jacobianOplusXi(1,5) = y*invz_2 *fy;
+
+  _jacobianOplusXi = w * _jacobianOplusXi;
+}
+
+Vector2d EdgeSE3ProjectXYZOnlyWeightPose::cam_project(const Vector3d & trans_xyz) const{
+  Vector2d proj;
+  proj(0) = trans_xyz(0)/trans_xyz(2);
+  proj(1) = trans_xyz(1)/trans_xyz(2);
+  Vector2d res;
+  res[0] = proj[0]*fx + cx;
+  res[1] = proj[1]*fy + cy;
+  return res;
+}
+
+// Vector2d EdgeSO3ProjectXYZOnlyRotation::cam_project(const Eigen::Quaterniond & q) const{
+// //   Eigen::Matrix3d R = q.matrix();
+//   Vector3d trans_xyz = q * Xw + tcw;
+//   Vector2d proj;
+//   proj(0) = trans_xyz(0)/trans_xyz(2);
+//   proj(1) = trans_xyz(1)/trans_xyz(2);
+//   Vector2d res;
+//   res[0] = proj[0]*fx + cx;
+//   res[1] = proj[1]*fy + cy;
+//   return res;
+// }
+
+// void EdgeSO3ProjectXYZOnlyRotation::linearizeOplus() 
+// {
+	
+// }
+
 void EdgeSE3ProjectXYZOnlyPoseQuat::linearizeOplus() 
 {
 	const VertexSE3Quat *v = static_cast<const VertexSE3Quat*>(_vertices[0]);
