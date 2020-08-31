@@ -26,7 +26,7 @@ class VertexRotation : public g2o::BaseVertex<3, Quaterniond>
 
 public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-    VertexRotation();
+    VertexRotation(){}
     virtual bool read(std::istream& is){}
     virtual bool write(std::ostream& os) const{}
 
@@ -141,7 +141,7 @@ public:
   void computeError()  {
     const g2o::VertexSE3Expmap* v1 = static_cast<const g2o::VertexSE3Expmap*>(_vertices[0]);
     Vector2d obs(_measurement);
-    _error = obs-cam_project(v1->estimate().map(Xw));
+    _error = w*(obs-cam_project(v1->estimate().map(Xw)));
   }
 
   bool isDepthPositive() {
@@ -155,33 +155,34 @@ public:
 
   Vector3d Xw;
   double fx, fy, cx, cy;
+  double w;
 };
 
 
 
-// class  EdgeSO3ProjectXYZOnlyRotation: public g2o::BaseUnaryEdge<2, Vector2d, VertexRotation>{
-// public:
-//   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+class  EdgeSO3ProjectXYZOnlyRotation: public g2o::BaseUnaryEdge<2, Vector2d, VertexRotation>{
+public:
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
-//   EdgeSO3ProjectXYZOnlyRotation(){}
+  EdgeSO3ProjectXYZOnlyRotation(){}
 
-//   bool read(std::istream& is){return false;}
+  bool read(std::istream& is){return false;}
 
-//   bool write(std::ostream& os) const{return false;}
+  bool write(std::ostream& os) const{return false;}
 
-//   void computeError()  {
-//     const VertexRotation* v1 = static_cast<const VertexRotation*>(_vertices[0]);
-//     Vector2d obs(_measurement);
-//     _error = obs-cam_project(v1->estimate());
-//   }
+  void computeError()  {
+    const VertexRotation* v1 = static_cast<const VertexRotation*>(_vertices[0]);
+    Vector2d obs(_measurement);
+    _error = obs-cam_project(v1->estimate());
+  }
 
-//   virtual void linearizeOplus();
+  virtual void linearizeOplus();
 
-//   Vector2d cam_project(const Eigen::Quaterniond & q) const;
+  Vector2d cam_project(const Eigen::Quaterniond & q) const;
 
-//   Vector3d Xw,tcw;
-//   double fx, fy, cx, cy;
-// };
+  Vector3d Xw,tcw;
+  double fx, fy, cx, cy;
+};
 
 
 class EdgeSE3ProjectXYZ2XYZOnlyPoseQuat: public g2o::BaseUnaryEdge<3, Vector3d, VertexSE3Quat>

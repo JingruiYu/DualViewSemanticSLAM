@@ -38,7 +38,6 @@ void EdgeSE3ProjectXYZOnlyWeightPose::linearizeOplus() {
   double y = xyz_trans[1];
   double invz = 1.0/xyz_trans[2];
   double invz_2 = invz*invz;
-  double w = 1;
 
   _jacobianOplusXi(0,0) = x*y*invz_2 *fx;
   _jacobianOplusXi(0,1) = -(1+(x*x*invz_2)) *fx;
@@ -54,7 +53,7 @@ void EdgeSE3ProjectXYZOnlyWeightPose::linearizeOplus() {
   _jacobianOplusXi(1,4) = -invz *fy;
   _jacobianOplusXi(1,5) = y*invz_2 *fy;
 
-  _jacobianOplusXi = w * _jacobianOplusXi;
+  _jacobianOplusXi = w*_jacobianOplusXi;
 }
 
 Vector2d EdgeSE3ProjectXYZOnlyWeightPose::cam_project(const Vector3d & trans_xyz) const{
@@ -67,22 +66,39 @@ Vector2d EdgeSE3ProjectXYZOnlyWeightPose::cam_project(const Vector3d & trans_xyz
   return res;
 }
 
-// Vector2d EdgeSO3ProjectXYZOnlyRotation::cam_project(const Eigen::Quaterniond & q) const{
-// //   Eigen::Matrix3d R = q.matrix();
-//   Vector3d trans_xyz = q * Xw + tcw;
-//   Vector2d proj;
-//   proj(0) = trans_xyz(0)/trans_xyz(2);
-//   proj(1) = trans_xyz(1)/trans_xyz(2);
-//   Vector2d res;
-//   res[0] = proj[0]*fx + cx;
-//   res[1] = proj[1]*fy + cy;
-//   return res;
-// }
+Vector2d EdgeSO3ProjectXYZOnlyRotation::cam_project(const Eigen::Quaterniond & q) const{
+  Eigen::Matrix3d R = q.matrix();
+  Vector3d trans_xyz = R * Xw + tcw;
+  Vector2d proj;
+  proj(0) = trans_xyz(0)/trans_xyz(2);
+  proj(1) = trans_xyz(1)/trans_xyz(2);
+  Vector2d res;
+  res[0] = proj[0]*fx + cx;
+  res[1] = proj[1]*fy + cy;
+  return res;
+}
 
-// void EdgeSO3ProjectXYZOnlyRotation::linearizeOplus() 
-// {
-	
-// }
+void EdgeSO3ProjectXYZOnlyRotation::linearizeOplus() 
+{
+	const VertexRotation* v1 = static_cast<const VertexRotation*>(_vertices[0]);
+	Eigen::Matrix3d R = v1->estimate().matrix();
+	Vector3d Pr = R * Xw;
+	Vector3d Pt = Pr + tcw;
+
+	double x = Pt[0], y = Pt[1], z = Pt[2];
+	double z2 = z * z;
+	Matrix<double, 2, 3> jacobian_e_p;
+	jacobian_e_p << -fx / z, 0, 	fx * x / z2,
+					0, 		-fy / z,fy * y / z2;
+
+	double xr = Pr[0], yr = Pr[1], zr = Pr[2];
+	Matrix<double, 3, 3> jacobian_p_r;
+	jacobian_p_r << 0, 	zr,	-yr,
+					-zr,0, 	xr,
+					yr,	-xr,0;
+
+	_jacobianOplusXi = jacobian_e_p * jacobian_p_r;
+}
 
 void EdgeSE3ProjectXYZOnlyPoseQuat::linearizeOplus() 
 {

@@ -1421,8 +1421,9 @@ bool Tracking::TrackingWithICP(const Eigen::Matrix4f &M)
     cv::Mat Tc12 = TcwB*LastTwc;
     cout << "before optimizat Tc12 is: " << norm(Tc12.rowRange(0,3).col(3)) << endl;
 
-    Optimizer::poseOptimizationFull(&mCurrentFrame, &mLastFrame);
+    // Optimizer::poseOptimizationFull(&mCurrentFrame, &mLastFrame);
     // Optimizer::poseOptimizationWeight(&mCurrentFrame, &mLastFrame);
+    Optimizer::poseOptimizationRotation(&mCurrentFrame, &mLastFrame);
 
     cv::Mat TcwA = mCurrentFrame.mTcw.clone();
 
