@@ -1373,7 +1373,7 @@ bool Tracking::TrackingWithICP(const Eigen::Matrix4f &M)
     if (score > 0.35)
         return false;
     
-    finalTransform = mLastFrame.current_pose_ * mCurrentFrame.current_pose_.inverse();
+    finalTransform = mCurrentFrame.current_pose_.inverse() * mLastFrame.current_pose_;
 
     
     ORBmatcher matcher(0.9,true);
@@ -1421,8 +1421,8 @@ bool Tracking::TrackingWithICP(const Eigen::Matrix4f &M)
     cv::Mat Tc12 = TcwB*LastTwc;
     cout << "before optimizat Tc12 is: " << norm(Tc12.rowRange(0,3).col(3)) << endl;
 
-    // Optimizer::poseOptimizationFull(&mCurrentFrame, &mLastFrame);
-    Optimizer::poseOptimizationWeight(&mCurrentFrame, &mLastFrame);
+    Optimizer::poseOptimizationFull(&mCurrentFrame, &mLastFrame);
+    // Optimizer::poseOptimizationWeight(&mCurrentFrame, &mLastFrame);
 
     cv::Mat TcwA = mCurrentFrame.mTcw.clone();
 
@@ -1501,8 +1501,8 @@ bool Tracking::TrackLocalMap()
         cv::Mat Tc12 = TcwB*LastTwc;
         cout << "before TrackMap Tc12 is: " << norm(Tc12.rowRange(0,3).col(3)) << endl;
 
-        //Optimizer::PoseOptimizationWithBirdview(&mCurrentFrame);
-        Optimizer::poseOptimizationWeight(&mCurrentFrame, &mLastFrame);
+        Optimizer::PoseOptimizationWithBirdview(&mCurrentFrame);
+        // Optimizer::poseOptimizationWeight(&mCurrentFrame, &mLastFrame);
 
         cv::Mat TcwA = mCurrentFrame.mTcw.clone();
 
