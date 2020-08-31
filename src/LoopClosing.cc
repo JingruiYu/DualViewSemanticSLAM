@@ -392,7 +392,7 @@ bool LoopClosing::ComputeSim3()
                     bMatch = true;
                     mpMatchedKF = pKF;
                     float s = 1;
-                    cv::Mat T12b = cv::Mat::eye(4,4,CV_32F);
+                    cv::Mat T12b = cv::Mat::eye(4,4,CV_32F); //check right
                     R12.copyTo(T12b.rowRange(0,2).colRange(0,2));
                     t12.copyTo(T12b.rowRange(0,2).col(3));
                     cv::Mat T12c = Frame::Tcb*T12b*Frame::Tbc;

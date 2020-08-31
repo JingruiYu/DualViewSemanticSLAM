@@ -533,7 +533,7 @@ bool Initializer::ReconstructF(vector<bool> &vbMatchesInliers, cv::Mat &F21, cv:
     cv::Mat T12b = cv::Mat::eye(4,4,CV_32F);
     R12.copyTo(T12b.rowRange(0,2).colRange(0,2));
     t12.copyTo(T12b.rowRange(0,2).col(3));
-    cv::Mat T12c = Frame::Tcb*T12b*Frame::Tbc;
+    cv::Mat T12c = Frame::Tcb*T12b*Frame::Tbc; // check right
     R12 = T12c.rowRange(0,3).colRange(0,3);
     t12 = T12c.rowRange(0,3).col(3);
     // fill in matches inliers

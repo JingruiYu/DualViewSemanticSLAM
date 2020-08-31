@@ -1184,7 +1184,7 @@ int Optimizer::poseOptimizationFull(Frame* pCurFrame, Frame* pRefFrame)
     vnIndexEdgeBird.reserve(Nb);
     int nBirdInitialCorrespondences = 0;
     
-    const int Nd = 10; // pRefFrame->mvMeasurement_p.size(); // the number of these edge should be controlled
+    const int Nd = 0; // pRefFrame->mvMeasurement_p.size(); // the number of these edge should be controlled
     vector<EdgeSE3ProjectDirect*> vpEdgesDirect;
     vector<size_t> vnIndexEdgeDirect;
     vector<bool> vOutlierDirect;

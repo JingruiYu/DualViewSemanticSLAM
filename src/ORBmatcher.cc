@@ -1924,7 +1924,7 @@ int ORBmatcher::SearchByProjectionBird(Frame &F, const vector<MapPointBird*> &vp
 {
     int nmatches=0;
 
-    cv::Mat Tbw = Frame::Tbc*F.mTcw;
+    cv::Mat Tbw = Frame::Tbc*F.mTcw; // check right
 
     for(size_t iMP=0; iMP<vpMapPointsBird.size(); iMP++)
     {

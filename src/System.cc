@@ -597,7 +597,7 @@ void System::SaveKeyFrameTrajectoryOdomTUM(const string &filename)
 
     // Transform all keyframes so that the first keyframe is at the origin.
     // After a loop closure the first keyframe might not be at the origin.
-    cv::Mat Two = vpKFs[0]->GetPoseInverse()*Frame::Tcb;
+    cv::Mat Two = vpKFs[0]->GetPoseInverse()*Frame::Tcb; //check right
     cout<<"Two = "<<endl<<Two<<endl;
     cout<<"extrinsics : Tbc = "<<endl<<Frame::Tbc<<endl;
 

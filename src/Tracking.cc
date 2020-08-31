@@ -560,7 +560,7 @@ void Tracking::Track()
         // Eigen::Matrix4f Tr = Converter::toMatrix4f(Twbr);
         if (!mCurrentFrame.mTcw.empty())
         {        
-            cv::Mat Rwc = mCurrentFrame.mTcw.rowRange(0,3).colRange(0,3).t();
+            cv::Mat Rwc = mCurrentFrame.mTcw.rowRange(0,3).colRange(0,3).t(); // checked right
             cv::Mat twc = -Rwc*mCurrentFrame.mTcw.rowRange(0,3).col(3);
             cv::Mat Twc = cv::Mat::eye(4,4,CV_32F);
             Rwc.copyTo(Twc.rowRange(0,3).colRange(0,3));
@@ -1373,7 +1373,7 @@ bool Tracking::TrackingWithICP(const Eigen::Matrix4f &M)
     if (score > 0.35)
         return false;
     
-    finalTransform = mCurrentFrame.current_pose_.inverse() * mLastFrame.current_pose_;
+    finalTransform = mCurrentFrame.current_pose_.inverse() * mLastFrame.current_pose_;  // check right
 
     
     ORBmatcher matcher(0.9,true);

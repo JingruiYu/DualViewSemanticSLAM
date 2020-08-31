@@ -104,16 +104,11 @@ void MapDrawer::DrawCloud()
             pb.at<float>(1,0) = p.y;
             pb.at<float>(2,0) = p.z;
             
-            cv::Mat pc = Frame::Tcb.rowRange(0,3).colRange(0,3) * pb + Frame::Tcb.rowRange(0,3).col(3);
-            
+            cv::Mat pc = Frame::Tcb.rowRange(0,3).colRange(0,3) * pb + Frame::Tcb.rowRange(0,3).col(3); //check right
             cv::Mat Twc = pKF->GetPoseInverse();
-            cv::Mat pwc = Twc.rowRange(0,3).colRange(0,3) * pc + Twc.rowRange(0,3).col(3);
+            cv::Mat pw = Twc.rowRange(0,3).colRange(0,3) * pc + Twc.rowRange(0,3).col(3);
 
-            cv::Mat Twb = Frame::Tcb * Twc;
-            // Twb = Twb.t();
-            cv::Mat pwb = Twb.rowRange(0,3).colRange(0,3) * pb + Twb.rowRange(0,3).col(3);
-            
-            cv::Mat p_o = pwc;
+            cv::Mat p_o = pw;
 
             glVertex3f(p_o.at<float>(0,0),p_o.at<float>(1,0),p_o.at<float>(2,0));
         }
@@ -135,16 +130,11 @@ void MapDrawer::DrawCloud()
         pb.at<float>(1,0) = p.y;
         pb.at<float>(2,0) = p.z;
         
-        cv::Mat pc = Frame::Tcb.rowRange(0,3).colRange(0,3) * pb + Frame::Tcb.rowRange(0,3).col(3);
-        
+        cv::Mat pc = Frame::Tcb.rowRange(0,3).colRange(0,3) * pb + Frame::Tcb.rowRange(0,3).col(3); //check right
         cv::Mat Twc = pKF->GetPoseInverse();
-        cv::Mat pwc = Twc.rowRange(0,3).colRange(0,3) * pc + Twc.rowRange(0,3).col(3);
+        cv::Mat pw = Twc.rowRange(0,3).colRange(0,3) * pc + Twc.rowRange(0,3).col(3);
 
-        cv::Mat Twb = Frame::Tcb * Twc;
-        // Twb = Twb.t();
-        cv::Mat pwb = Twb.rowRange(0,3).colRange(0,3) * pb + Twb.rowRange(0,3).col(3);
-        
-        cv::Mat p_o = pwc;
+        cv::Mat p_o = pw;
 
         glVertex3f(p_o.at<float>(0,0),p_o.at<float>(1,0),p_o.at<float>(2,0));
     }
@@ -167,7 +157,6 @@ void MapDrawer::DrawKeyFrames(const bool bDrawKF, const bool bDrawGraph)
         {
             KeyFrame* pKF = vpKFs[i];
             cv::Mat Twc = pKF->GetPoseInverse();
-            cv::Mat Twb = Frame::Tcb * Twc;
             cv::Mat Tr = Twc.t();
             glPushMatrix();
 

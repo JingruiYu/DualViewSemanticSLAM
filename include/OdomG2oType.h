@@ -315,7 +315,7 @@ public:
         const g2o::VertexSE3Expmap* v  =static_cast<const g2o::VertexSE3Expmap*> ( _vertices[0] );
         Eigen::Vector3d x_local = v->estimate().map ( x_world_ );
         cv::Mat p_c = Converter::toCvMat(x_local);
-		cv::Mat uv = Ror_ * Rcb_.t() * ( p_c - tcb_) + tor_; 
+		cv::Mat uv = Ror_ * Rcb_.t() * ( p_c - tcb_) + tor_; //Ror_ from bady to image, check right
         float x = uv.at<float>(0);
         float y = uv.at<float>(1);
 
