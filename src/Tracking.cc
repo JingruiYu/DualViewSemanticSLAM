@@ -475,7 +475,6 @@ void Tracking::Track()
                     }
                     
                     bOK = TrackingWithICP(initTransform);
-                    bOK = false;
 
                     if(!bOK)
                     {
@@ -1374,10 +1373,8 @@ bool Tracking::TrackingWithICP(const Eigen::Matrix4f &M)
     if (score > 0.35)
         return false;
     
-    return false;
     finalTransform = mCurrentFrame.current_pose_.inverse() * mLastFrame.current_pose_;  // check right
 
-    
     ORBmatcher matcher(0.9,true);
 
     UpdateLastFrame();
@@ -1423,7 +1420,9 @@ bool Tracking::TrackingWithICP(const Eigen::Matrix4f &M)
     cv::Mat Tc12 = TcwB*LastTwc;
     cout << "before optimizat Tc12 is: " << norm(Tc12.rowRange(0,3).col(3)) << endl;
 
-    Optimizer::poseOptimizationFull(&mCurrentFrame, &mLastFrame);
+    Optimizer::PoseOptimizationWithBirdviewPixel(&mCurrentFrame);
+
+    // Optimizer::poseOptimizationFull(&mCurrentFrame, &mLastFrame);
     // Optimizer::poseOptimizationWeight(&mCurrentFrame, &mLastFrame);
     // Optimizer::poseOptimizationRotation(&mCurrentFrame, &mLastFrame);
 

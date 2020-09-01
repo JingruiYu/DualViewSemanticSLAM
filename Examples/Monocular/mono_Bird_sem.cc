@@ -45,6 +45,13 @@ int main(int argc, char **argv)
     
     LoadDataset(strFile, vstrImageFilenames, vstrBirdviewFilenames, vstrBirdviewMaskFilenames, vstrBirdviewContourFilenames, vstrBirdviewContourICPFilenames, vgtPose, vTimestamps);
 
+    vstrImageFilenames.clear();
+    vstrBirdviewFilenames.clear();
+    vstrBirdviewMaskFilenames.clear();
+    vstrBirdviewContourFilenames.clear();
+    vstrBirdviewContourICPFilenames.clear();
+    vTimestamps.clear();
+
     strFile = string(argv[3])+"/associate.txt";
     LoadDataset(strFile, vstrImageFilenames, vstrBirdviewFilenames, vstrBirdviewMaskFilenames, vstrBirdviewContourFilenames, vstrBirdviewContourICPFilenames, vodomPose, vTimestamps);
 

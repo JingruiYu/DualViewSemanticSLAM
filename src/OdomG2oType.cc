@@ -154,6 +154,40 @@ Matrix3d EdgeSE3ProjectXYZ2XYZOnlyPoseQuat::skew(Vector3d phi)
 	return Phi;
 }
 
+Vector2d EdgeSE3ProjectPw2BirdPixel::cam_project(const Vector3d & Xc) const{
+  
+  Vector3d Xb = Rbc * Xc + tbc;
+  Vector2d res;
+  res[0] = birdviewCols/2- Xb[1] *meter2pixel;
+  res[1] = birdviewRows/2-(Xb[0]-rear_axle_to_center)*meter2pixel;
+
+  return res;
+}
+
+void EdgeSE3ProjectPw2BirdPixel::linearizeOplus() {
+  g2o::VertexSE3Expmap * vi = static_cast<g2o::VertexSE3Expmap *>(_vertices[0]);
+  Vector3d Xc = vi->estimate().map(Xw);
+  
+  Matrix<double, 3, 6> jacobian_pc_pw;
+  jacobian_pc_pw << -skew(Xc), Matrix3d::Identity();
+
+  Matrix<double, 3, 3> jacobian_pb_pc = Rbc;
+
+  Matrix<double, 2, 3> jacobian_pixel_pb;
+  jacobian_pixel_pb << 0, meter2pixel, 0,
+					meter2pixel, 0, 0;
+
+  _jacobianOplusXi = jacobian_pixel_pb * jacobian_pb_pc * jacobian_pc_pw;
+}
+
+Matrix3d EdgeSE3ProjectPw2BirdPixel::skew(Vector3d phi)
+{
+	Matrix3d Phi;
+	Phi << 0, -phi[2], phi[1],
+		phi[2], 0, -phi[0],
+		-phi[1], phi[0], 0;
+	return Phi;
+}
 
 Matrix3d EdgePointTransformSE3Quat::skew(Vector3d phi)
 {

@@ -621,6 +621,223 @@ int Optimizer::PoseOptimizationWithBirdview(Frame *pFrame, Frame* pRefFrame)
     return nInitialCorrespondences-nBad;
 }
 
+int Optimizer::PoseOptimizationWithBirdviewPixel(Frame *pCurFrame, Frame* pRefFrame)
+{
+    // 0. graph model
+    g2o::SparseOptimizer optimizer;
+
+    // 1. linearSolver
+    g2o::BlockSolverX::LinearSolverType * linearSolver;
+    linearSolver = new g2o::LinearSolverDense<g2o::BlockSolverX::PoseMatrixType>(); // linear solver using dense cholesky decomposition
+    
+    // 2. blockSolver
+    g2o::BlockSolverX * solver_ptr = new g2o::BlockSolverX(linearSolver);
+
+    // 3. optimizer algorithm
+    g2o::OptimizationAlgorithmLevenberg * solver = new g2o::OptimizationAlgorithmLevenberg(solver_ptr);
+
+    // 4. set solver 
+    optimizer.setAlgorithm(solver);
+    optimizer.setVerbose(false); // for output
+
+    // 5. vertex
+    g2o::VertexSE3Expmap * vSE3c = new g2o::VertexSE3Expmap();
+    vSE3c->setId(0);
+    vSE3c->setEstimate(Converter::toSE3Quat(pCurFrame->mTcw));
+    vSE3c->setFixed(false);
+    optimizer.addVertex(vSE3c);
+
+    // 6. edge
+    const int Nf = pCurFrame->N;
+    vector<g2o::EdgeSE3ProjectXYZOnlyPose*> vpEdgesFront;
+    vector<size_t> vnIndexEdgeFront;
+    vpEdgesFront.reserve(Nf);
+    vnIndexEdgeFront.reserve(Nf);
+    int nFrontInitialCorrespondences = 0;
+
+    const int Nb = pCurFrame->mvbBirdviewInliers.size();
+    vector<EdgeSE3ProjectPw2BirdPixel*> vpEdgesBird;
+    vector<size_t> vnIndexEdgeBird;
+    vpEdgesBird.reserve(Nb);
+    vnIndexEdgeBird.reserve(Nb);
+    int nBirdInitialCorrespondences = 0;
+
+    
+    const float deltaMono = sqrt(5.991);
+    {
+    unique_lock<mutex> lock(MapPoint::mGlobalMutex);
+    // front pts
+    for (int i = 0; i < Nf; i++)
+    {
+        MapPoint* pMP = pCurFrame->mvpMapPoints[i];
+        if (pMP)
+        {
+            nFrontInitialCorrespondences++;
+            pCurFrame->mvbOutlier[i] = false;
+
+            Eigen::Matrix<double,2,1> obs;
+            const cv::KeyPoint &kpUn = pCurFrame->mvKeysUn[i];
+            obs << kpUn.pt.x, kpUn.pt.y;
+
+            g2o::EdgeSE3ProjectXYZOnlyPose * e = new g2o::EdgeSE3ProjectXYZOnlyPose();
+            e->setVertex(0,dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertex(0))); // dynamic_cast : type convert for class only
+            e->setMeasurement(obs);
+            const float invSigma2 = pCurFrame->mvInvLevelSigma2[kpUn.octave]; // uncertainty per pixel
+            e->setInformation(Eigen::Matrix2d::Identity()*invSigma2);
+
+            g2o::RobustKernelHuber * rk = new g2o::RobustKernelHuber;
+            e->setRobustKernel(rk);
+            rk->setDelta(deltaMono);
+
+            e->fx = pCurFrame->fx;
+            e->fy = pCurFrame->fy;
+            e->cx = pCurFrame->cx;
+            e->cy = pCurFrame->cy;
+
+            cv::Mat Xw = pMP->GetWorldPos();
+            e->Xw[0] = Xw.at<float>(0);
+            e->Xw[1] = Xw.at<float>(1);
+            e->Xw[2] = Xw.at<float>(2);
+            
+            optimizer.addEdge(e);
+            vpEdgesFront.push_back(e);
+            vnIndexEdgeFront.push_back(i);
+        }
+    }
+
+    // bird pts
+    for (int i = 0; i < Nb; i++)
+    {
+        MapPointBird* pMP = pCurFrame->mvpMapPointsBird[i];
+        if (pMP)
+        {
+            nBirdInitialCorrespondences++;
+            pCurFrame->mvbBirdviewInliers[i] = true;
+            
+            Eigen::Matrix<double,2,1> obs;
+            const cv::KeyPoint &kpUn = pCurFrame->mvKeysBird[i];
+            obs << kpUn.pt.x, kpUn.pt.y;
+
+            EdgeSE3ProjectPw2BirdPixel * e = new EdgeSE3ProjectPw2BirdPixel();
+            e->setVertex(0,dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertex(0)));
+            e->setMeasurement(obs);
+            const float invSigma2 = pCurFrame->mvInvLevelSigma2[pCurFrame->mvKeysBird[i].octave]; // set according to the uncertainty of pixel location
+            e->setInformation(Eigen::Matrix2d::Identity()*invSigma2); 
+
+            g2o::RobustKernelHuber * rk = new g2o::RobustKernelHuber;
+            e->setRobustKernel(rk);
+            rk->setDelta(deltaMono); // less, more linear
+
+            e->Rbc = Converter::toMatrix3d(Frame::Tbc.rowRange(0,3).colRange(0,3));
+            e->tbc = Converter::toVector3d(Frame::Tbc.rowRange(0,3).col(3));
+            e->meter2pixel = Frame::meter2pixel;
+            e->birdviewCols = Frame::birdviewCols;
+            e->birdviewRows = Frame::birdviewRows;
+            e->rear_axle_to_center = Frame::rear_axle_to_center;
+
+            cv::Mat Xw = pMP->GetWorldPos();
+            e->Xw[0] = Xw.at<float>(0);
+            e->Xw[1] = Xw.at<float>(1);
+            e->Xw[2] = Xw.at<float>(2);
+
+            optimizer.addEdge(e);
+            vpEdgesBird.push_back(e);
+            vnIndexEdgeBird.push_back(i);
+        }
+    }
+
+    }
+
+    if (nFrontInitialCorrespondences < 3 && nBirdInitialCorrespondences < 3)
+        return 0;
+
+    
+    // 7. iteration optimization
+    const float chi2Mono[4]={5.991,5.991,5.991,5.991};
+    const int its[4]={10,10,10,10};
+    int nFrontBad = 0;
+    int nBirdBad = 0;
+
+    for (size_t it = 0; it < 4; it++)
+    {
+        vSE3c->setEstimate(Converter::toSE3Quat(pCurFrame->mTcw));
+        optimizer.initializeOptimization(0);
+        optimizer.optimize(its[it]);
+
+        nFrontBad = 0;
+        for (size_t i = 0, iend = vpEdgesFront.size(); i < iend; i++)
+        {
+            g2o::EdgeSE3ProjectXYZOnlyPose * e = vpEdgesFront[i];
+            const size_t idx = vnIndexEdgeFront[i];
+
+            if (pCurFrame->mvbOutlier[idx])
+                e->computeError();
+            
+            const float chi2 = e->chi2();
+            if (chi2>chi2Mono[it])
+            {
+                pCurFrame->mvbOutlier[idx] = true;
+                e->setLevel(1);
+                nFrontBad++;
+            }
+            else
+            {
+                pCurFrame->mvbOutlier[idx] = false;
+                e->setLevel(0);
+            }
+
+            if (it==2)
+                e->setRobustKernel(0); // means no kernel used
+        }
+
+        nBirdBad = 0;
+        for (size_t i = 0, iend = vpEdgesBird.size(); i < iend; i++)
+        {
+            EdgeSE3ProjectPw2BirdPixel * e = vpEdgesBird[i];
+            const size_t idx = vnIndexEdgeBird[i];
+
+            if (!pCurFrame->mvbBirdviewInliers[idx])
+                e->computeError();
+            
+            const float chi2 = e->chi2();
+            if (chi2>chi2Mono[it])
+            {
+                pCurFrame->mvbBirdviewInliers[idx] = false;
+                e->setLevel(1);
+                nBirdBad++;
+            }
+            else
+            {
+                pCurFrame->mvbBirdviewInliers[idx] = true;
+                e->setLevel(0);
+            }
+            
+            if (it==2)
+                e->setRobustKernel(0);
+        }
+    }
+
+    // 8. get result
+    g2o::VertexSE3Expmap * vSE3c_recov = static_cast<g2o::VertexSE3Expmap*>(optimizer.vertex(0));
+    g2o::SE3Quat SE3c_recov = vSE3c_recov->estimate();
+    cv::Mat pose = Converter::toCvMat(SE3c_recov);
+    pCurFrame->SetPose(pose);
+
+    bool suc = false;
+    if ( (nFrontInitialCorrespondences-nFrontBad) > 0)
+        suc = true;
+    else
+        cout << "\033[31m" << "nFrontInitialCorrespondences-nFrontBad < 0" << "\033[0m" << endl;
+    
+    if ( (nBirdInitialCorrespondences-nBirdBad) > 0)
+        suc = true;
+    else
+        cout << "\033[31m" << "nBirdInitialCorrespondences-nBirdBad < 0" << "\033[0m" << endl;
+    
+    
+    return suc;
+}
+
 void Optimizer::LocalBundleAdjustmentWithBirdview(KeyFrame *pKF, bool* pbStopFlag, Map* pMap)
 {    
     // Local KeyFrames: First Breath Search from Current Keyframe

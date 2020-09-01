@@ -207,6 +207,33 @@ public:
 	Vector3d Xw,Xc;
 };
 
+class  EdgeSE3ProjectPw2BirdPixel: public  g2o::BaseUnaryEdge<2, Vector2d, g2o::VertexSE3Expmap>{
+public:
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
+  EdgeSE3ProjectPw2BirdPixel(){}
+
+  bool read(std::istream& is){return false;}
+
+  bool write(std::ostream& os) const{return false;}
+
+  void computeError()  {
+    const g2o::VertexSE3Expmap* v1 = static_cast<const g2o::VertexSE3Expmap*>(_vertices[0]);
+    Vector2d obs(_measurement);
+    _error = obs-cam_project(v1->estimate().map(Xw));
+  }
+
+  virtual void linearizeOplus();
+
+  Vector2d cam_project(const Vector3d & Xc) const;
+  
+  Matrix3d skew(Vector3d phi);
+
+  Vector3d Xw,tbc;
+  Matrix3d Rbc;
+  double meter2pixel,birdviewCols,birdviewRows,rear_axle_to_center;
+};
+
 class EdgePointTransformSE3Quat :public g2o::BaseBinaryEdge<3, Vector3d, VertexSE3Quat, VertexSE3Quat>
 {
 public:
