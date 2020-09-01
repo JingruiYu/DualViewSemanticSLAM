@@ -18,7 +18,7 @@ const double vehicle_width = 1.901;
 
 void LoadDataset(const string &strFile, vector<string> &vstrImageFilenames, vector<string> &vstrBirdviewFilenames, 
                 vector<string> &vstrBirdviewMaskFilenames, vector<string> &vstrBirdviewContourFilenames, 
-                vector<string> &vstrBirdviewContourICPFilenames, vector<cv::Vec3d> &vodomPose, vector<double> &vTimestamps);
+                vector<string> &vstrBirdviewContourICPFilenames, vector<cv::Vec3d> &vgtPose, vector<double> &vTimestamps);
 void applyMask(const cv::Mat& src, cv::Mat& dst, const cv::Mat& mask);
 void applyMaskBirdview(const cv::Mat& src, cv::Mat& dst, const cv::Mat& mask);
 void ConvertMaskBirdview(const cv::Mat& src, cv::Mat& dst);
@@ -38,10 +38,14 @@ int main(int argc, char **argv)
     vector<string> vstrBirdviewContourFilenames;
     vector<string> vstrBirdviewContourICPFilenames;
     vector<double> vTimestamps;
+    vector<cv::Vec3d> vgtPose;
     vector<cv::Vec3d> vodomPose;
 
-    string strFile = string(argv[3])+"/associate.txt";
+    string strFile = string(argv[3])+"/groundtruth.txt";
     
+    LoadDataset(strFile, vstrImageFilenames, vstrBirdviewFilenames, vstrBirdviewMaskFilenames, vstrBirdviewContourFilenames, vstrBirdviewContourICPFilenames, vgtPose, vTimestamps);
+
+    strFile = string(argv[3])+"/associate.txt";
     LoadDataset(strFile, vstrImageFilenames, vstrBirdviewFilenames, vstrBirdviewMaskFilenames, vstrBirdviewContourFilenames, vstrBirdviewContourICPFilenames, vodomPose, vTimestamps);
 
     int nImages = vstrImageFilenames.size();
@@ -79,7 +83,8 @@ int main(int argc, char **argv)
         birdviewContour = cv::imread(string(argv[3])+"/"+vstrBirdviewContourFilenames[ni], CV_LOAD_IMAGE_UNCHANGED);
         birdviewContourICP = cv::imread(string(argv[3])+"/"+vstrBirdviewContourICPFilenames[ni], CV_LOAD_IMAGE_UNCHANGED);
         double tframe = vTimestamps[ni];
-        cv::Vec3d odomframe=vodomPose[ni];
+        cv::Vec3d gtPose=vgtPose[ni];
+        cv::Vec3d odomPose=vodomPose[ni];
 
         if(im.empty())
         {
@@ -143,7 +148,7 @@ int main(int argc, char **argv)
             cout << endl << "it is frame ... " << ni << endl;
         // Pass the image to the SLAM system
         //SLAM.TrackMonocular(im,tframe);
-        SLAM.TrackMonocularWithBirdviewSem(im,birdview,birdviewmask,birdviewContour,birdviewContourICP,odomframe,tframe);
+        SLAM.TrackMonocularWithBirdviewSem(im,birdview,birdviewmask,birdviewContour,birdviewContourICP,gtPose,odomPose,tframe);
 
 #ifdef COMPILEDWITHC11
         std::chrono::steady_clock::time_point t2 = std::chrono::steady_clock::now();
@@ -190,7 +195,7 @@ int main(int argc, char **argv)
 
 void LoadDataset(const string &strFile, vector<string> &vstrImageFilenames, vector<string> &vstrBirdviewFilenames, 
                 vector<string> &vstrBirdviewMaskFilenames, vector<string> &vstrBirdviewContourFilenames,
-                vector<string> &vstrBirdviewContourICPFilenames, vector<cv::Vec3d> &vodomPose, vector<double> &vTimestamps)
+                vector<string> &vstrBirdviewContourICPFilenames, vector<cv::Vec3d> &vgtPose, vector<double> &vTimestamps)
 {
     ifstream f;
     f.open(strFile.c_str());
@@ -209,7 +214,7 @@ void LoadDataset(const string &strFile, vector<string> &vstrImageFilenames, vect
             ss >> t;
             vTimestamps.push_back(t);
             ss>>x>>y>>theta;
-            vodomPose.push_back(cv::Vec3d(x,y,theta));
+            vgtPose.push_back(cv::Vec3d(x,y,theta));
             ss >> image;
             vstrImageFilenames.push_back("image/"+image+".jpg");
             vstrBirdviewFilenames.push_back("birdview/"+image+".jpg");

@@ -343,7 +343,7 @@ cv::Mat Tracking::GrabImageMonocularWithBirdview(const cv::Mat &im, const cv::Ma
     return mCurrentFrame.mTcw.clone();
 }
 
-cv::Mat Tracking::GrabImageMonocularWithBirdviewSem(const cv::Mat &im, const cv::Mat &birdview, const cv::Mat &birdviewmask, const cv::Mat &birdviewContour, const cv::Mat &birdviewContourICP, const double &timestamp, cv::Vec3d odomPose)
+cv::Mat Tracking::GrabImageMonocularWithBirdviewSem(const cv::Mat &im, const cv::Mat &birdview, const cv::Mat &birdviewmask, const cv::Mat &birdviewContour, const cv::Mat &birdviewContourICP, const double &timestamp, cv::Vec3d gtPose, cv::Vec3d odomPose)
 {
     mImGray = im;
     mBirdviewGray = birdview;
@@ -387,9 +387,9 @@ cv::Mat Tracking::GrabImageMonocularWithBirdviewSem(const cv::Mat &im, const cv:
 
 
     if(mState==NOT_INITIALIZED || mState==NO_IMAGES_YET)
-        mCurrentFrame = Frame(mImGray,mBirdviewGray,mBirdICP,birdviewmask,birdviewContour,odomPose,timestamp,mpIniORBextractor,mpORBVocabulary,mK,mDistCoef,mbf,mThDepth);
+        mCurrentFrame = Frame(mImGray,mBirdviewGray,mBirdICP,birdviewmask,birdviewContour,gtPose,odomPose,timestamp,mpIniORBextractor,mpORBVocabulary,mK,mDistCoef,mbf,mThDepth);
     else
-        mCurrentFrame = Frame(mImGray,mBirdviewGray,mBirdICP,birdviewmask,birdviewContour,odomPose,timestamp,mpORBextractorLeft,mpORBVocabulary,mK,mDistCoef,mbf,mThDepth);
+        mCurrentFrame = Frame(mImGray,mBirdviewGray,mBirdICP,birdviewmask,birdviewContour,gtPose,odomPose,timestamp,mpORBextractorLeft,mpORBVocabulary,mK,mDistCoef,mbf,mThDepth);
 
     
     if(!mpmatcherBirdview)
@@ -454,7 +454,9 @@ void Tracking::Track()
                     // Get the initial transform
                     Eigen::Matrix4f initTransform = Eigen::Matrix4f::Identity();
                     {
-                        // cv::Mat encPose = GetEncoderPose();
+                        cv::Mat encPose = GetEncoderPose();
+                        cv::Mat gtPose = GetGTPose();
+                        cv::Mat birdICP = GetBirdICP();
                         // if (!encPose.empty())
                         // {
                         //     initTransform = Converter::toMatrix4f(encPose);
@@ -473,6 +475,7 @@ void Tracking::Track()
                     }
                     
                     bOK = TrackingWithICP(initTransform);
+                    bOK = false;
 
                     if(!bOK)
                     {
@@ -539,25 +542,6 @@ void Tracking::Track()
         // Update drawer
         mpFrameDrawer->Update(this);
 
-        // cv::Mat Two = Frame::Tcb;
-        // cv::Mat Tbw= Frame::Tbc * mCurrentFrame.mTcw * Two;
-        // cv::Mat Tbwr= Frame::Tbc * mLastFrame.mTcw * Two;
-
-        // cv::Mat Rwb = Tbw.rowRange(0,3).colRange(0,3).t();
-        // cv::Mat twb = -Rwb*Tbw.rowRange(0,3).col(3);
-        // cv::Mat Rwbr = Tbwr.rowRange(0,3).colRange(0,3).t();
-        // cv::Mat twbr = -Rwbr*Tbwr.rowRange(0,3).col(3);
-
-        // cv::Mat Twb = cv::Mat::eye(4,4,CV_32F);
-        // Rwb.copyTo(Twb.rowRange(0,3).colRange(0,3));
-        // twb.copyTo(Twb.rowRange(0,3).col(3));
-        // cv::Mat Twbr = cv::Mat::eye(4,4,CV_32F);
-        // Rwbr.copyTo(Twbr.rowRange(0,3).colRange(0,3));
-        // twbr.copyTo(Twbr.rowRange(0,3).col(3));
-
-
-        // Eigen::Matrix4f Tc = Converter::toMatrix4f(Twb);
-        // Eigen::Matrix4f Tr = Converter::toMatrix4f(Twbr);
         if (!mCurrentFrame.mTcw.empty())
         {        
             cv::Mat Rwc = mCurrentFrame.mTcw.rowRange(0,3).colRange(0,3).t(); // checked right
@@ -997,6 +981,7 @@ void Tracking::CreateInitialMapMonocular()
     mCurrentFrame.mpReferenceKF = pKFcur;
 
     mLastFrame = Frame(mCurrentFrame);
+    mKeyBirdFrame = Frame(mCurrentFrame);
 
     mpMap->SetReferenceMapPoints(mvpLocalMapPoints);
 
@@ -1350,9 +1335,25 @@ bool Tracking::TrackingWithICP(const Eigen::Matrix4f &M)
         localCloudPose = mCurrentFrame.current_pose_;
         updateKfCloud = true;
     }
+    else
+    {
+        updateKfCloud = false;
+    }
         
 
     {    
+        // -- local
+        //---- convert to map frame
+        SemanticCloud::Ptr local_cloud_in_map(new SemanticCloud);
+        pcl::transformPointCloud(*localCloud, *local_cloud_in_map, localCloudPose);
+
+        pcl::visualization::PointCloudColorHandlerCustom<SemanticPoint>
+            local_handler(local_cloud_in_map, 255, 255, 255);
+        string cloud_name = "cloud" + to_string(mCurrentFrame.mnId);
+        viewer_ptr_->addPointCloud(local_cloud_in_map, cloud_name);
+        // viewer_ptr_->setPointCloudRenderingProperties(
+        //     pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 5, "local_cloud");
+            
         // -- vehicle model
         Eigen::Affine3f vehicle_pose;
         vehicle_pose.matrix() = trajectory_.back();
@@ -1373,6 +1374,7 @@ bool Tracking::TrackingWithICP(const Eigen::Matrix4f &M)
     if (score > 0.35)
         return false;
     
+    return false;
     finalTransform = mCurrentFrame.current_pose_.inverse() * mLastFrame.current_pose_;  // check right
 
     
@@ -1421,9 +1423,9 @@ bool Tracking::TrackingWithICP(const Eigen::Matrix4f &M)
     cv::Mat Tc12 = TcwB*LastTwc;
     cout << "before optimizat Tc12 is: " << norm(Tc12.rowRange(0,3).col(3)) << endl;
 
-    // Optimizer::poseOptimizationFull(&mCurrentFrame, &mLastFrame);
+    Optimizer::poseOptimizationFull(&mCurrentFrame, &mLastFrame);
     // Optimizer::poseOptimizationWeight(&mCurrentFrame, &mLastFrame);
-    Optimizer::poseOptimizationRotation(&mCurrentFrame, &mLastFrame);
+    // Optimizer::poseOptimizationRotation(&mCurrentFrame, &mLastFrame);
 
     cv::Mat TcwA = mCurrentFrame.mTcw.clone();
 
@@ -1492,7 +1494,6 @@ bool Tracking::TrackLocalMap()
     {
         // generate more birdview mappoints
         MatchAndRetriveBirdMP();
-
 
         cv::Mat TcwB = mCurrentFrame.mTcw.clone();
 
@@ -2381,6 +2382,22 @@ cv::Mat Tracking::GetEncoderPose()
     double x1=mLastFrame.mOdomPose[0],y1=mLastFrame.mOdomPose[1],theta1=mLastFrame.mOdomPose[2];
     double x2=mCurrentFrame.mOdomPose[0],y2=mCurrentFrame.mOdomPose[1],theta2=mCurrentFrame.mOdomPose[2];
 
+    cv::Mat Tgc=(cv::Mat_<float>(4,4)<<cos(theta2),-sin(theta2),0,x2,
+                                        sin(theta2), cos(theta2),0,y2,
+                                             0,            0,      1, 0,
+                                             0,            0,      0, 1);
+    Eigen::Matrix4f Tg = Converter::toMatrix4f(Tgc);
+
+    Eigen::Affine3f vehicle_pose;
+    vehicle_pose.matrix() = Tg;
+    birdseye_odometry::SemanticPoint waypoint;
+    waypoint.x = vehicle_pose.translation()[0];
+    waypoint.y = vehicle_pose.translation()[1];
+    waypoint.z = vehicle_pose.translation()[2];
+    string waypoint_name = "encoder" + to_string(mCurrentFrame.mnId);
+    viewer_ptr_->addSphere(waypoint, 0.1, 150, 0, 150, waypoint_name);
+    viewer_ptr_->spinOnce();
+
     //pre-integration terms
     double theta12=theta2-theta1;
     double x12=(x2-x1)*cos(theta1)+(y2-y1)*sin(theta1);
@@ -2396,22 +2413,68 @@ cv::Mat Tracking::GetEncoderPose()
 }
 
 
+cv::Mat Tracking::GetGTPose()
+{
+    //odometer pose    
+    double x1=mLastFrame.mGtPose[0],y1=mLastFrame.mGtPose[1],theta1=mLastFrame.mGtPose[2];
+    double x2=mCurrentFrame.mGtPose[0],y2=mCurrentFrame.mGtPose[1],theta2=mCurrentFrame.mGtPose[2];
+
+    cv::Mat Tgc=(cv::Mat_<float>(4,4)<<cos(theta2),-sin(theta2),0,x2,
+                                        sin(theta2), cos(theta2),0,y2,
+                                             0,            0,      1, 0,
+                                             0,            0,      0, 1);
+    Eigen::Matrix4f Tg = Converter::toMatrix4f(Tgc);
+
+    Eigen::Affine3f vehicle_pose;
+    vehicle_pose.matrix() = Tg;
+    birdseye_odometry::SemanticPoint waypoint;
+    waypoint.x = vehicle_pose.translation()[0];
+    waypoint.y = vehicle_pose.translation()[1];
+    waypoint.z = vehicle_pose.translation()[2];
+    string waypoint_name = "groundTruth" + to_string(mCurrentFrame.mnId);
+    viewer_ptr_->addSphere(waypoint, 0.1, 0, 0, 150, waypoint_name);
+    viewer_ptr_->spinOnce();
+
+    //pre-integration terms
+    double theta12=theta2-theta1;
+    double x12=(x2-x1)*cos(theta1)+(y2-y1)*sin(theta1);
+    double y12=(y2-y1)*cos(theta1)-(x2-x1)*sin(theta1);
+
+    //T12
+    cv::Mat T12b=(cv::Mat_<float>(4,4)<<cos(theta12),-sin(theta12),0,x12,
+                                        sin(theta12), cos(theta12),0,y12,
+                                             0,            0,      1, 0,
+                                             0,            0,      0, 1);
+
+    return T12b.clone();
+}
+
 cv::Mat Tracking::GetBirdICP()
 {
     cv::Mat T12c;
 
-    mvnBirdviewMatches12.clear();
-    int nmatches = mpmatcherBirdview->BirdviewMatch(mLastFrame,mCurrentFrame,mvnBirdviewMatches12,10);
+    if (!mLastFrame.mTcw.empty() )
+    {
+        if (mLastFrame.mnId % 3 == 0)
+        {
+            mKeyBirdFrame = Frame(mLastFrame);
+        }
+    }
+    
+    std::vector<int> vBirdviewMatches12(mvnBirdviewMatches12);
+    vBirdviewMatches12.clear();
+    int nmatches = mpmatcherBirdview->BirdviewMatch(mKeyBirdFrame,mCurrentFrame,vBirdviewMatches12,30);
     
     if (nmatches < 20)
         return T12c.clone();
+        
     
     vector<Match> vMatchesBird12;
-    for(size_t k=0;k<mvnBirdviewMatches12.size();k++)
+    for(size_t k=0;k<vBirdviewMatches12.size();k++)
     {
-        if(mvnBirdviewMatches12[k]>=0)
+        if(vBirdviewMatches12[k]>=0)
         {
-            vMatchesBird12.push_back(make_pair(k,mvnBirdviewMatches12[k]));
+            vMatchesBird12.push_back(make_pair(k,vBirdviewMatches12[k]));
         }
     }
 
@@ -2419,11 +2482,30 @@ cv::Mat Tracking::GetBirdICP()
     cv::Mat R12,t12;
     float score=0;
     float sigma = 1.0*Frame::pixel2meter;
-    mIcp->FindRtICP2D(mLastFrame.mvKeysBirdBaseXY,mCurrentFrame.mvKeysBirdBaseXY,vMatchesBird12,vbMatchesInliersBird,R12,t12,score,sigma);
+    mIcp->FindRtICP2D(mKeyBirdFrame.mvKeysBirdBaseXY,mCurrentFrame.mvKeysBirdBaseXY,vMatchesBird12,vbMatchesInliersBird,R12,t12,score,sigma);
 
     cv::Mat T12b = cv::Mat::eye(4,4,CV_32F);
     R12.copyTo(T12b.rowRange(0,2).colRange(0,2));
     t12.copyTo(T12b.rowRange(0,2).col(3));
+
+    cv::Mat T21b = cv::Mat::eye(4,4,CV_32F);
+    cv::Mat R21b = R12.t();
+    cv::Mat t21b = -R21b*t12;
+    R21b.copyTo(T21b.rowRange(0,2).colRange(0,2));
+    t21b.copyTo(T21b.rowRange(0,2).col(3));
+
+    mCurrentFrame.current_ICP2D_pose = mKeyBirdFrame.current_ICP2D_pose * T12b;
+    Eigen::Matrix4f Ticp = Converter::toMatrix4f(mCurrentFrame.current_ICP2D_pose);
+    Eigen::Affine3f vehicle_pose;
+    vehicle_pose.matrix() = Ticp;
+    birdseye_odometry::SemanticPoint waypoint;
+    waypoint.x = vehicle_pose.translation()[0];
+    waypoint.y = vehicle_pose.translation()[1];
+    waypoint.z = vehicle_pose.translation()[2];
+    string waypoint_name = "ICP2D" + to_string(mCurrentFrame.mnId);
+    viewer_ptr_->addSphere(waypoint, 0.1, 0, 150, 150, waypoint_name);
+    viewer_ptr_->spinOnce();
+   
 
     return T12b.clone();
 }

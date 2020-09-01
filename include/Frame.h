@@ -74,7 +74,7 @@ public:
     // Constructor for Monocular cameras with birdview.
     Frame(const cv::Mat &imGray, const cv::Mat &birdviewGray, const cv::Mat &birdviewMask, const double &timeStamp, ORBextractor* extractor,ORBVocabulary* voc, cv::Mat &K, cv::Mat &distCoef, const float &bf, const float &thDepth);
     // for contour
-    Frame(const cv::Mat &imGray, const cv::Mat &birdviewGray, const cv::Mat &birdICP, const cv::Mat &birdviewMask, const cv::Mat &birdviewContour, const cv::Vec3d odomPose, const double &timeStamp, ORBextractor* extractor,ORBVocabulary* voc, cv::Mat &K, cv::Mat &distCoef, const float &bf, const float &thDepth);
+    Frame(const cv::Mat &imGray, const cv::Mat &birdviewGray, const cv::Mat &birdICP, const cv::Mat &birdviewMask, const cv::Mat &birdviewContour, const cv::Vec3d gtPose, const cv::Vec3d odomPose, const double &timeStamp, ORBextractor* extractor,ORBVocabulary* voc, cv::Mat &K, cv::Mat &distCoef, const float &bf, const float &thDepth);
 
     // Extract ORB on the image. 0 for left image and 1 for right image.
     void ExtractORB(int flag, const cv::Mat &im);
@@ -237,6 +237,7 @@ public:
     static float mfGridElementHeightInvBirdview;
     std::vector<std::size_t> mGridBirdview[FRAME_GRID_COLS][FRAME_GRID_ROWS];
 
+    cv::Vec3d mGtPose;
     cv::Vec3d mOdomPose;
     // Camera pose.
     cv::Mat mTcw;
@@ -271,6 +272,7 @@ public:
     // pcl::PointCloud<pcl::PointXYZ>::Ptr mCloud;
     birdseye_odometry::SemanticCloud::Ptr mCloud;
     Eigen::Matrix4f current_pose_;
+    cv::Mat current_ICP2D_pose;
 private:
 
     // Undistort keypoints given OpenCV distortion parameters.

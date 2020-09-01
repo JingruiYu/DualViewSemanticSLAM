@@ -37,7 +37,7 @@ float Frame::mfGridElementWidthInvBirdview, Frame::mfGridElementHeightInvBirdvie
 cv::Mat Frame::Tbc,Frame::Tcb,Frame::Rro,Frame::tro,Frame::Ror,Frame::tor;
 int Frame::birdviewRows, Frame::birdviewCols;
 
-const double correction = 1.7;
+const double correction = 1;
 const double Frame::pixel2meter = 0.03984*correction;
 const double Frame::meter2pixel = 25.1/correction;
 const double Frame::rear_axle_to_center = 1.393;
@@ -66,7 +66,7 @@ Frame::Frame(const Frame &frame)
      mnScaleLevels(frame.mnScaleLevels), mfScaleFactor(frame.mfScaleFactor), mfLogScaleFactor(frame.mfLogScaleFactor),
      mvScaleFactors(frame.mvScaleFactors), mvInvScaleFactors(frame.mvInvScaleFactors),
      mvLevelSigma2(frame.mvLevelSigma2), mvInvLevelSigma2(frame.mvInvLevelSigma2),
-     mvMeasurement_p(frame.mvMeasurement_p), mvMeasurement_g(frame.mvMeasurement_g), mCloud(frame.mCloud), current_pose_(frame.current_pose_)
+     mvMeasurement_p(frame.mvMeasurement_p), mvMeasurement_g(frame.mvMeasurement_g), mCloud(frame.mCloud), current_pose_(frame.current_pose_), current_ICP2D_pose(frame.current_ICP2D_pose)
 {
     for(int i=0;i<FRAME_GRID_COLS;i++)
         for(int j=0; j<FRAME_GRID_ROWS; j++)
@@ -372,9 +372,9 @@ Frame::Frame(const cv::Mat &imGray, const cv::Mat &birdviewGray, const cv::Mat &
     mvbBirdviewInliers = vector<bool>(mvKeysBird.size(),true);
 }
 
-Frame::Frame(const cv::Mat &imGray, const cv::Mat &birdviewGray, const cv::Mat &birdICP, const cv::Mat &birdviewMask, const cv::Mat &birdviewContour, const cv::Vec3d odomPose, const double &timeStamp, ORBextractor* extractor,ORBVocabulary* voc, cv::Mat &K, cv::Mat &distCoef, const float &bf, const float &thDepth)
+Frame::Frame(const cv::Mat &imGray, const cv::Mat &birdviewGray, const cv::Mat &birdICP, const cv::Mat &birdviewMask, const cv::Mat &birdviewContour, const cv::Vec3d gtPose, const cv::Vec3d odomPose, const double &timeStamp, ORBextractor* extractor,ORBVocabulary* voc, cv::Mat &K, cv::Mat &distCoef, const float &bf, const float &thDepth)
     :mpORBvocabulary(voc),mpORBextractorLeft(extractor),mpORBextractorRight(static_cast<ORBextractor*>(NULL)), mTimeStamp(timeStamp), mK(K.clone()),
-     mDistCoef(distCoef.clone()), mbf(bf), mThDepth(thDepth),mbHaveBirdview(true),mpReferenceKFBird(static_cast<KeyFrame*>(NULL)),mOdomPose(odomPose), mCloud(new birdseye_odometry::SemanticCloud)
+     mDistCoef(distCoef.clone()), mbf(bf), mThDepth(thDepth),mbHaveBirdview(true),mpReferenceKFBird(static_cast<KeyFrame*>(NULL)), mGtPose(gtPose), mOdomPose(odomPose), mCloud(new birdseye_odometry::SemanticCloud)
 {
     // Frame ID
     mnId=nNextId++;
@@ -462,7 +462,8 @@ Frame::Frame(const cv::Mat &imGray, const cv::Mat &birdviewGray, const cv::Mat &
     getICPEdges();
 
     current_pose_ = Eigen::Matrix4f::Identity();
-
+    current_ICP2D_pose = cv::Mat::eye(4,4,CV_32F);
+    
     UndistortKeyPoints();
 
     // Set no stereo information
