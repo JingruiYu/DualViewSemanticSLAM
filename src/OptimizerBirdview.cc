@@ -649,7 +649,8 @@ int Optimizer::PoseOptimizationWithBirdviewPixel(Frame *pCurFrame, Frame* pRefFr
 
     // 6. edge
     const int Nf = pCurFrame->N;
-    vector<g2o::EdgeSE3ProjectXYZOnlyPose*> vpEdgesFront;
+    vector<EdgeSE3ProjectXYZOnlyWeightPose*> vpEdgesFront;
+    // vector<g2o::EdgeSE3ProjectXYZOnlyPose*> vpEdgesFront;
     vector<size_t> vnIndexEdgeFront;
     vpEdgesFront.reserve(Nf);
     vnIndexEdgeFront.reserve(Nf);
@@ -679,7 +680,8 @@ int Optimizer::PoseOptimizationWithBirdviewPixel(Frame *pCurFrame, Frame* pRefFr
             const cv::KeyPoint &kpUn = pCurFrame->mvKeysUn[i];
             obs << kpUn.pt.x, kpUn.pt.y;
 
-            g2o::EdgeSE3ProjectXYZOnlyPose * e = new g2o::EdgeSE3ProjectXYZOnlyPose();
+            EdgeSE3ProjectXYZOnlyWeightPose * e = new EdgeSE3ProjectXYZOnlyWeightPose();
+            // g2o::EdgeSE3ProjectXYZOnlyPose * e = new g2o::EdgeSE3ProjectXYZOnlyPose();
             e->setVertex(0,dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertex(0))); // dynamic_cast : type convert for class only
             e->setMeasurement(obs);
             const float invSigma2 = pCurFrame->mvInvLevelSigma2[kpUn.octave]; // uncertainty per pixel
@@ -699,6 +701,8 @@ int Optimizer::PoseOptimizationWithBirdviewPixel(Frame *pCurFrame, Frame* pRefFr
             e->Xw[1] = Xw.at<float>(1);
             e->Xw[2] = Xw.at<float>(2);
             
+            e->w = 1;
+
             optimizer.addEdge(e);
             vpEdgesFront.push_back(e);
             vnIndexEdgeFront.push_back(i);
@@ -740,6 +744,8 @@ int Optimizer::PoseOptimizationWithBirdviewPixel(Frame *pCurFrame, Frame* pRefFr
             e->Xw[1] = Xw.at<float>(1);
             e->Xw[2] = Xw.at<float>(2);
 
+            e->w = 1;
+
             optimizer.addEdge(e);
             vpEdgesBird.push_back(e);
             vnIndexEdgeBird.push_back(i);
@@ -767,7 +773,8 @@ int Optimizer::PoseOptimizationWithBirdviewPixel(Frame *pCurFrame, Frame* pRefFr
         nFrontBad = 0;
         for (size_t i = 0, iend = vpEdgesFront.size(); i < iend; i++)
         {
-            g2o::EdgeSE3ProjectXYZOnlyPose * e = vpEdgesFront[i];
+            EdgeSE3ProjectXYZOnlyWeightPose * e = vpEdgesFront[i];
+            // g2o::EdgeSE3ProjectXYZOnlyPose * e = vpEdgesFront[i];
             const size_t idx = vnIndexEdgeFront[i];
 
             if (pCurFrame->mvbOutlier[idx])

@@ -160,6 +160,7 @@ Vector2d EdgeSE3ProjectPw2BirdPixel::cam_project(const Vector3d & Xc) const{
   Vector2d res;
   res[0] = birdviewCols/2- Xb[1] *meter2pixel;
   res[1] = birdviewRows/2-(Xb[0]-rear_axle_to_center)*meter2pixel;
+  res = res;
 
   return res;
 }
@@ -177,7 +178,7 @@ void EdgeSE3ProjectPw2BirdPixel::linearizeOplus() {
   jacobian_pixel_pb << 0, meter2pixel, 0,
 					meter2pixel, 0, 0;
 
-  _jacobianOplusXi = jacobian_pixel_pb * jacobian_pb_pc * jacobian_pc_pw;
+  _jacobianOplusXi = w * jacobian_pixel_pb * jacobian_pb_pc * jacobian_pc_pw;
 }
 
 Matrix3d EdgeSE3ProjectPw2BirdPixel::skew(Vector3d phi)

@@ -1502,7 +1502,8 @@ bool Tracking::TrackLocalMap()
         cv::Mat Tc12 = TcwB*LastTwc;
         cout << "before TrackMap Tc12 is: " << norm(Tc12.rowRange(0,3).col(3)) << endl;
 
-        Optimizer::PoseOptimizationWithBirdview(&mCurrentFrame);
+        Optimizer::PoseOptimizationWithBirdviewPixel(&mCurrentFrame);
+        // Optimizer::PoseOptimizationWithBirdview(&mCurrentFrame);
         // Optimizer::poseOptimizationWeight(&mCurrentFrame, &mLastFrame);
 
         cv::Mat TcwA = mCurrentFrame.mTcw.clone();
