@@ -197,7 +197,7 @@ public:
 	{
 		const VertexSE3Quat *v = static_cast<const VertexSE3Quat*>(_vertices[0]);
 		Vector3d p = v->estimate().map(Xw);
-		_error = Xc-p;
+		_error = w*(Xc-p);
 	}
 
 	virtual void linearizeOplus();
@@ -205,6 +205,7 @@ public:
 	Matrix3d skew(Vector3d phi);
 
 	Vector3d Xw,Xc;
+	double w;
 };
 
 class  EdgeSE3ProjectPw2BirdPixel: public  g2o::BaseUnaryEdge<2, Vector2d, g2o::VertexSE3Expmap>{
@@ -221,6 +222,37 @@ public:
     const g2o::VertexSE3Expmap* v1 = static_cast<const g2o::VertexSE3Expmap*>(_vertices[0]);
     Vector2d obs(_measurement);
     _error = w*(obs-cam_project(v1->estimate().map(Xw)));
+  }
+
+  virtual void linearizeOplus();
+
+  Vector2d cam_project(const Vector3d & Xc) const;
+  
+  Matrix3d skew(Vector3d phi);
+
+  Vector3d Xw,tbc;
+  Matrix3d Rbc;
+  double meter2pixel,birdviewCols,birdviewRows,rear_axle_to_center;
+  double w;
+};
+
+class  EdgeSE3ProjectPw2BirdPixelPoint: public  g2o::BaseBinaryEdge<2, Vector2d, g2o::VertexSBAPointXYZ, VertexSE3Quat>{
+public:
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
+  EdgeSE3ProjectPw2BirdPixelPoint(){}
+
+  bool read(std::istream& is){return false;}
+
+  bool write(std::ostream& os) const{return false;}
+
+  void computeError()  {
+    g2o::SE3Quat pose = (static_cast<VertexSE3Quat*> (_vertices[1]))->estimate();
+	Vector3d point = (static_cast<g2o::VertexSBAPointXYZ*> (_vertices[0]))->estimate();
+
+    const g2o::VertexSE3Expmap* v1 = static_cast<const g2o::VertexSE3Expmap*>(_vertices[0]);
+    Vector2d obs(_measurement);
+    _error = w*(obs-cam_project(pose.map(point)));
   }
 
   virtual void linearizeOplus();

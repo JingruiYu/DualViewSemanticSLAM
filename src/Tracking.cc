@@ -446,7 +446,6 @@ void Tracking::Track()
                 CheckReplacedInLastFrame();
 
                 // Match Birdview Keypoints
-                // MatchAndRetriveBirdMP();
                 if (mbHaveBirdview)
                 {
                     // cout << "Using ICP... " << endl;
@@ -457,21 +456,6 @@ void Tracking::Track()
                         cv::Mat encPose = GetEncoderPose();
                         cv::Mat gtPose = GetGTPose();
                         cv::Mat birdICP = GetBirdICP();
-                        // if (!encPose.empty())
-                        // {
-                        //     initTransform = Converter::toMatrix4f(encPose);
-                        // }
-                        // else if (!mVelocity.empty())
-                        // {
-                        //     cv::Mat tmpMat = Frame::Tbc * mVelocity * Frame::Tcb;
-                        //     initTransform = Converter::toMatrix4f(tmpMat);
-                        // }
-                        // else
-                        // {
-                        //     cv::Mat birdICP = GetBirdICP();
-                        //     if (!birdICP.empty())
-                        //         initTransform = Converter::toMatrix4f(birdICP);  
-                        // }
                     }
                     
                     bOK = TrackingWithICP(initTransform);
@@ -1021,7 +1005,7 @@ bool Tracking::TrackReferenceKeyFrame()
 
     int nmatches = matcher.SearchByBoW(mpReferenceKF,mCurrentFrame,vpMapPointMatches);
 
-    // cout<<"Track Reference KeyFrame, "<<nmatches<<" Matches."<<endl;
+    cout<< "\033[31m" << "Track Reference KeyFrame, "<<nmatches<<" Matches." << "\033[0m"<<endl;
 
     if(nmatches<15)
         return false;
@@ -1040,7 +1024,7 @@ bool Tracking::TrackReferenceKeyFrame()
         }
         mCurrentFrame.mvpMapPointsBird = vpMapPointMatchesBird;
         // cout<<"Track Reference KeyFrame, "<<nmatchesbird<<" Birdview Matches."<<endl;
-
+        // Optimizer::PoseOptimizationWithBirdviewPixel(&mCurrentFrame);
         Optimizer::PoseOptimizationWithBirdview(&mCurrentFrame);
     }
     else
@@ -1070,8 +1054,7 @@ bool Tracking::TrackReferenceKeyFrame()
         }
     }
 
-    // cout<<"After Optimization, "<<nmatches<<" Matches, "<<nmatchesMap<<" Matches in Map."<<endl;
-
+    
     /********************* Modified Here *********************/
     int nmatchesBirdMap=0;
     if(mbHaveBirdview)
@@ -1095,6 +1078,8 @@ bool Tracking::TrackReferenceKeyFrame()
             }
         }
     }
+
+    cout<<"After Track Reference KeyFrame : -Front: "<<nmatches<<" Matches, -Bird: "<<nmatchesBirdMap<<" Matches in Map."<<endl;
 
 
     return nmatchesMap+nmatchesBirdMap>=10;
@@ -1214,20 +1199,20 @@ bool Tracking::TrackWithMotionModel()
         if(nmatchesBird<20)
         {
             fill(mCurrentFrame.mvpMapPointsBird.begin(),mCurrentFrame.mvpMapPointsBird.end(),static_cast<MapPointBird*>(NULL));
-            nmatchesBird = mpmatcherBirdview->SearchByMatchBird(mCurrentFrame,mLastFrame,20);
+            nmatchesBird = mpmatcherBirdview->SearchByMatchBird(mCurrentFrame,mLastFrame,30);
         }
-        // cout<<"Track with Motion Model, "<<nmatches<<" Matches and "<<nmatchesBird<<" Birdview Matchces."<<endl;
     }
 
-    if(nmatches<20)
+    cout<<"Track with Motion Model, "<<nmatches<<" Matches and "<<nmatchesBird<<" Birdview Matchces."<<endl;
+
+    if(nmatches<20 || nmatchesBird<20)
         return false;
 
 
     // Optimize frame pose with all matches
     if(mbHaveBirdview)
     {
-        Optimizer::PoseOptimizationWithBirdview(&mCurrentFrame);
-        // MatchAndRetriveBirdMP();
+        Optimizer::PoseOptimizationWithBirdviewPixel(&mCurrentFrame);
         // Optimizer::PoseOptimizationWithBirdview(&mCurrentFrame);
         // Optimizer::PoseOptimization(&mCurrentFrame);
         // Optimizer::PoseOptimizationWithBirdview(&mCurrentFrame,&mBirdviewRefFrame);
@@ -1259,8 +1244,6 @@ bool Tracking::TrackWithMotionModel()
         }
     }
 
-    // cout<<"After Optimization, "<<nmatches<<" Matches and "<<nmatchesMap<<" Matches in Map."<<endl;
-
     if(mbHaveBirdview)
     {
         // Discard outliers for birdview
@@ -1286,13 +1269,7 @@ bool Tracking::TrackWithMotionModel()
         // cout<<"After Optimization, "<<nmatchesBird<<" Birdview Matches."<<endl;    
     }
     
-
-    // if(mbOnlyTracking)
-    // {
-    //     cout << "Is only Tracking ??????? " << endl;
-    //     mbVO = nmatchesMap<10;
-    //     return nmatches>20;
-    // }
+    cout<<"Track with Motion Model, After Optimization, "<<nmatchesMap<<" Matches and "<<nmatchesBird<<" Birdview Matchces."<<endl;
 
     return nmatchesMap>=10;
 }
@@ -1407,7 +1384,7 @@ bool Tracking::TrackingWithICP(const Eigen::Matrix4f &M)
         nmatchesBird = mpmatcherBirdview->SearchByMatchBird(mCurrentFrame,mLastFrame,20);
     }
 
-    cout << "before optimization 1 : " << " -nmatches: " << nmatches << " -nmatchesBird: " << nmatchesBird << endl;
+    cout << "before ICP optimization 1 : " << " -nmatches: " << nmatches << " -nmatchesBird: " << nmatchesBird << endl;
 
     if(nmatches<20 || nmatchesBird < 20)
         return false;
@@ -1418,7 +1395,7 @@ bool Tracking::TrackingWithICP(const Eigen::Matrix4f &M)
     mLastFrame.GetRotationInverse().copyTo(LastTwc.rowRange(0,3).colRange(0,3));
     mLastFrame.GetCameraCenter().copyTo(LastTwc.rowRange(0,3).col(3));
     cv::Mat Tc12 = TcwB*LastTwc;
-    cout << "before optimizat Tc12 is: " << norm(Tc12.rowRange(0,3).col(3)) << endl;
+    // cout << "before optimizat Tc12 is: " << norm(Tc12.rowRange(0,3).col(3)) << endl;
 
     Optimizer::PoseOptimizationWithBirdviewPixel(&mCurrentFrame);
 
@@ -1429,8 +1406,6 @@ bool Tracking::TrackingWithICP(const Eigen::Matrix4f &M)
     cv::Mat TcwA = mCurrentFrame.mTcw.clone();
 
     Tc12 = TcwA*LastTwc;
-    cout << "after optimizat Tc12 is: " << norm(Tc12.rowRange(0,3).col(3)) << endl;
-
 
     // Discard outliers
     int nmatchesMap = 0;
@@ -1466,7 +1441,7 @@ bool Tracking::TrackingWithICP(const Eigen::Matrix4f &M)
         }
     }
 
-    cout << "after optimization 1 : " << " -nmatches: " << nmatches << " -nmatchesBird: " << nmatchesBird << endl;
+    cout << "after TrackingWithICP : " << " -nmatches: " << nmatches << " -nmatchesBird: " << nmatchesBird << endl;
 
     bool isTrue = true;
     if (nmatchesMap < 20 || nmatchesBird < 20)
@@ -1479,7 +1454,7 @@ bool Tracking::TrackingWithICP(const Eigen::Matrix4f &M)
 
 bool Tracking::TrackLocalMap()
 {
-    // cout<<"Start Track Local Map."<<endl;
+    cout<<"Start Track Local Map."<<endl;
     // We have an estimation of the camera pose and some map points tracked in the frame.
     // We retrieve the local map and try to find matches to points in the local map.
 
@@ -1500,7 +1475,7 @@ bool Tracking::TrackLocalMap()
         mLastFrame.GetRotationInverse().copyTo(LastTwc.rowRange(0,3).colRange(0,3));
         mLastFrame.GetCameraCenter().copyTo(LastTwc.rowRange(0,3).col(3));
         cv::Mat Tc12 = TcwB*LastTwc;
-        cout << "before TrackMap Tc12 is: " << norm(Tc12.rowRange(0,3).col(3)) << endl;
+        // cout << "before TrackMap Tc12 is: " << norm(Tc12.rowRange(0,3).col(3)) << endl;
 
         Optimizer::PoseOptimizationWithBirdviewPixel(&mCurrentFrame);
         // Optimizer::PoseOptimizationWithBirdview(&mCurrentFrame);
@@ -1509,7 +1484,7 @@ bool Tracking::TrackLocalMap()
         cv::Mat TcwA = mCurrentFrame.mTcw.clone();
 
         Tc12 = TcwA*LastTwc;
-        cout << "after TrackMap Tc12 is: " << norm(Tc12.rowRange(0,3).col(3)) << endl;
+        // cout << "after TrackMap Tc12 is: " << norm(Tc12.rowRange(0,3).col(3)) << endl;
 
         // Optimizer::PoseOptimization(&mCurrentFrame);
     }
@@ -2068,6 +2043,7 @@ void Tracking::UpdateLocalKeyFrames()
 
 bool Tracking::Relocalization()
 {
+    cout << "Relocalization:() " << endl;
     // Compute Bag of Words Vector
     mCurrentFrame.ComputeBoW();
 
@@ -2328,7 +2304,7 @@ void Tracking::MatchAndRetriveBirdMP()
     {
         nmatches = mpmatcherBirdview->BirdviewMatch(mLastFrame,mCurrentFrame,mvnBirdviewMatches12,20);
     }
-    // cout<<"Matched "<<nmatches<<" birdview points."<<endl;
+    cout<<"Shoul be Track Map, Matched "<<nmatches<<" birdview points."<<endl;
 
     cv::Mat Twc1 = Frame::InverseTransformSE3(mLastFrame.mTcw);
     cv::Mat Tb2w = Frame::Tbc*mCurrentFrame.mTcw;

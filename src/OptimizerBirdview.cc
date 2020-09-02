@@ -23,6 +23,7 @@ namespace ORB_SLAM2
 {
 void Optimizer::GlobalBundleAdjustemntWithBirdview(Map* pMap, int nIterations, bool* pbStopFlag, const unsigned long nLoopKF, const bool bRobust)
 {
+    cout<<"GlobalBundleAdjustemntWithBirdview..."<<endl;
     vector<KeyFrame*> vpKFs = pMap->GetAllKeyFrames();
     vector<MapPoint*> vpMP = pMap->GetAllMapPoints();
     vector<MapPointBird*> vpMPBird = pMap->GetAllMapPointsBird();
@@ -32,7 +33,7 @@ void Optimizer::GlobalBundleAdjustemntWithBirdview(Map* pMap, int nIterations, b
 void Optimizer::BundleAdjustmentWithBirdview(const vector<KeyFrame *> &vpKFs, const vector<MapPoint *> &vpMP,const std::vector<MapPointBird*> &vpMPBird,
                                  int nIterations, bool* pbStopFlag, const unsigned long nLoopKF, const bool bRobust)
 {
-    cout<<"BundleAdjustmentWithBirdview..."<<endl;
+    cout<< "\033[33m" << "BundleAdjustmentWithBirdview..." << "\033[0m" <<endl;
 
     vector<bool> vbNotIncludedMP;
     vbNotIncludedMP.resize(vpMP.size());
@@ -440,7 +441,7 @@ int Optimizer::PoseOptimizationWithBirdview(Frame *pFrame, Frame* pRefFrame)
 
             // float scale = Frame::meter2pixel*Frame::meter2pixel;
             // float scale = Frame::meter2pixel;
-            float scale = 3.0;
+            float scale = 1.0;
             const float invSigma2 = pFrame->mvInvLevelSigma2[pFrame->mvKeysBird[k].octave]*scale;
             e->setInformation(Eigen::Matrix3d::Identity()*invSigma2);
 
@@ -449,7 +450,7 @@ int Optimizer::PoseOptimizationWithBirdview(Frame *pFrame, Frame* pRefFrame)
             // rk->setDelta(delta3D);
             rk->setDelta(deltaMono);
 
-
+            e->w = 1;
             e->Xw = Xw;
             e->Xc = Xc;
 
@@ -754,6 +755,8 @@ int Optimizer::PoseOptimizationWithBirdviewPixel(Frame *pCurFrame, Frame* pRefFr
 
     }
 
+    cout << "before PoseOptimizationWithBirdviewPixel optimization : " << " -Front: " << nFrontInitialCorrespondences << " -Bird: " << nBirdInitialCorrespondences << endl;
+
     if (nFrontInitialCorrespondences < 3 && nBirdInitialCorrespondences < 3)
         return 0;
 
@@ -829,6 +832,8 @@ int Optimizer::PoseOptimizationWithBirdviewPixel(Frame *pCurFrame, Frame* pRefFr
     g2o::SE3Quat SE3c_recov = vSE3c_recov->estimate();
     cv::Mat pose = Converter::toCvMat(SE3c_recov);
     pCurFrame->SetPose(pose);
+
+    cout << "after PoseOptimizationWithBirdviewPixel optimization : " << " -Front: " << nFrontInitialCorrespondences << " -Bird: " << nBirdInitialCorrespondences << endl;
 
     bool suc = false;
     if ( (nFrontInitialCorrespondences-nFrontBad) > 0)
@@ -1071,35 +1076,6 @@ void Optimizer::LocalBundleAdjustmentWithBirdview(KeyFrame *pKF, bool* pbStopFla
                 }
                 else // Stereo observation
                 {
-                    // Eigen::Matrix<double,3,1> obs;
-                    // const float kp_ur = pKFi->mvuRight[mit->second];
-                    // obs << kpUn.pt.x, kpUn.pt.y, kp_ur;
-
-                    // g2o::EdgeStereoSE3ProjectXYZ* e = new g2o::EdgeStereoSE3ProjectXYZ();
-
-                    // e->setVertex(0, dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertex(id)));
-                    // e->setVertex(1, dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertex(pKFi->mnId)));
-                    // e->setMeasurement(obs);
-                    // const float &invSigma2 = pKFi->mvInvLevelSigma2[kpUn.octave];
-                    // Eigen::Matrix3d Info = Eigen::Matrix3d::Identity()*invSigma2;
-                    // e->setInformation(Info);
-
-                    // g2o::RobustKernelHuber* rk = new g2o::RobustKernelHuber;
-                    // e->setRobustKernel(rk);
-                    // rk->setDelta(thHuberStereo);
-
-                    // e->fx = pKFi->fx;
-                    // e->fy = pKFi->fy;
-                    // e->cx = pKFi->cx;
-                    // e->cy = pKFi->cy;
-                    // e->bf = pKFi->mbf;
-
-                    // optimizer.addEdge(e);
-                    // vpEdgesStereo.push_back(e);
-                    // vpEdgeKFStereo.push_back(pKFi);
-                    // vpMapPointEdgeStereo.push_back(pMP);
-
-                    //TODO: Add Stereo Types
                 }
             }
         }
