@@ -455,7 +455,7 @@ void Tracking::Track()
                     {
                         cv::Mat encPose = GetEncoderPose();
                         cv::Mat gtPose = GetGTPose();
-                        cv::Mat birdICP = GetBirdICP();
+                        // cv::Mat birdICP = GetBirdICP();
                     }
                     
                     bOK = TrackingWithICP(initTransform);
@@ -1020,7 +1020,7 @@ bool Tracking::TrackReferenceKeyFrame()
         int nmatchesbird = mpmatcherBirdview->SearchByMatchBird(mpReferenceKF,mCurrentFrame,vpMapPointMatchesBird,15);
         if(nmatchesbird<15)
         {
-            nmatchesbird = mpmatcherBirdview->SearchByMatchBird(mpReferenceKF,mCurrentFrame,vpMapPointMatchesBird,20);
+            nmatchesbird = mpmatcherBirdview->SearchByMatchBird(mpReferenceKF,mCurrentFrame,vpMapPointMatchesBird,30);
         }
         mCurrentFrame.mvpMapPointsBird = vpMapPointMatchesBird;
         // cout<<"Track Reference KeyFrame, "<<nmatchesbird<<" Birdview Matches."<<endl;
@@ -1320,15 +1320,14 @@ bool Tracking::TrackingWithICP(const Eigen::Matrix4f &M)
     {    
         // -- local
         //---- convert to map frame
-        SemanticCloud::Ptr local_cloud_in_map(new SemanticCloud);
-        pcl::transformPointCloud(*localCloud, *local_cloud_in_map, localCloudPose);
 
-        pcl::visualization::PointCloudColorHandlerCustom<SemanticPoint>
-            local_handler(local_cloud_in_map, 255, 255, 255);
-        string cloud_name = "cloud" + to_string(mCurrentFrame.mnId);
-        viewer_ptr_->addPointCloud(local_cloud_in_map, cloud_name);
-        // viewer_ptr_->setPointCloudRenderingProperties(
-        //     pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 5, "local_cloud");
+        // SemanticCloud::Ptr local_cloud_in_map(new SemanticCloud);
+        // pcl::transformPointCloud(*localCloud, *local_cloud_in_map, localCloudPose);
+
+        // pcl::visualization::PointCloudColorHandlerCustom<SemanticPoint>
+        //     local_handler(local_cloud_in_map, 255, 255, 255);
+        // string cloud_name = "cloud" + to_string(mCurrentFrame.mnId);
+        // viewer_ptr_->addPointCloud(local_cloud_in_map, cloud_name);
             
         // -- vehicle model
         Eigen::Affine3f vehicle_pose;
@@ -1467,7 +1466,18 @@ bool Tracking::TrackLocalMap()
     if(mbHaveBirdview)
     {
         // generate more birdview mappoints
-        MatchAndRetriveBirdMP();
+        // MatchAndRetriveBirdMP();
+
+        if (mpReferenceKF->mnId+4 > mCurrentFrame.mnId)
+        {
+            vector<MapPointBird*> vpMapPointMatchesBird;
+            mpmatcherBirdview->SearchByMatchBird(mpReferenceKF,mCurrentFrame,vpMapPointMatchesBird,15);
+            mCurrentFrame.mvpMapPointsBird = vpMapPointMatchesBird;
+        }
+        else
+        {
+            MatchAndRetriveBirdMP();
+        }        
 
         cv::Mat TcwB = mCurrentFrame.mTcw.clone();
 

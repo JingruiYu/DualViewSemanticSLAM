@@ -193,6 +193,39 @@ Matrix3d EdgeSE3ProjectPw2BirdPixelPoint::skew(Vector3d phi)
 	return Phi;
 }
 
+Matrix6d EdgePose2Pose::JRInv(Vector6d e)
+{
+	Matrix6d J;
+	J.block(0, 0, 3, 3) = skew(e.head(3));
+	J.block(3, 3, 3, 3) = skew(e.head(3));
+	J.block(3, 0, 3, 3) = skew(e.tail(3));
+	J.block(0, 3, 3, 3) = Eigen::Matrix3d::Zero();
+	
+	J = 0.5 * J + Matrix6d::Identity();
+	return J;
+}
+
+void EdgePose2Pose::linearizeOplus()
+{
+	g2o::SE3Quat v1 = (static_cast<VertexSE3Quat*> (_vertices[0]))->estimate();
+	g2o::SE3Quat v2 = (static_cast<VertexSE3Quat*> (_vertices[1]))->estimate();
+
+	g2o::SE3Quat e = _measurement.inverse() * v1 * v2.inverse();
+	Matrix6d J = JRInv(e.log());
+
+	_jacobianOplusXi = w*J*v2.adj()*v1.inverse().adj();
+	_jacobianOplusXj = -w*J;
+}
+
+Matrix3d EdgePose2Pose::skew(Vector3d phi)
+{
+	Matrix3d Phi;
+	Phi << 0, -phi[2], phi[1],
+		phi[2], 0, -phi[0],
+		-phi[1], phi[0], 0;
+	return Phi;
+}
+
 Vector2d EdgeSE3ProjectPw2BirdPixel::cam_project(const Vector3d & Xc) const{
   
   Vector3d Xb = Rbc * Xc + tbc;

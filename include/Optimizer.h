@@ -64,6 +64,8 @@ public:
                                        const unsigned long nLoopKF=0, const bool bRobust = true);
     void static LocalBundleAdjustmentWithBirdview(KeyFrame* pKF, bool *pbStopFlag, Map *pMap);
 
+    void static LocalBundleAdjustmentWithBirdviewPose(KeyFrame* pKF, bool *pbStopFlag, Map *pMap);
+
     int static PoseOptimizationWithBirdview(Frame* pFrame, Frame* pRefFrame=NULL);
 
     int static PoseOptimizationWithBirdviewPixel(Frame* pCurFrame, Frame* pRefFrame=NULL);

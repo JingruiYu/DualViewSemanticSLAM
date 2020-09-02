@@ -167,6 +167,8 @@ public:
     int mnRelocWords;
     float mRelocScore;
 
+    cv::Vec3d mGtPose;
+    cv::Vec3d mOdomPose;
     // Variables used by loop closing
     cv::Mat mTcwGBA;
     cv::Mat mTcwBefGBA;

@@ -131,6 +131,7 @@ public:
     void getContourPixels();
     void getICPEdges();
 
+    static cv::Mat GetTransformFromOdometer(const cv::Vec3d &odomPose1, const cv::Vec3d &odomPose2);
 
 public:
     // Vocabulary used for relocalization.

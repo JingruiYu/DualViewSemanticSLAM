@@ -1231,4 +1231,25 @@ void Frame::getICPEdges()
     mCloud->is_dense = true;
 }
 
+
+cv::Mat Frame::GetTransformFromOdometer(const cv::Vec3d &odomPose1, const cv::Vec3d &odomPose2)
+{
+    //odometer pose
+    double x1=odomPose1[0],y1=odomPose1[1],theta1=odomPose1[2];
+    double x2=odomPose2[0],y2=odomPose2[1],theta2=odomPose2[2];
+
+    //pre-integration terms
+    double theta12=theta2-theta1;
+    double x12=(x2-x1)*cos(theta1)+(y2-y1)*sin(theta1);
+    double y12=(y2-y1)*cos(theta1)-(x2-x1)*sin(theta1);
+
+    //T12
+    cv::Mat T12b=(cv::Mat_<float>(4,4)<<cos(theta12),-sin(theta12),0,x12,
+                                        sin(theta12), cos(theta12),0,y12,
+                                             0,            0,      1, 0,
+                                             0,            0,      0, 1);
+    cv::Mat T12c=Tcb*T12b*Tbc;
+    return T12c;
+}
+
 } //namespace ORB_SLAM

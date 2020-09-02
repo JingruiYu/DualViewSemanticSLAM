@@ -267,6 +267,24 @@ public:
   double w;
 };
 
+class EdgePose2Pose : public g2o::BaseBinaryEdge<6, g2o::SE3Quat, VertexSE3Quat, VertexSE3Quat>
+{
+public:
+	EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+	bool read(std::istream& is){return false;}
+	bool write(std::ostream& os) const{return false;}
+	virtual void computeError()
+	{
+		g2o::SE3Quat v1 = (static_cast<VertexSE3Quat*> (_vertices[0]))->estimate();
+		g2o::SE3Quat v2 = (static_cast<VertexSE3Quat*> (_vertices[1]))->estimate();
+		_error = w*(_measurement.inverse()*v1*v2.inverse()).log();
+	}
+	virtual void linearizeOplus();
+	Matrix6d JRInv(Vector6d e);
+	Matrix3d skew(Vector3d phi);
+	double w;
+};
+
 class EdgePointTransformSE3Quat :public g2o::BaseBinaryEdge<3, Vector3d, VertexSE3Quat, VertexSE3Quat>
 {
 public:
