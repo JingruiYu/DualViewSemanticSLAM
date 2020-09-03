@@ -49,13 +49,12 @@ namespace ORB_SLAM2
 Tracking::Tracking(System *pSys, ORBVocabulary* pVoc, FrameDrawer *pFrameDrawer, MapDrawer *pMapDrawer, Map *pMap, KeyFrameDatabase* pKFDB, const string &strSettingPath, const int sensor):
     mState(NO_IMAGES_YET), mSensor(sensor),  
     ndt_aligner_ptr_(new pclomp::NormalDistributionsTransform<birdseye_odometry::SemanticPoint, birdseye_odometry::SemanticPoint>()),      
-    viewer_ptr_(new pcl::visualization::PCLVisualizer("viewer")), localCloud(new birdseye_odometry::SemanticCloud),
+    viewer_ptr_(new pcl::visualization::PCLVisualizer("Bird_viewer")), localCloud(new birdseye_odometry::SemanticCloud),
     mbOnlyTracking(false), mbVO(false), mpORBVocabulary(pVoc),
     mpKeyFrameDB(pKFDB), mpInitializer(static_cast<Initializer*>(NULL)), mpSystem(pSys), mpViewer(NULL),
     mpFrameDrawer(pFrameDrawer), mpMapDrawer(pMapDrawer), mpMap(pMap), mnLastRelocFrameId(0)
 {
     // Load camera parameters from settings file
-
     cv::FileStorage fSettings(strSettingPath, cv::FileStorage::READ);
     float fx = fSettings["Camera.fx"];
     float fy = fSettings["Camera.fy"];
@@ -161,10 +160,10 @@ Tracking::Tracking(System *pSys, ORBVocabulary* pVoc, FrameDrawer *pFrameDrawer,
     viewer_ptr_->createViewPort(0.0, 0.0, 1.0, 1.0, v1);
     viewer_ptr_->createViewPortCamera(v1);
     viewer_ptr_->setBackgroundColor(0, 0, 0, v1);
-    viewer_ptr_->addCube(-(Frame::vehicle_length / 2 - Frame::rear_axle_to_center),
-                         Frame::vehicle_length / 2 + Frame::rear_axle_to_center,
-                         -Frame::vehicle_width / 2, Frame::vehicle_width / 2, 0.0, 0.2, 128.0,
-                         69.0, 0.0, "vehicle", v1);
+    // viewer_ptr_->addCube(-(Frame::vehicle_length / 2 - Frame::rear_axle_to_center),
+    //                      Frame::vehicle_length / 2 + Frame::rear_axle_to_center,
+    //                      -Frame::vehicle_width / 2, Frame::vehicle_width / 2, 0.0, 0.2, 128.0,
+    //                      69.0, 0.0, "vehicle", v1);
     viewer_ptr_->addCoordinateSystem(1.0, 0.0, 0.0, 0.3, "vehicle_frame", v1);
     viewer_ptr_->addCoordinateSystem(1.0, 0.0, 0.0, 0.0, "map_frame", v1);
 
@@ -453,7 +452,7 @@ void Tracking::Track()
                     
                     if(!bOK)
                     {
-                        cout << "not right ... " << endl;
+                        // cout << "not right ... " << endl;
                         if (!mVelocity.empty())
                         {
                             bOK = TrackWithMotionModel();
@@ -469,7 +468,7 @@ void Tracking::Track()
                     }
                     else
                     {
-                        cout << "right ... " << endl;
+                        // cout << "right ... " << endl;
                     }  
                 }
                 else
@@ -1070,7 +1069,7 @@ bool Tracking::TrackReferenceKeyFrame()
         }
     }
 
-    cout<<"After Track Reference KeyFrame : -Front: "<<nmatches<<" Matches, -Bird: "<<nmatchesBirdMap<<" Matches in Map."<<endl;
+    // cout<<"After Track Reference KeyFrame : -Front: "<<nmatches<<" Matches, -Bird: "<<nmatchesBirdMap<<" Matches in Map."<<endl;
 
 
     return nmatchesMap+nmatchesBirdMap>=10;
@@ -1194,7 +1193,7 @@ bool Tracking::TrackWithMotionModel()
         }
     }
 
-    cout<<"Track with Motion Model, "<<nmatches<<" Matches and "<<nmatchesBird<<" Birdview Matchces."<<endl;
+    // cout<<"Track with Motion Model, "<<nmatches<<" Matches and "<<nmatchesBird<<" Birdview Matchces."<<endl;
 
     if(nmatches<20 || nmatchesBird<20)
         return false;
@@ -1260,7 +1259,7 @@ bool Tracking::TrackWithMotionModel()
         // cout<<"After Optimization, "<<nmatchesBird<<" Birdview Matches."<<endl;    
     }
     
-    cout<<"Track with Motion Model, After Optimization, "<<nmatchesMap<<" Matches and "<<nmatchesBird<<" Birdview Matchces."<<endl;
+    // cout<<"Track with Motion Model, After Optimization, "<<nmatchesMap<<" Matches and "<<nmatchesBird<<" Birdview Matchces."<<endl;
 
     return nmatchesMap>=10;
 }
@@ -1317,7 +1316,7 @@ bool Tracking::TrackingWithICP()
         nmatchesBird = mpmatcherBirdview->SearchByMatchBird(mCurrentFrame,mLastFrame,20);
     }
 
-    cout << "before ICP optimization 1 : " << " -nmatches: " << nmatches << " -nmatchesBird: " << nmatchesBird << endl;
+    // cout << "before ICP optimization 1 : " << " -nmatches: " << nmatches << " -nmatchesBird: " << nmatchesBird << endl;
 
     if(nmatches<20 || nmatchesBird < 20)
         return false;
@@ -1374,7 +1373,7 @@ bool Tracking::TrackingWithICP()
         }
     }
 
-    cout << "after TrackingWithICP : " << " -nmatches: " << nmatches << " -nmatchesBird: " << nmatchesBird << endl;
+    // cout << "after TrackingWithICP : " << " -nmatches: " << nmatches << " -nmatchesBird: " << nmatchesBird << endl;
 
     bool isTrue = true;
     if (nmatchesMap < 20 || nmatchesBird < 20)
@@ -1387,7 +1386,7 @@ bool Tracking::TrackingWithICP()
 
 bool Tracking::TrackLocalMap()
 {
-    cout<<"Start Track Local Map."<<endl;
+    // cout<<"Start Track Local Map."<<endl;
     // We have an estimation of the camera pose and some map points tracked in the frame.
     // We retrieve the local map and try to find matches to points in the local map.
 
@@ -2248,7 +2247,7 @@ void Tracking::MatchAndRetriveBirdMP()
     {
         nmatches = mpmatcherBirdview->BirdviewMatch(mLastFrame,mCurrentFrame,mvnBirdviewMatches12,20);
     }
-    cout<<"Shoul be Track Map, Matched "<<nmatches<<" birdview points."<<endl;
+    // cout<<"Shoul be Track Map, Matched "<<nmatches<<" birdview points."<<endl;
 
     cv::Mat Twc1 = Frame::InverseTransformSE3(mLastFrame.mTcw);
     cv::Mat Tb2w = Frame::Tbc*mCurrentFrame.mTcw;
@@ -2441,7 +2440,7 @@ bool Tracking::GetCloudICP(Eigen::Matrix4f &finalTransform)
     ndt_aligner_ptr_->align(*aligned_cloud, initTransform);
     Eigen::Matrix4f relative_pose = ndt_aligner_ptr_->getFinalTransformation();
     double score = ndt_aligner_ptr_->getFitnessScore();
-    cout << "score: " << score << endl;
+    // cout << "score: " << score << endl;
 
     mCurrentFrame.current_pose_ = localCloudPose * relative_pose;
     trajectory_.push_back(mCurrentFrame.current_pose_);
@@ -2452,7 +2451,7 @@ bool Tracking::GetCloudICP(Eigen::Matrix4f &finalTransform)
 
     Eigen::Matrix4f Tb12 = mLastFrame.current_pose_.inverse() * mCurrentFrame.current_pose_;
     Eigen::Vector3f Tb12t = Tb12.topRightCorner(3, 1);
-    cout << "ICP trans: " << Tb12t.norm() << endl;
+    // cout << "ICP trans: " << Tb12t.norm() << endl;
     // cout << "ICP T's trans: " << mCurrentFrame.current_pose_.topRightCorner(3, 1).norm() << endl;
 
     // -- threshold for updating the key cloud
@@ -2487,8 +2486,8 @@ bool Tracking::GetCloudICP(Eigen::Matrix4f &finalTransform)
         // -- vehicle model
         Eigen::Affine3f vehicle_pose;
         vehicle_pose.matrix() = trajectory_.back();
-        viewer_ptr_->updateShapePose("vehicle", vehicle_pose);
-        viewer_ptr_->updateCoordinateSystemPose("vehicle_frame", vehicle_pose);
+        // viewer_ptr_->updateShapePose("vehicle", vehicle_pose);
+        // viewer_ptr_->updateCoordinateSystemPose("vehicle_frame", vehicle_pose);
 
         // -- trajectory
         birdseye_odometry::SemanticPoint waypoint;

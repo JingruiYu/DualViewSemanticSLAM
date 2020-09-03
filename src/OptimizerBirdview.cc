@@ -755,7 +755,7 @@ int Optimizer::PoseOptimizationWithBirdviewPixel(Frame *pCurFrame, Frame* pRefFr
 
     }
 
-    cout << "before PoseOptimizationWithBirdviewPixel optimization : " << " -Front: " << nFrontInitialCorrespondences << " -Bird: " << nBirdInitialCorrespondences << endl;
+    // cout << "before PoseOptimizationWithBirdviewPixel optimization : " << " -Front: " << nFrontInitialCorrespondences << " -Bird: " << nBirdInitialCorrespondences << endl;
 
     if (nFrontInitialCorrespondences < 3 && nBirdInitialCorrespondences < 3)
         return 0;
@@ -833,7 +833,7 @@ int Optimizer::PoseOptimizationWithBirdviewPixel(Frame *pCurFrame, Frame* pRefFr
     cv::Mat pose = Converter::toCvMat(SE3c_recov);
     pCurFrame->SetPose(pose);
 
-    cout << "after PoseOptimizationWithBirdviewPixel optimization : " << " -Front: " << nFrontInitialCorrespondences << " -Bird: " << nBirdInitialCorrespondences << endl;
+    // cout << "after PoseOptimizationWithBirdviewPixel optimization : " << " -Front: " << nFrontInitialCorrespondences << " -Bird: " << nBirdInitialCorrespondences << endl;
 
     bool suc = false;
     if ( (nFrontInitialCorrespondences-nFrontBad) > 0)
@@ -1290,7 +1290,7 @@ void Optimizer::LocalBundleAdjustmentWithBirdview(KeyFrame *pKF, bool* pbStopFla
 
 void Optimizer::LocalBundleAdjustmentWithBirdviewPose(KeyFrame *pKF, bool* pbStopFlag, Map* pMap)
 {    
-    cout << "\033[33m" << "LocalBundleAdjustmentWithBirdviewPose" << "\033[0m" << endl;
+    // cout << "\033[33m" << "LocalBundleAdjustmentWithBirdviewPose" << "\033[0m" << endl;
 
     // Local KeyFrames: First Breath Search from Current Keyframe
     list<KeyFrame*> lLocalKeyFrames;
