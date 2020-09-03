@@ -178,7 +178,7 @@ protected:
     bool TrackReferenceKeyFrame();
     void UpdateLastFrame();
     bool TrackWithMotionModel();
-    bool TrackingWithICP(const Eigen::Matrix4f &M);
+    bool TrackingWithICP();
 
     bool Relocalization();
 
@@ -197,6 +197,7 @@ protected:
     cv::Mat GetEncoderPose();
     cv::Mat GetGTPose();
     cv::Mat GetBirdICP();
+    bool GetCloudICP(Eigen::Matrix4f &finalTransform);
 
     // In case of performing only localization, this flag is true when there are no matches to
     // points in the map. Still tracking will continue if there are enough matches with temporal points.

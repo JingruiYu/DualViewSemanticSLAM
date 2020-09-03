@@ -448,18 +448,9 @@ void Tracking::Track()
                 // Match Birdview Keypoints
                 if (mbHaveBirdview)
                 {
-                    // cout << "Using ICP... " << endl;
-
-                    // Get the initial transform
-                    Eigen::Matrix4f initTransform = Eigen::Matrix4f::Identity();
-                    {
-                        cv::Mat encPose = GetEncoderPose();
-                        cv::Mat gtPose = GetGTPose();
-                        // cv::Mat birdICP = GetBirdICP();
-                    }
+                   
+                    bOK = TrackingWithICP();
                     
-                    bOK = TrackingWithICP(initTransform);
-
                     if(!bOK)
                     {
                         cout << "not right ... " << endl;
@@ -1274,90 +1265,33 @@ bool Tracking::TrackWithMotionModel()
     return nmatchesMap>=10;
 }
 
-bool Tracking::TrackingWithICP(const Eigen::Matrix4f &M)
+bool Tracking::TrackingWithICP()
 {
-    Eigen::Matrix4f finalTransform = M;
-    Eigen::Matrix4f initTransform = localCloudPose.inverse() * mLastFrame.current_pose_;
-
-    ndt_aligner_ptr_->setInputSource(mCurrentFrame.mCloud);
-    ndt_aligner_ptr_->setInputTarget(localCloud);
-
-    birdseye_odometry::SemanticCloud::Ptr aligned_cloud(new birdseye_odometry::SemanticCloud);
-    ndt_aligner_ptr_->align(*aligned_cloud, initTransform);
-    Eigen::Matrix4f relative_pose = ndt_aligner_ptr_->getFinalTransformation();
-    double score = ndt_aligner_ptr_->getFitnessScore();
-    cout << "score: " << score << endl;
-
-    mCurrentFrame.current_pose_ = localCloudPose * relative_pose;
-    trajectory_.push_back(mCurrentFrame.current_pose_);
-
-    Eigen::Vector3f relative_trans = relative_pose.topRightCorner(3, 1);
-    Eigen::AngleAxisf relative_rot;
-    relative_rot = Eigen::Matrix3f(relative_pose.topLeftCorner(3, 3));
-
-    Eigen::Matrix4f Tb12 = mLastFrame.current_pose_.inverse() * mCurrentFrame.current_pose_;
-    Eigen::Vector3f Tb12t = Tb12.topRightCorner(3, 1);
-    cout << "ICP trans: " << Tb12t.norm() << endl;
-    // cout << "ICP T's trans: " << mCurrentFrame.current_pose_.topRightCorner(3, 1).norm() << endl;
-
-    // -- threshold for updating the key cloud
-    // 0.1-0.1-368
-    double key_cloud_range_threshold_ = 0.5;                // m
-    double key_cloud_angle_threshold_ = 5 / 180.0 * M_PI; // rad
-
-    if (relative_trans.norm() > key_cloud_range_threshold_ || fabs(relative_rot.angle()) > key_cloud_angle_threshold_)
-    {
-        localCloud = mCurrentFrame.mCloud;
-        localCloudPose = mCurrentFrame.current_pose_;
-        updateKfCloud = true;
-    }
+    Eigen::Matrix4f finalTransform = Eigen::Matrix4f::Identity();
+    bool isUse = GetCloudICP(finalTransform);
+    
+    cv::Mat T12b;
+    if (!isUse)
+        return false;
     else
     {
-        updateKfCloud = false;
+        T12b = Converter::toCVMat(finalTransform);
     }
-        
-
-    {    
-        // -- local
-        //---- convert to map frame
-
-        // SemanticCloud::Ptr local_cloud_in_map(new SemanticCloud);
-        // pcl::transformPointCloud(*localCloud, *local_cloud_in_map, localCloudPose);
-
-        // pcl::visualization::PointCloudColorHandlerCustom<SemanticPoint>
-        //     local_handler(local_cloud_in_map, 255, 255, 255);
-        // string cloud_name = "cloud" + to_string(mCurrentFrame.mnId);
-        // viewer_ptr_->addPointCloud(local_cloud_in_map, cloud_name);
-            
-        // -- vehicle model
-        Eigen::Affine3f vehicle_pose;
-        vehicle_pose.matrix() = trajectory_.back();
-        viewer_ptr_->updateShapePose("vehicle", vehicle_pose);
-        viewer_ptr_->updateCoordinateSystemPose("vehicle_frame", vehicle_pose);
-
-        // -- trajectory
-        birdseye_odometry::SemanticPoint waypoint;
-        waypoint.x = vehicle_pose.translation()[0];
-        waypoint.y = vehicle_pose.translation()[1];
-        waypoint.z = vehicle_pose.translation()[2];
-        string waypoint_name = "waypoint" + to_string(trajectory_.size());
-        viewer_ptr_->addSphere(waypoint, 0.1, 150, 0, 0, waypoint_name);
-
-        viewer_ptr_->spinOnce();
-    }    
-
-    if (score > 0.35)
-        return false;
     
-    finalTransform = mCurrentFrame.current_pose_.inverse() * mLastFrame.current_pose_;  // check right
-
+    {
+        cv::Mat encPose = GetEncoderPose();
+        cv::Mat gtPose = GetGTPose();
+        // cv::Mat birdICP = GetBirdICP();
+    }
+    
+    
     ORBmatcher matcher(0.9,true);
 
     UpdateLastFrame();
 
     // cout << "Converter: \n" << Converter::toCVMat(finalTransform) << endl;
 
-    cv::Mat T12c = Frame::Tcb * Converter::toCVMat(finalTransform) * Frame::Tbc;
+    cv::Mat T12c = Frame::Tcb * T12b * Frame::Tbc;
 
     // cout << "T12c: \n" << T12c << endl;
 
@@ -2494,6 +2428,85 @@ cv::Mat Tracking::GetBirdICP()
    
 
     return T12b.clone();
+}
+
+bool Tracking::GetCloudICP(Eigen::Matrix4f &finalTransform)
+{
+    Eigen::Matrix4f initTransform = localCloudPose.inverse() * mLastFrame.current_pose_;
+
+    ndt_aligner_ptr_->setInputSource(mCurrentFrame.mCloud);
+    ndt_aligner_ptr_->setInputTarget(localCloud);
+
+    birdseye_odometry::SemanticCloud::Ptr aligned_cloud(new birdseye_odometry::SemanticCloud);
+    ndt_aligner_ptr_->align(*aligned_cloud, initTransform);
+    Eigen::Matrix4f relative_pose = ndt_aligner_ptr_->getFinalTransformation();
+    double score = ndt_aligner_ptr_->getFitnessScore();
+    cout << "score: " << score << endl;
+
+    mCurrentFrame.current_pose_ = localCloudPose * relative_pose;
+    trajectory_.push_back(mCurrentFrame.current_pose_);
+
+    Eigen::Vector3f relative_trans = relative_pose.topRightCorner(3, 1);
+    Eigen::AngleAxisf relative_rot;
+    relative_rot = Eigen::Matrix3f(relative_pose.topLeftCorner(3, 3));
+
+    Eigen::Matrix4f Tb12 = mLastFrame.current_pose_.inverse() * mCurrentFrame.current_pose_;
+    Eigen::Vector3f Tb12t = Tb12.topRightCorner(3, 1);
+    cout << "ICP trans: " << Tb12t.norm() << endl;
+    // cout << "ICP T's trans: " << mCurrentFrame.current_pose_.topRightCorner(3, 1).norm() << endl;
+
+    // -- threshold for updating the key cloud
+    // 0.1-0.1-368
+    double key_cloud_range_threshold_ = 0.5;                // m
+    double key_cloud_angle_threshold_ = 5 / 180.0 * M_PI; // rad
+
+    if (relative_trans.norm() > key_cloud_range_threshold_ || fabs(relative_rot.angle()) > key_cloud_angle_threshold_)
+    {
+        localCloud = mCurrentFrame.mCloud;
+        localCloudPose = mCurrentFrame.current_pose_;
+        updateKfCloud = true;
+    }
+    else
+    {
+        updateKfCloud = false;
+    }
+        
+
+    {    
+        // -- local
+        //---- convert to map frame
+
+        // SemanticCloud::Ptr local_cloud_in_map(new SemanticCloud);
+        // pcl::transformPointCloud(*localCloud, *local_cloud_in_map, localCloudPose);
+
+        // pcl::visualization::PointCloudColorHandlerCustom<SemanticPoint>
+        //     local_handler(local_cloud_in_map, 255, 255, 255);
+        // string cloud_name = "cloud" + to_string(mCurrentFrame.mnId);
+        // viewer_ptr_->addPointCloud(local_cloud_in_map, cloud_name);
+            
+        // -- vehicle model
+        Eigen::Affine3f vehicle_pose;
+        vehicle_pose.matrix() = trajectory_.back();
+        viewer_ptr_->updateShapePose("vehicle", vehicle_pose);
+        viewer_ptr_->updateCoordinateSystemPose("vehicle_frame", vehicle_pose);
+
+        // -- trajectory
+        birdseye_odometry::SemanticPoint waypoint;
+        waypoint.x = vehicle_pose.translation()[0];
+        waypoint.y = vehicle_pose.translation()[1];
+        waypoint.z = vehicle_pose.translation()[2];
+        string waypoint_name = "waypoint" + to_string(trajectory_.size());
+        viewer_ptr_->addSphere(waypoint, 0.1, 150, 0, 0, waypoint_name);
+
+        viewer_ptr_->spinOnce();
+    }    
+       
+    finalTransform = mCurrentFrame.current_pose_.inverse() * mLastFrame.current_pose_;  // check right
+
+    if (score > 0.35)
+        return false;
+    else
+        return true;
 }
 
 void Tracking::GetMatchesInliersBird(vector<cv::DMatch> &vMatchesInliers12)
