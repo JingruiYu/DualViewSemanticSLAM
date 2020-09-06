@@ -204,7 +204,6 @@ void Optimizer::BundleAdjustmentWithBirdview(const vector<KeyFrame *> &vpKFs, co
             e->setVertex(0, dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertex(id)));
             e->setVertex(1, dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertex(pKF->mnId)));
             e->setMeasurement(obs);
-            // float scale = Frame::meter2pixel*Frame::meter2pixel;
             float scale = 3.0;
             const float &invSigma2 = pKF->mvInvLevelSigma2[pKF->mvKeysBird[mit->second].octave]*scale;
             e->setInformation(Eigen::Matrix3d::Identity()*invSigma2);
@@ -299,6 +298,8 @@ void Optimizer::BundleAdjustmentWithBirdview(const vector<KeyFrame *> &vpKFs, co
 
 int Optimizer::PoseOptimizationWithBirdview(Frame *pFrame, Frame* pRefFrame)
 {
+    cout << "\033[33m" << "PoseOptimizationWithBirdview" << "\033[0m" << endl;
+
     g2o::SparseOptimizer optimizer;
     g2o::BlockSolver_6_3::LinearSolverType * linearSolver;
     linearSolver = new g2o::LinearSolverDense<g2o::BlockSolver_6_3::PoseMatrixType>();
@@ -438,9 +439,6 @@ int Optimizer::PoseOptimizationWithBirdview(Frame *pFrame, Frame* pRefFrame)
 
             EdgeSE3ProjectXYZ2XYZOnlyPoseQuat *e = new EdgeSE3ProjectXYZ2XYZOnlyPoseQuat();
             e->setVertex(0, dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertex(0)));
-
-            // float scale = Frame::meter2pixel*Frame::meter2pixel;
-            // float scale = Frame::meter2pixel;
             float scale = 1.0;
             const float invSigma2 = pFrame->mvInvLevelSigma2[pFrame->mvKeysBird[k].octave]*scale;
             e->setInformation(Eigen::Matrix3d::Identity()*invSigma2);
@@ -450,7 +448,7 @@ int Optimizer::PoseOptimizationWithBirdview(Frame *pFrame, Frame* pRefFrame)
             // rk->setDelta(delta3D);
             rk->setDelta(deltaMono);
 
-            e->w = 0.9;
+            e->w = 1;
             e->Xw = Xw;
             e->Xc = Xc;
 
@@ -469,6 +467,7 @@ int Optimizer::PoseOptimizationWithBirdview(Frame *pFrame, Frame* pRefFrame)
         }
         else
         {
+            cout << "\033[33m" << "PoseOptimizationWithBirdview-Reference" << "\033[0m" << endl;
             // cout<<"Optimize with Birdview."<<endl;
             // set reference frane vertex
             VertexSE3Quat *vSE3 = new VertexSE3Quat();
@@ -497,8 +496,6 @@ int Optimizer::PoseOptimizationWithBirdview(Frame *pFrame, Frame* pRefFrame)
                     e->pc2[1] = pc2cv.y;
                     e->pc2[2] = pc2cv.z;
 
-                    // float scale = Frame::pixel2meter*Frame::pixel2meter;
-                    // float scale = Frame::pixel2meter;
                     float scale = 3.0;
                     const float invSigma2 = pFrame->mvInvLevelSigma2[pFrame->mvKeysBird[k].octave]*scale;
                     // float meter2pixel = 1.0/Frame::pixel2meter;
@@ -622,7 +619,7 @@ int Optimizer::PoseOptimizationWithBirdview(Frame *pFrame, Frame* pRefFrame)
     return nInitialCorrespondences-nBad;
 }
 
-int Optimizer::PoseOptimizationWithBirdviewPixel(Frame *pCurFrame, Frame* pRefFrame)
+int Optimizer::PoseOptimizationWithBirdviewPixel(Frame *pCurFrame, double scale, Frame* pRefFrame)
 {
     // 0. graph model
     g2o::SparseOptimizer optimizer;
@@ -726,7 +723,7 @@ int Optimizer::PoseOptimizationWithBirdviewPixel(Frame *pCurFrame, Frame* pRefFr
             EdgeSE3ProjectPw2BirdPixel * e = new EdgeSE3ProjectPw2BirdPixel();
             e->setVertex(0,dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertex(0)));
             e->setMeasurement(obs);
-            const float invSigma2 = pCurFrame->mvInvLevelSigma2[pCurFrame->mvKeysBird[i].octave]; // set according to the uncertainty of pixel location
+            const float invSigma2 = pCurFrame->mvInvLevelSigma2[pCurFrame->mvKeysBird[i].octave] * scale; // set according to the uncertainty of pixel location
             e->setInformation(Eigen::Matrix2d::Identity()*invSigma2); 
 
             g2o::RobustKernelHuber * rk = new g2o::RobustKernelHuber;
@@ -755,6 +752,7 @@ int Optimizer::PoseOptimizationWithBirdviewPixel(Frame *pCurFrame, Frame* pRefFr
 
     }
 
+    // Bird is twice of Front
     // cout << "before PoseOptimizationWithBirdviewPixel optimization : " << " -Front: " << nFrontInitialCorrespondences << " -Bird: " << nBirdInitialCorrespondences << endl;
 
     if (nFrontInitialCorrespondences < 3 && nBirdInitialCorrespondences < 3)
@@ -1109,7 +1107,6 @@ void Optimizer::LocalBundleAdjustmentWithBirdview(KeyFrame *pKF, bool* pbStopFla
                 e->setVertex(0, dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertex(id)));
                 e->setVertex(1, dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertex(pKFi->mnId)));
                 e->setMeasurement(obs);
-                // float scale = Frame::meter2pixel*Frame::meter2pixel;
                 float scale = 5.0;
                 const float &invSigma2 = pKFi->mvInvLevelSigma2[pKFi->mvKeysBird[mit->second].octave]*scale;
                 e->setInformation(Eigen::Matrix3d::Identity()*invSigma2);
@@ -1528,7 +1525,6 @@ void Optimizer::LocalBundleAdjustmentWithBirdviewPose(KeyFrame *pKF, bool* pbSto
                 e->setVertex(0, dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertex(id)));
                 e->setVertex(1, dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertex(pKFi->mnId)));
                 e->setMeasurement(obs);
-                // float scale = Frame::meter2pixel*Frame::meter2pixel;
                 float scale = 5.0;
                 const float &invSigma2 = pKFi->mvInvLevelSigma2[pKFi->mvKeysBird[mit->second].octave]*scale;
                 e->setInformation(Eigen::Matrix3d::Identity()*invSigma2);
@@ -1554,14 +1550,15 @@ void Optimizer::LocalBundleAdjustmentWithBirdviewPose(KeyFrame *pKF, bool* pbSto
     {
         KeyFrame *KF1=*KFit;
         KeyFrame *KF2=*KFnext;
-        Eigen::Matrix4d T12=Converter::toMatrix4d(Frame::GetTransformFromOdometer(KF1->mOdomPose,KF2->mOdomPose));
+        // Eigen::Matrix4d T12=Converter::toMatrix4d(Frame::GetTransformFromOdometer(KF1->mOdomPose,KF2->mOdomPose));
+        Eigen::Matrix4d T12=Converter::toMatrix4d(Frame::GetTransformFromICP(KF1->local_cloud_pose_,KF2->local_cloud_pose_));
 
         EdgePose2Pose *e = new EdgePose2Pose();
         e->setMeasurement(g2o::SE3Quat(T12.block(0,0,3,3),T12.block(0,3,3,1)));
         e->setVertex(0,dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertex(KF1->mnId)));
         e->setVertex(1,dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertex(KF2->mnId)));
         e->w = 1;
-        g2o::Matrix6d Info=g2o::Matrix6d::Identity()*1e4;
+        g2o::Matrix6d Info=g2o::Matrix6d::Identity()*1e3;
         e->setInformation(Info);
         
         optimizer.addEdge(e);
@@ -1767,6 +1764,7 @@ void Optimizer::poseDirectEstimation(const Frame &ReferenceFrame, const Frame &C
 
 int Optimizer::poseOptimizationFull(Frame* pCurFrame, Frame* pRefFrame)
 {
+    cout << "poseOptimizationFull" << endl;
     // 0. graph model
     g2o::SparseOptimizer optimizer;
 
@@ -2037,704 +2035,5 @@ int Optimizer::poseOptimizationFull(Frame* pCurFrame, Frame* pRefFrame)
     return nFrontInitialCorrespondences-nFrontBad;
 }
 
-
-int Optimizer::poseOptimizationWeight(Frame* pCurFrame, Frame* pRefFrame)
-{
-    // 0. graph model
-    g2o::SparseOptimizer optimizer;
-
-    // 1. linearSolver
-    g2o::BlockSolverX::LinearSolverType * linearSolver;
-    linearSolver = new g2o::LinearSolverDense<g2o::BlockSolverX::PoseMatrixType>(); // linear solver using dense cholesky decomposition
-    // linearSolver = new g2o::LinearSolverEigen<g2o::BlockSolverX::PoseMatrixType>(); using sparse cholesky solver from Eigen
-    // linearSolver = new g2o::LinearSolverCSparse<g2o::BlockSolverX::PoseMatrixType>(); using CSparse
-    // linearSolver = new g2o::LinearSolverCholmod<g2o::BlockSolverX::PoseMatrixType>(); basic solver 
-
-    // 2. blockSolver
-    g2o::BlockSolverX * solver_ptr = new g2o::BlockSolverX(linearSolver);
-
-    // 3. optimizer algorithm
-    g2o::OptimizationAlgorithmLevenberg * solver = new g2o::OptimizationAlgorithmLevenberg(solver_ptr);
-
-    // 4. set solver 
-    optimizer.setAlgorithm(solver);
-    optimizer.setVerbose(false); // for output
-
-    // 5. vertex
-    g2o::VertexSE3Expmap * vSE3c = new g2o::VertexSE3Expmap();
-    vSE3c->setId(0);
-    vSE3c->setEstimate(Converter::toSE3Quat(pCurFrame->mTcw));
-    vSE3c->setFixed(false);
-    optimizer.addVertex(vSE3c);
-
-    // g2o::VertexSE3Expmap * vSE3r = new g2o::VertexSE3Expmap();
-    // vSE3r->setId(1);
-    // vSE3r->setEstimate(Converter::toSE3Quat(pRefFrame->mTcw));
-    // vSE3r->setFixed(false);
-    // optimizer.addVertex(vSE3r); 
-
-    // 6. edge
-    const int Nf = pCurFrame->N;
-    vector<EdgeSE3ProjectXYZOnlyWeightPose*> vpEdgesFront;
-    vector<size_t> vnIndexEdgeFront;
-    vpEdgesFront.reserve(Nf);
-    vnIndexEdgeFront.reserve(Nf);
-    int nFrontInitialCorrespondences = 0;
-
-    const int Nb = pCurFrame->mvbBirdviewInliers.size();
-    vector<EdgeSE3ProjectXYZ2XYZOnlyPoseQuat*> vpEdgesBird;
-    vector<size_t> vnIndexEdgeBird;
-    vpEdgesBird.reserve(Nb);
-    vnIndexEdgeBird.reserve(Nb);
-    int nBirdInitialCorrespondences = 0;
-    
-    const int Nd = 0; // pRefFrame->mvMeasurement_p.size(); // the number of these edge should be controlled
-    vector<EdgeSE3ProjectDirect*> vpEdgesDirect;
-    vector<size_t> vnIndexEdgeDirect;
-    vector<bool> vOutlierDirect;
-    vpEdgesDirect.reserve(Nd);
-    vnIndexEdgeDirect.reserve(Nd);
-    vOutlierDirect = vector<bool>(Nd,false);
-
-    const float deltaMono = sqrt(5.991);
-    {
-    unique_lock<mutex> lock(MapPoint::mGlobalMutex);
-    // front pts
-    for (int i = 0; i < Nf; i++)
-    {
-        MapPoint* pMP = pCurFrame->mvpMapPoints[i];
-        if (pMP)
-        {
-            nFrontInitialCorrespondences++;
-            pCurFrame->mvbOutlier[i] = false;
-
-            Eigen::Matrix<double,2,1> obs;
-            const cv::KeyPoint &kpUn = pCurFrame->mvKeysUn[i];
-            obs << kpUn.pt.x, kpUn.pt.y;
-
-            EdgeSE3ProjectXYZOnlyWeightPose * e = new EdgeSE3ProjectXYZOnlyWeightPose();
-            e->setVertex(0,dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertex(0))); // dynamic_cast : type convert for class only
-            e->setMeasurement(obs);
-            const float invSigma2 = pCurFrame->mvInvLevelSigma2[kpUn.octave]; // uncertainty per pixel
-            double w = 1;
-            e->setInformation(Eigen::Matrix2d::Identity()*invSigma2*w);
-
-            g2o::RobustKernelHuber * rk = new g2o::RobustKernelHuber;
-            e->setRobustKernel(rk);
-            rk->setDelta(deltaMono);
-
-            e->w = 0.2;
-            e->fx = pCurFrame->fx;
-            e->fy = pCurFrame->fy;
-            e->cx = pCurFrame->cx;
-            e->cy = pCurFrame->cy;
-
-            cv::Mat Xw = pMP->GetWorldPos();
-            e->Xw[0] = Xw.at<float>(0);
-            e->Xw[1] = Xw.at<float>(1);
-            e->Xw[2] = Xw.at<float>(2);
-            
-            optimizer.addEdge(e);
-            vpEdgesFront.push_back(e);
-            vnIndexEdgeFront.push_back(i);
-        }
-    }
-
-    // bird pts
-    for (int i = 0; i < Nb; i++)
-    {
-        MapPointBird* pMP = pCurFrame->mvpMapPointsBird[i];
-        if (pMP)
-        {
-            nBirdInitialCorrespondences++;
-            pCurFrame->mvbBirdviewInliers[i] = true;
-            
-            Vector3d Xw = Converter::toVector3d(pMP->GetWorldPos());
-            Vector3d Xc;
-            cv::Point3f p = pCurFrame->mvKeysBirdCamXYZ[i];
-            Xc << p.x, p.y, p.z;
-
-            EdgeSE3ProjectXYZ2XYZOnlyPoseQuat * e = new EdgeSE3ProjectXYZ2XYZOnlyPoseQuat();
-            e->setVertex(0,dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertex(0)));
-            e->Xc = Xc;
-            float scale = 3.0;
-            const float invSigma2 = pCurFrame->mvInvLevelSigma2[pCurFrame->mvKeysBird[i].octave]*scale; // set according to the uncertainty of pixel location
-            e->setInformation(Eigen::Matrix3d::Identity()*invSigma2); 
-
-            g2o::RobustKernelHuber * rk = new g2o::RobustKernelHuber;
-            e->setRobustKernel(rk);
-            rk->setDelta(deltaMono); // less, more linear
-
-            e->Xw = Xw;
-
-            optimizer.addEdge(e);
-            vpEdgesBird.push_back(e);
-            vnIndexEdgeBird.push_back(i);
-        }
-    }
-
-    // bird direct
-    for (int i = 0; i < Nd; i++)
-    {
-        EdgeSE3ProjectDirect * edge = new EdgeSE3ProjectDirect(
-            Converter::toVector3d(pRefFrame->mvMeasurement_p[i]),
-            pRefFrame->Tcb.rowRange(0,3).colRange(0,3),
-            pRefFrame->Tcb.rowRange(0,3).col(3),
-            pRefFrame->Rro, pRefFrame->tro,
-            pRefFrame->Ror, pRefFrame->tor,
-            pCurFrame->mBirdviewContour
-        );
-        edge->setVertex(0,dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertex(0)));
-        edge->setMeasurement(pRefFrame->mvMeasurement_g[i]);
-        edge->setInformation(Eigen::Matrix<double,1,1>::Identity()*5);
-
-        g2o::RobustKernelHuber * rk = new g2o::RobustKernelHuber;
-        edge->setRobustKernel(rk);
-        rk->setDelta(deltaMono);
-
-        optimizer.addEdge(edge);
-        vpEdgesDirect.push_back(edge);
-        vnIndexEdgeDirect.push_back(i);
-    }
-        
-    }
-
-    // cout << "the feature of front: ... " << vnIndexEdgeFront.size() << endl;
-    // cout << "the feature of bird : ... " << vnIndexEdgeBird.size() << endl;
-    // cout << "the directio of bird: ... " << vnIndexEdgeDirect.size() << endl << endl;
-
-    if (nFrontInitialCorrespondences < 3 && nBirdInitialCorrespondences < 3)
-        return 0;
-
-    
-    
-    // 7. iteration optimization
-    const float chi2Mono[4]={5.991,5.991,5.991,5.991};
-    const int its[4]={10,10,10,10};
-    int nFrontBad = 0;
-    int nBirdBad = 0;
-    int nDirectBad = 0;
-
-    for (size_t it = 0; it < 4; it++)
-    {
-        vSE3c->setEstimate(Converter::toSE3Quat(pCurFrame->mTcw));
-        optimizer.initializeOptimization(0);
-        optimizer.optimize(its[it]);
-
-        // g2o::VertexSE3Expmap * vSE3c_tmp = static_cast<g2o::VertexSE3Expmap*>(optimizer.vertex(0));
-        // g2o::SE3Quat SE3c_tmp = vSE3c_tmp->estimate();
-        // cv::Mat pose = Converter::toCvMat(SE3c_tmp);
-        // pCurFrame->mTcw.rowRange(0,3).col(3).copyTo(pose.rowRange(0,3).col(3));
-        // vSE3c->setEstimate(Converter::toSE3Quat(pose));
-
-        nFrontBad = 0;
-        for (size_t i = 0, iend = vpEdgesFront.size(); i < iend; i++)
-        {
-            EdgeSE3ProjectXYZOnlyWeightPose * e = vpEdgesFront[i];
-            const size_t idx = vnIndexEdgeFront[i];
-
-            if (pCurFrame->mvbOutlier[idx])
-                e->computeError();
-            
-            const float chi2 = e->chi2();
-            if (chi2>chi2Mono[it])
-            {
-                pCurFrame->mvbOutlier[idx] = true;
-                e->setLevel(1);
-                nFrontBad++;
-            }
-            else
-            {
-                pCurFrame->mvbOutlier[idx] = false;
-                e->setLevel(0);
-            }
-
-            if (it==2)
-                e->setRobustKernel(0); // means no kernel used
-        }
-
-        nBirdBad = 0;
-        for (size_t i = 0, iend = vpEdgesBird.size(); i < iend; i++)
-        {
-            EdgeSE3ProjectXYZ2XYZOnlyPoseQuat * e = vpEdgesBird[i];
-            const size_t idx = vnIndexEdgeBird[i];
-
-            if (!pCurFrame->mvbBirdviewInliers[idx])
-                e->computeError();
-            
-            const float chi2 = e->chi2();
-            if (chi2>chi2Mono[it])
-            {
-                pCurFrame->mvbBirdviewInliers[idx] = false;
-                e->setLevel(1);
-                nBirdBad++;
-            }
-            else
-            {
-                pCurFrame->mvbBirdviewInliers[idx] = true;
-                e->setLevel(0);
-            }
-            
-            if (it==2)
-                e->setRobustKernel(0);
-        }
-
-        nDirectBad = 0;
-        for (size_t i = 0, iend = vpEdgesDirect.size(); i < iend; i++)
-        {
-            EdgeSE3ProjectDirect * edge = vpEdgesDirect[i];
-            const size_t idx = vnIndexEdgeDirect[i];
-
-            if (!vOutlierDirect[idx])
-                edge->computeError();
-            
-            const float chi2 = edge->chi2();
-            if (chi2>chi2Mono[it])
-            {
-                vOutlierDirect[idx] = true;
-                edge->setLevel(1);
-                nDirectBad++;
-            }
-            else
-            {
-                vOutlierDirect[idx] = false;
-                edge->setLevel(0);
-            }
-        }
-        
-        if (optimizer.edges().size() < 10)
-            break;
-    }
-    
-    // 8. get result
-    g2o::VertexSE3Expmap * vSE3c_recov = static_cast<g2o::VertexSE3Expmap*>(optimizer.vertex(0));
-    g2o::SE3Quat SE3c_recov = vSE3c_recov->estimate();
-    cv::Mat pose = Converter::toCvMat(SE3c_recov);
-    if (1)
-    {
-        pCurFrame->SetPose(pose);
-    }
-
-    return nFrontInitialCorrespondences-nFrontBad;
-}
-
-
-int Optimizer::poseOptimizationRotation(Frame* pCurFrame, Frame* pRefFrame)
-{
-    // 0. graph model
-    g2o::SparseOptimizer optimizer;
-
-    // 1. linearSolver
-    g2o::BlockSolverX::LinearSolverType * linearSolver;
-    linearSolver = new g2o::LinearSolverDense<g2o::BlockSolverX::PoseMatrixType>(); // linear solver using dense cholesky decomposition
-    // linearSolver = new g2o::LinearSolverEigen<g2o::BlockSolverX::PoseMatrixType>(); using sparse cholesky solver from Eigen
-    // linearSolver = new g2o::LinearSolverCSparse<g2o::BlockSolverX::PoseMatrixType>(); using CSparse
-    // linearSolver = new g2o::LinearSolverCholmod<g2o::BlockSolverX::PoseMatrixType>(); basic solver 
-
-    // 2. blockSolver
-    g2o::BlockSolverX * solver_ptr = new g2o::BlockSolverX(linearSolver);
-
-    // 3. optimizer algorithm
-    g2o::OptimizationAlgorithmLevenberg * solver = new g2o::OptimizationAlgorithmLevenberg(solver_ptr);
-
-    // 4. set solver 
-    optimizer.setAlgorithm(solver);
-    optimizer.setVerbose(false); // for output
-
-    // 5. vertex
-    VertexRotation * vRc = new VertexRotation();
-    vRc->setId(0);
-    cv::Mat mRcw = pCurFrame->mTcw.rowRange(0,3).colRange(0,3);
-    cv::Mat mtcw = pCurFrame->mTcw.rowRange(0,3).col(3);
-    vRc->setEstimate(Converter::toQuaterniond(mRcw));
-    vRc->setFixed(false);
-    optimizer.addVertex(vRc);
-
-    // 6. edge
-    const int Nf = pCurFrame->N;
-    vector<EdgeSO3ProjectXYZOnlyRotation*> vpEdgesFront;
-    vector<size_t> vnIndexEdgeFront;
-    vpEdgesFront.reserve(Nf);
-    vnIndexEdgeFront.reserve(Nf);
-    int nFrontInitialCorrespondences = 0;
-
-    const float deltaMono = sqrt(5.991);
-    {
-    unique_lock<mutex> lock(MapPoint::mGlobalMutex);
-    // front pts
-    for (int i = 0; i < Nf; i++)
-    {
-        MapPoint* pMP = pCurFrame->mvpMapPoints[i];
-        if (pMP)
-        {
-            nFrontInitialCorrespondences++;
-            pCurFrame->mvbOutlier[i] = false;
-
-            Eigen::Matrix<double,2,1> obs;
-            const cv::KeyPoint &kpUn = pCurFrame->mvKeysUn[i];
-            obs << kpUn.pt.x, kpUn.pt.y;
-
-            EdgeSO3ProjectXYZOnlyRotation * e = new EdgeSO3ProjectXYZOnlyRotation();
-            e->setVertex(0,dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertex(0))); // dynamic_cast : type convert for class only
-            e->setMeasurement(obs);
-            const float invSigma2 = pCurFrame->mvInvLevelSigma2[kpUn.octave]; // uncertainty per pixel
-            e->setInformation(Eigen::Matrix2d::Identity()*invSigma2);
-
-            g2o::RobustKernelHuber * rk = new g2o::RobustKernelHuber;
-            e->setRobustKernel(rk);
-            rk->setDelta(deltaMono);
-
-            e->fx = pCurFrame->fx;
-            e->fy = pCurFrame->fy;
-            e->cx = pCurFrame->cx;
-            e->cy = pCurFrame->cy;
-
-            cv::Mat Xw = pMP->GetWorldPos();
-            e->Xw[0] = Xw.at<float>(0);
-            e->Xw[1] = Xw.at<float>(1);
-            e->Xw[2] = Xw.at<float>(2);
-
-            Vector3d tcw = Converter::toVector3d(mtcw);
-            e->tcw = tcw;
-            
-            optimizer.addEdge(e);
-            vpEdgesFront.push_back(e);
-            vnIndexEdgeFront.push_back(i);
-        }
-    }
-
-    }
-
-    if (nFrontInitialCorrespondences < 3)
-    {
-        cout << "nFrontInitialCorrespondences is : " << nFrontInitialCorrespondences << " less than 3";
-        return 0;
-    }
-           
-    
-    // 7. iteration optimization
-    const float chi2Mono[4]={5.991,5.991,5.991,5.991};
-    const int its[4]={10,10,10,10};
-    int nFrontBad = 0;
-    for (size_t it = 0; it < 4; it++)
-    {
-        vRc->setEstimate(Converter::toQuaterniond(mRcw));
-        optimizer.initializeOptimization(0);
-        optimizer.optimize(its[it]);
-
-        nFrontBad = 0;
-        for (size_t i = 0, iend = vpEdgesFront.size(); i < iend; i++)
-        {
-            EdgeSO3ProjectXYZOnlyRotation * e = vpEdgesFront[i];
-            const size_t idx = vnIndexEdgeFront[i];
-
-            if (pCurFrame->mvbOutlier[idx])
-                e->computeError();
-            
-            const float chi2 = e->chi2();
-            if (chi2>chi2Mono[it])
-            {
-                pCurFrame->mvbOutlier[idx] = true;
-                e->setLevel(1);
-                nFrontBad++;
-            }
-            else
-            {
-                pCurFrame->mvbOutlier[idx] = false;
-                e->setLevel(0);
-            }
-
-            if (it==2)
-                e->setRobustKernel(0); // means no kernel used
-        }
-    }
-    
-    // 8. get result
-    VertexRotation * vRc_rec = static_cast<VertexRotation*>(optimizer.vertex(0));
-    Eigen::Matrix3d R_rec = vRc_rec->estimate().matrix();
-    mRcw = Converter::toCvMat(R_rec);
-    cv::Mat Tcw_rec = cv::Mat::eye(4,4,CV_32F);
-    mRcw.copyTo(Tcw_rec.rowRange(0,3).colRange(0,3));
-    mtcw.copyTo(Tcw_rec.rowRange(0,3).col(3));   
-
-    pCurFrame->SetPose(Tcw_rec);
-
-    return nFrontInitialCorrespondences;
-
-    return 0;
-}
-
-
-int Optimizer::poseOptimizationTranslation(Frame* pCurFrame, Frame* pRefFrame)
-{
-    // 0. graph model
-    g2o::SparseOptimizer optimizer;
-
-    // 1. linearSolver
-    g2o::BlockSolverX::LinearSolverType * linearSolver;
-    linearSolver = new g2o::LinearSolverDense<g2o::BlockSolverX::PoseMatrixType>(); // linear solver using dense cholesky decomposition
-    // linearSolver = new g2o::LinearSolverEigen<g2o::BlockSolverX::PoseMatrixType>(); using sparse cholesky solver from Eigen
-    // linearSolver = new g2o::LinearSolverCSparse<g2o::BlockSolverX::PoseMatrixType>(); using CSparse
-    // linearSolver = new g2o::LinearSolverCholmod<g2o::BlockSolverX::PoseMatrixType>(); basic solver 
-
-    // 2. blockSolver
-    g2o::BlockSolverX * solver_ptr = new g2o::BlockSolverX(linearSolver);
-
-    // 3. optimizer algorithm
-    g2o::OptimizationAlgorithmLevenberg * solver = new g2o::OptimizationAlgorithmLevenberg(solver_ptr);
-
-    // 4. set solver 
-    optimizer.setAlgorithm(solver);
-    optimizer.setVerbose(false); // for output
-
-    // 5. vertex
-    g2o::VertexSE3Expmap * vSE3c = new g2o::VertexSE3Expmap();
-    vSE3c->setId(0);
-    vSE3c->setEstimate(Converter::toSE3Quat(pCurFrame->mTcw));
-    vSE3c->setFixed(false);
-    optimizer.addVertex(vSE3c);
-
-    // g2o::VertexSE3Expmap * vSE3r = new g2o::VertexSE3Expmap();
-    // vSE3r->setId(1);
-    // vSE3r->setEstimate(Converter::toSE3Quat(pRefFrame->mTcw));
-    // vSE3r->setFixed(false);
-    // optimizer.addVertex(vSE3r); 
-
-    // 6. edge
-    const int Nf = pCurFrame->N;
-    vector<g2o::EdgeSE3ProjectXYZOnlyPose*> vpEdgesFront;
-    vector<size_t> vnIndexEdgeFront;
-    vpEdgesFront.reserve(Nf);
-    vnIndexEdgeFront.reserve(Nf);
-    int nFrontInitialCorrespondences = 0;
-
-    const int Nb = pCurFrame->mvbBirdviewInliers.size();
-    vector<EdgeSE3ProjectXYZ2XYZOnlyPoseQuat*> vpEdgesBird;
-    vector<size_t> vnIndexEdgeBird;
-    vpEdgesBird.reserve(Nb);
-    vnIndexEdgeBird.reserve(Nb);
-    int nBirdInitialCorrespondences = 0;
-    
-    const int Nd = 10; // pRefFrame->mvMeasurement_p.size(); // the number of these edge should be controlled
-    vector<EdgeSE3ProjectDirect*> vpEdgesDirect;
-    vector<size_t> vnIndexEdgeDirect;
-    vector<bool> vOutlierDirect;
-    vpEdgesDirect.reserve(Nd);
-    vnIndexEdgeDirect.reserve(Nd);
-    vOutlierDirect = vector<bool>(Nd,false);
-
-    const float deltaMono = sqrt(5.991);
-    {
-    unique_lock<mutex> lock(MapPoint::mGlobalMutex);
-    // front pts
-    for (int i = 0; i < Nf; i++)
-    {
-        MapPoint* pMP = pCurFrame->mvpMapPoints[i];
-        if (pMP)
-        {
-            nFrontInitialCorrespondences++;
-            pCurFrame->mvbOutlier[i] = false;
-
-            Eigen::Matrix<double,2,1> obs;
-            const cv::KeyPoint &kpUn = pCurFrame->mvKeysUn[i];
-            obs << kpUn.pt.x, kpUn.pt.y;
-
-            g2o::EdgeSE3ProjectXYZOnlyPose * e = new g2o::EdgeSE3ProjectXYZOnlyPose();
-            e->setVertex(0,dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertex(0))); // dynamic_cast : type convert for class only
-            e->setMeasurement(obs);
-            const float invSigma2 = pCurFrame->mvInvLevelSigma2[kpUn.octave]; // uncertainty per pixel
-            e->setInformation(Eigen::Matrix2d::Identity()*invSigma2);
-
-            g2o::RobustKernelHuber * rk = new g2o::RobustKernelHuber;
-            e->setRobustKernel(rk);
-            rk->setDelta(deltaMono);
-
-            e->fx = pCurFrame->fx;
-            e->fy = pCurFrame->fy;
-            e->cx = pCurFrame->cx;
-            e->cy = pCurFrame->cy;
-
-            cv::Mat Xw = pMP->GetWorldPos();
-            e->Xw[0] = Xw.at<float>(0);
-            e->Xw[1] = Xw.at<float>(1);
-            e->Xw[2] = Xw.at<float>(2);
-            
-            optimizer.addEdge(e);
-            vpEdgesFront.push_back(e);
-            vnIndexEdgeFront.push_back(i);
-        }
-    }
-
-    // bird pts
-    for (int i = 0; i < Nb; i++)
-    {
-        MapPointBird* pMP = pCurFrame->mvpMapPointsBird[i];
-        if (pMP)
-        {
-            nBirdInitialCorrespondences++;
-            pCurFrame->mvbBirdviewInliers[i] = true;
-            
-            Vector3d Xw = Converter::toVector3d(pMP->GetWorldPos());
-            Vector3d Xc;
-            cv::Point3f p = pCurFrame->mvKeysBirdCamXYZ[i];
-            Xc << p.x, p.y, p.z;
-
-            EdgeSE3ProjectXYZ2XYZOnlyPoseQuat * e = new EdgeSE3ProjectXYZ2XYZOnlyPoseQuat();
-            e->setVertex(0,dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertex(0)));
-            e->Xc = Xc;
-            float scale = 3.0;
-            const float invSigma2 = pCurFrame->mvInvLevelSigma2[pCurFrame->mvKeysBird[i].octave]*scale; // set according to the uncertainty of pixel location
-            e->setInformation(Eigen::Matrix3d::Identity()*invSigma2); 
-
-            g2o::RobustKernelHuber * rk = new g2o::RobustKernelHuber;
-            e->setRobustKernel(rk);
-            rk->setDelta(deltaMono); // less, more linear
-
-            e->Xw = Xw;
-
-            optimizer.addEdge(e);
-            vpEdgesBird.push_back(e);
-            vnIndexEdgeBird.push_back(i);
-        }
-    }
-
-    // bird direct
-    for (int i = 0; i < Nd; i++)
-    {
-        EdgeSE3ProjectDirect * edge = new EdgeSE3ProjectDirect(
-            Converter::toVector3d(pRefFrame->mvMeasurement_p[i]),
-            pRefFrame->Tcb.rowRange(0,3).colRange(0,3),
-            pRefFrame->Tcb.rowRange(0,3).col(3),
-            pRefFrame->Rro, pRefFrame->tro,
-            pRefFrame->Ror, pRefFrame->tor,
-            pCurFrame->mBirdviewContour
-        );
-        edge->setVertex(0,dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertex(0)));
-        edge->setMeasurement(pRefFrame->mvMeasurement_g[i]);
-        edge->setInformation(Eigen::Matrix<double,1,1>::Identity()*5);
-
-        g2o::RobustKernelHuber * rk = new g2o::RobustKernelHuber;
-        edge->setRobustKernel(rk);
-        rk->setDelta(deltaMono);
-
-        optimizer.addEdge(edge);
-        vpEdgesDirect.push_back(edge);
-        vnIndexEdgeDirect.push_back(i);
-    }
-        
-    }
-
-    // cout << "the feature of front: ... " << vnIndexEdgeFront.size() << endl;
-    // cout << "the feature of bird : ... " << vnIndexEdgeBird.size() << endl;
-    // cout << "the directio of bird: ... " << vnIndexEdgeDirect.size() << endl << endl;
-
-    if (nFrontInitialCorrespondences < 3 && nBirdInitialCorrespondences < 3)
-        return 0;
-
-    
-    
-    // 7. iteration optimization
-    const float chi2Mono[4]={5.991,5.991,5.991,5.991};
-    const int its[4]={10,10,10,10};
-    int nFrontBad = 0;
-    int nBirdBad = 0;
-    int nDirectBad = 0;
-
-    for (size_t it = 0; it < 4; it++)
-    {
-        vSE3c->setEstimate(Converter::toSE3Quat(pCurFrame->mTcw));
-        optimizer.initializeOptimization(0);
-        optimizer.optimize(its[it]);
-
-        nFrontBad = 0;
-        for (size_t i = 0, iend = vpEdgesFront.size(); i < iend; i++)
-        {
-            g2o::EdgeSE3ProjectXYZOnlyPose * e = vpEdgesFront[i];
-            const size_t idx = vnIndexEdgeFront[i];
-
-            if (pCurFrame->mvbOutlier[idx])
-                e->computeError();
-            
-            const float chi2 = e->chi2();
-            if (chi2>chi2Mono[it])
-            {
-                pCurFrame->mvbOutlier[idx] = true;
-                e->setLevel(1);
-                nFrontBad++;
-            }
-            else
-            {
-                pCurFrame->mvbOutlier[idx] = false;
-                e->setLevel(0);
-            }
-
-            if (it==2)
-                e->setRobustKernel(0); // means no kernel used
-        }
-
-        nBirdBad = 0;
-        for (size_t i = 0, iend = vpEdgesBird.size(); i < iend; i++)
-        {
-            EdgeSE3ProjectXYZ2XYZOnlyPoseQuat * e = vpEdgesBird[i];
-            const size_t idx = vnIndexEdgeBird[i];
-
-            if (!pCurFrame->mvbBirdviewInliers[idx])
-                e->computeError();
-            
-            const float chi2 = e->chi2();
-            if (chi2>chi2Mono[it])
-            {
-                pCurFrame->mvbBirdviewInliers[idx] = false;
-                e->setLevel(1);
-                nBirdBad++;
-            }
-            else
-            {
-                pCurFrame->mvbBirdviewInliers[idx] = true;
-                e->setLevel(0);
-            }
-            
-            if (it==2)
-                e->setRobustKernel(0);
-        }
-
-        nDirectBad = 0;
-        for (size_t i = 0, iend = vpEdgesDirect.size(); i < iend; i++)
-        {
-            EdgeSE3ProjectDirect * edge = vpEdgesDirect[i];
-            const size_t idx = vnIndexEdgeDirect[i];
-
-            if (!vOutlierDirect[idx])
-                edge->computeError();
-            
-            const float chi2 = edge->chi2();
-            if (chi2>chi2Mono[it])
-            {
-                vOutlierDirect[idx] = true;
-                edge->setLevel(1);
-                nDirectBad++;
-            }
-            else
-            {
-                vOutlierDirect[idx] = false;
-                edge->setLevel(0);
-            }
-        }
-        
-        if (optimizer.edges().size() < 10)
-            break;
-    }
-    
-    // 8. get result
-    g2o::VertexSE3Expmap * vSE3c_recov = static_cast<g2o::VertexSE3Expmap*>(optimizer.vertex(0));
-    g2o::SE3Quat SE3c_recov = vSE3c_recov->estimate();
-    cv::Mat pose = Converter::toCvMat(SE3c_recov);
-    if (1)
-    {
-        pCurFrame->SetPose(pose);
-    }
-
-    return nFrontInitialCorrespondences-nFrontBad;
-}
 
 }  // namespace ORB_SLAM2

@@ -132,6 +132,7 @@ public:
     void getICPEdges();
 
     static cv::Mat GetTransformFromOdometer(const cv::Vec3d &odomPose1, const cv::Vec3d &odomPose2);
+    static cv::Mat GetTransformFromICP(Eigen::Matrix4f &ICPPose1, Eigen::Matrix4f &ICPPose2);
 
 public:
     // Vocabulary used for relocalization.

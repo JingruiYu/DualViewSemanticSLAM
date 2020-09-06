@@ -68,17 +68,11 @@ public:
 
     int static PoseOptimizationWithBirdview(Frame* pFrame, Frame* pRefFrame=NULL);
 
-    int static PoseOptimizationWithBirdviewPixel(Frame* pCurFrame, Frame* pRefFrame=NULL);
+    int static PoseOptimizationWithBirdviewPixel(Frame* pCurFrame, double scale, Frame* pRefFrame=NULL);
 
     void static poseDirectEstimation(const Frame &ReferenceFrame, const Frame &CurrentFrame, cv::Mat &Tcw );
 
     int static poseOptimizationFull(Frame* pCurFrame, Frame* pRefFrame);
-
-    int static poseOptimizationWeight(Frame* pCurFrame, Frame* pRefFrame);
-
-    int static poseOptimizationRotation(Frame* pCurFrame, Frame* pRefFrame);
-
-    int static poseOptimizationTranslation(Frame* pCurFrame, Frame* pRefFrame);
 };
 
 } //namespace ORB_SLAM

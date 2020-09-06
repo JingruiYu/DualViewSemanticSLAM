@@ -1252,4 +1252,11 @@ cv::Mat Frame::GetTransformFromOdometer(const cv::Vec3d &odomPose1, const cv::Ve
     return T12c;
 }
 
+cv::Mat Frame::GetTransformFromICP(Eigen::Matrix4f &ICPPose1, Eigen::Matrix4f &ICPPose2)
+{
+    Eigen::Matrix4f Tb12 = ICPPose1.inverse() * ICPPose2;
+    cv::Mat T12c=Tcb*Converter::toCVMat(Tb12)*Tbc;
+    return T12c;
+}
+
 } //namespace ORB_SLAM

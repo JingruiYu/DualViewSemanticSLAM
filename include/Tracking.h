@@ -161,6 +161,7 @@ public:
     void Reset();
 
     void GetMatchesInliersBird(vector<cv::DMatch> &vMatchesInliers12);
+    void DrawerVisial(cv::Mat &Tcw, double r, double g, double d, string name);
 
 protected:
 
@@ -179,6 +180,7 @@ protected:
     void UpdateLastFrame();
     bool TrackWithMotionModel();
     bool TrackingWithICP();
+    bool TrackShotTerm();
 
     bool Relocalization();
 
@@ -198,6 +200,7 @@ protected:
     cv::Mat GetGTPose();
     cv::Mat GetBirdICP();
     bool GetCloudICP(Eigen::Matrix4f &finalTransform);
+    
 
     // In case of performing only localization, this flag is true when there are no matches to
     // points in the map. Still tracking will continue if there are enough matches with temporal points.
@@ -264,6 +267,9 @@ protected:
 
     //Motion Model
     cv::Mat mVelocity;
+    cv::Mat mT12b;
+    cv::Mat mVisOnlyTrackTcw;
+    cv::Mat mAfterMapTcw;
 
     //Color order (true RGB, false BGR, ignored if grayscale)
     bool mbRGB;
