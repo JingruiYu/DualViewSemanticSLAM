@@ -159,6 +159,37 @@ public:
 };
 
 
+class  EdgeSE3ProjectXYZOnlyWeightPoseDebug: public g2o::BaseUnaryEdge<2, Vector2d, g2o::VertexSE3Expmap>{
+public:
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
+  EdgeSE3ProjectXYZOnlyWeightPoseDebug(){}
+
+  bool read(std::istream& is);
+
+  bool write(std::ostream& os) const;
+
+  void computeError()  {
+    const g2o::VertexSE3Expmap* v1 = static_cast<const g2o::VertexSE3Expmap*>(_vertices[0]);
+    Vector2d obs(_measurement);
+    _error = w*(obs-cam_project(v1->estimate().map(Xw)));
+  }
+
+  bool isDepthPositive() {
+    const g2o::VertexSE3Expmap* v1 = static_cast<const g2o::VertexSE3Expmap*>(_vertices[0]);
+    return (v1->estimate().map(Xw))(2)>0.0;
+  }
+
+  virtual void linearizeOplus();
+
+  Vector2d cam_project(const Vector3d & trans_xyz) const;
+
+  Vector3d Xw;
+  double fx, fy, cx, cy;
+  double w;
+};
+
+
 
 class  EdgeSO3ProjectXYZOnlyRotation: public g2o::BaseUnaryEdge<2, Vector2d, VertexRotation>{
 public:
