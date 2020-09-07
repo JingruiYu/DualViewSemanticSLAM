@@ -21,17 +21,17 @@
 
 namespace ORB_SLAM2
 {
-void Optimizer::GlobalBundleAdjustemntWithBirdview(Map* pMap, int nIterations, bool* pbStopFlag, const unsigned long nLoopKF, const bool bRobust)
+void Optimizer::GlobalBundleAdjustemntWithBirdview(Map* pMap, int nIterations, bool* pbStopFlag, const unsigned long nLoopKF, const bool bRobust, double wF, double wb)
 {
     cout<<"GlobalBundleAdjustemntWithBirdview..."<<endl;
     vector<KeyFrame*> vpKFs = pMap->GetAllKeyFrames();
     vector<MapPoint*> vpMP = pMap->GetAllMapPoints();
     vector<MapPointBird*> vpMPBird = pMap->GetAllMapPointsBird();
-    BundleAdjustmentWithBirdview(vpKFs,vpMP,vpMPBird,nIterations,pbStopFlag, nLoopKF, bRobust);
+    BundleAdjustmentWithBirdview(vpKFs,vpMP,vpMPBird, nIterations,pbStopFlag, nLoopKF, bRobust);
 }
 
-void Optimizer::BundleAdjustmentWithBirdview(const vector<KeyFrame *> &vpKFs, const vector<MapPoint *> &vpMP,const std::vector<MapPointBird*> &vpMPBird,
-                                 int nIterations, bool* pbStopFlag, const unsigned long nLoopKF, const bool bRobust)
+void Optimizer::BundleAdjustmentWithBirdview(const vector<KeyFrame *> &vpKFs, const vector<MapPoint *> &vpMP,const std::vector<MapPointBird*> &vpMPBird,  
+                                 int nIterations, bool* pbStopFlag, const unsigned long nLoopKF, const bool bRobust, double wF, double wb)
 {
     cout<< "\033[33m" << "BundleAdjustmentWithBirdview..." << "\033[0m" <<endl;
 
@@ -112,7 +112,7 @@ void Optimizer::BundleAdjustmentWithBirdview(const vector<KeyFrame *> &vpKFs, co
                 e->setVertex(1, dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertex(pKF->mnId)));
                 e->setMeasurement(obs);
                 const float &invSigma2 = pKF->mvInvLevelSigma2[kpUn.octave];
-                e->setInformation(Eigen::Matrix2d::Identity()*invSigma2);
+                e->setInformation(Eigen::Matrix2d::Identity()*invSigma2*wF);
 
                 if(bRobust)
                 {
@@ -206,7 +206,7 @@ void Optimizer::BundleAdjustmentWithBirdview(const vector<KeyFrame *> &vpKFs, co
             e->setMeasurement(obs);
             float scale = 3.0;
             const float &invSigma2 = pKF->mvInvLevelSigma2[pKF->mvKeysBird[mit->second].octave]*scale;
-            e->setInformation(Eigen::Matrix3d::Identity()*invSigma2);
+            e->setInformation(Eigen::Matrix3d::Identity()*invSigma2*wb);
 
             if(bRobust)
             {
@@ -296,7 +296,7 @@ void Optimizer::BundleAdjustmentWithBirdview(const vector<KeyFrame *> &vpKFs, co
 
 }
 
-int Optimizer::PoseOptimizationWithBirdview(Frame *pFrame, Frame* pRefFrame)
+int Optimizer::PoseOptimizationWithBirdview(Frame *pFrame, Frame* pRefFrame, double wF, double wb)
 {
     cout << "\033[33m" << "PoseOptimizationWithBirdview" << "\033[0m" << endl;
 
@@ -362,7 +362,7 @@ int Optimizer::PoseOptimizationWithBirdview(Frame *pFrame, Frame* pRefFrame)
                 EdgeSE3ProjectXYZOnlyPoseQuat *e = new EdgeSE3ProjectXYZOnlyPoseQuat();
                 e->setVertex(0, dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertex(0)));
                 e->setMeasurement(obs);
-                const float invSigma2 = pFrame->mvInvLevelSigma2[kpUn.octave];
+                const float invSigma2 = pFrame->mvInvLevelSigma2[kpUn.octave] * wF;
                 e->setInformation(Eigen::Matrix2d::Identity()*invSigma2);
 
                 g2o::RobustKernelHuber* rk = new g2o::RobustKernelHuber;
@@ -439,8 +439,7 @@ int Optimizer::PoseOptimizationWithBirdview(Frame *pFrame, Frame* pRefFrame)
 
             EdgeSE3ProjectXYZ2XYZOnlyPoseQuat *e = new EdgeSE3ProjectXYZ2XYZOnlyPoseQuat();
             e->setVertex(0, dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertex(0)));
-            float scale = 1.0;
-            const float invSigma2 = pFrame->mvInvLevelSigma2[pFrame->mvKeysBird[k].octave]*scale;
+            const float invSigma2 = pFrame->mvInvLevelSigma2[pFrame->mvKeysBird[k].octave]*wb;
             e->setInformation(Eigen::Matrix3d::Identity()*invSigma2);
 
             g2o::RobustKernelHuber* rk = new g2o::RobustKernelHuber;
@@ -619,7 +618,7 @@ int Optimizer::PoseOptimizationWithBirdview(Frame *pFrame, Frame* pRefFrame)
     return nInitialCorrespondences-nBad;
 }
 
-int Optimizer::PoseOptimizationWithBirdviewPixel(Frame *pCurFrame, double scale, Frame* pRefFrame)
+int Optimizer::PoseOptimizationWithBirdviewPixel(Frame *pCurFrame, Frame* pRefFrame, double wF, double wb)
 {
     // 0. graph model
     g2o::SparseOptimizer optimizer;
@@ -682,7 +681,7 @@ int Optimizer::PoseOptimizationWithBirdviewPixel(Frame *pCurFrame, double scale,
             // g2o::EdgeSE3ProjectXYZOnlyPose * e = new g2o::EdgeSE3ProjectXYZOnlyPose();
             e->setVertex(0,dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertex(0))); // dynamic_cast : type convert for class only
             e->setMeasurement(obs);
-            const float invSigma2 = pCurFrame->mvInvLevelSigma2[kpUn.octave]; // uncertainty per pixel
+            const float invSigma2 = pCurFrame->mvInvLevelSigma2[kpUn.octave] * wF; // uncertainty per pixel
             e->setInformation(Eigen::Matrix2d::Identity()*invSigma2);
 
             g2o::RobustKernelHuber * rk = new g2o::RobustKernelHuber;
@@ -723,7 +722,7 @@ int Optimizer::PoseOptimizationWithBirdviewPixel(Frame *pCurFrame, double scale,
             EdgeSE3ProjectPw2BirdPixel * e = new EdgeSE3ProjectPw2BirdPixel();
             e->setVertex(0,dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertex(0)));
             e->setMeasurement(obs);
-            const float invSigma2 = pCurFrame->mvInvLevelSigma2[pCurFrame->mvKeysBird[i].octave] * scale; // set according to the uncertainty of pixel location
+            const float invSigma2 = pCurFrame->mvInvLevelSigma2[pCurFrame->mvKeysBird[i].octave] * wb; // set according to the uncertainty of pixel location
             e->setInformation(Eigen::Matrix2d::Identity()*invSigma2); 
 
             g2o::RobustKernelHuber * rk = new g2o::RobustKernelHuber;
@@ -753,7 +752,7 @@ int Optimizer::PoseOptimizationWithBirdviewPixel(Frame *pCurFrame, double scale,
     }
 
     // Bird is twice of Front
-    // cout << "before PoseOptimizationWithBirdviewPixel optimization : " << " -Front: " << nFrontInitialCorrespondences << " -Bird: " << nBirdInitialCorrespondences << endl;
+    cout << "before PoseOptimizationWithBirdviewPixel optimization : " << " -Front: " << nFrontInitialCorrespondences << " -Bird: " << nBirdInitialCorrespondences << endl;
 
     if (nFrontInitialCorrespondences < 3 && nBirdInitialCorrespondences < 3)
         return 0;
@@ -848,7 +847,7 @@ int Optimizer::PoseOptimizationWithBirdviewPixel(Frame *pCurFrame, double scale,
     return suc;
 }
 
-void Optimizer::LocalBundleAdjustmentWithBirdview(KeyFrame *pKF, bool* pbStopFlag, Map* pMap)
+void Optimizer::LocalBundleAdjustmentWithBirdview(KeyFrame *pKF, bool* pbStopFlag, Map* pMap, double wF, double wb)
 {    
     // Local KeyFrames: First Breath Search from Current Keyframe
     list<KeyFrame*> lLocalKeyFrames;
@@ -1056,7 +1055,7 @@ void Optimizer::LocalBundleAdjustmentWithBirdview(KeyFrame *pKF, bool* pbStopFla
                     e->setVertex(1, dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertex(pKFi->mnId)));
                     e->setMeasurement(obs);
                     const float &invSigma2 = pKFi->mvInvLevelSigma2[kpUn.octave];
-                    e->setInformation(Eigen::Matrix2d::Identity()*invSigma2);
+                    e->setInformation(Eigen::Matrix2d::Identity()*invSigma2*wF);
 
                     g2o::RobustKernelHuber* rk = new g2o::RobustKernelHuber;
                     e->setRobustKernel(rk);
@@ -1109,7 +1108,7 @@ void Optimizer::LocalBundleAdjustmentWithBirdview(KeyFrame *pKF, bool* pbStopFla
                 e->setMeasurement(obs);
                 float scale = 5.0;
                 const float &invSigma2 = pKFi->mvInvLevelSigma2[pKFi->mvKeysBird[mit->second].octave]*scale;
-                e->setInformation(Eigen::Matrix3d::Identity()*invSigma2);
+                e->setInformation(Eigen::Matrix3d::Identity()*invSigma2 * wb);
 
                 g2o::RobustKernelHuber* rk = new g2o::RobustKernelHuber;
                 e->setRobustKernel(rk);
@@ -1285,7 +1284,7 @@ void Optimizer::LocalBundleAdjustmentWithBirdview(KeyFrame *pKF, bool* pbStopFla
 }
 
 
-void Optimizer::LocalBundleAdjustmentWithBirdviewPose(KeyFrame *pKF, bool* pbStopFlag, Map* pMap)
+void Optimizer::LocalBundleAdjustmentWithBirdviewPose(KeyFrame *pKF, bool* pbStopFlag, Map* pMap, double wF, double wb)
 {    
     // cout << "\033[33m" << "LocalBundleAdjustmentWithBirdviewPose" << "\033[0m" << endl;
 
@@ -1467,7 +1466,7 @@ void Optimizer::LocalBundleAdjustmentWithBirdviewPose(KeyFrame *pKF, bool* pbSto
                     e->setVertex(1, dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertex(pKFi->mnId)));
                     e->setMeasurement(obs);
                     const float &invSigma2 = pKFi->mvInvLevelSigma2[kpUn.octave];
-                    e->setInformation(Eigen::Matrix2d::Identity()*invSigma2);
+                    e->setInformation(Eigen::Matrix2d::Identity()*invSigma2*wF);
 
                     g2o::RobustKernelHuber* rk = new g2o::RobustKernelHuber;
                     e->setRobustKernel(rk);
@@ -1527,7 +1526,7 @@ void Optimizer::LocalBundleAdjustmentWithBirdviewPose(KeyFrame *pKF, bool* pbSto
                 e->setMeasurement(obs);
                 float scale = 5.0;
                 const float &invSigma2 = pKFi->mvInvLevelSigma2[pKFi->mvKeysBird[mit->second].octave]*scale;
-                e->setInformation(Eigen::Matrix3d::Identity()*invSigma2);
+                e->setInformation(Eigen::Matrix3d::Identity()*invSigma2*wb);
 
                 g2o::RobustKernelHuber* rk = new g2o::RobustKernelHuber;
                 e->setRobustKernel(rk);
@@ -1550,8 +1549,8 @@ void Optimizer::LocalBundleAdjustmentWithBirdviewPose(KeyFrame *pKF, bool* pbSto
     {
         KeyFrame *KF1=*KFit;
         KeyFrame *KF2=*KFnext;
-        // Eigen::Matrix4d T12=Converter::toMatrix4d(Frame::GetTransformFromOdometer(KF1->mOdomPose,KF2->mOdomPose));
-        Eigen::Matrix4d T12=Converter::toMatrix4d(Frame::GetTransformFromICP(KF1->local_cloud_pose_,KF2->local_cloud_pose_));
+        Eigen::Matrix4d T12=Converter::toMatrix4d(Frame::GetTransformFromOdometer(KF1->mOdomPose,KF2->mOdomPose));
+        // Eigen::Matrix4d T12=Converter::toMatrix4d(Frame::GetTransformFromICP(KF1->local_cloud_pose_,KF2->local_cloud_pose_));
 
         EdgePose2Pose *e = new EdgePose2Pose();
         e->setMeasurement(g2o::SE3Quat(T12.block(0,0,3,3),T12.block(0,3,3,1)));

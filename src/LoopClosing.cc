@@ -364,7 +364,7 @@ bool LoopClosing::ComputeSim3()
                 }
             }
 
-            if (Scm.empty() && vnmatcheBrid[i] > 10)
+            if (Scm.empty() && vnmatcheBrid[i] > 10 && 0)
             {
                 cout << "Loopclosing using ICP ... " << endl; 
                 IcpSolver* mIcp = new IcpSolver(200);
@@ -389,7 +389,6 @@ bool LoopClosing::ComputeSim3()
 
                 if (score > 10)
                 {
-                    bMatch = true;
                     mpMatchedKF = pKF;
                     float s = 1;
                     cv::Mat T12b = cv::Mat::eye(4,4,CV_32F); //check right
@@ -399,13 +398,27 @@ bool LoopClosing::ComputeSim3()
                     R12 = T12c.rowRange(0,3).colRange(0,3);
                     t12 = T12c.rowRange(0,3).col(3);
                     g2o::Sim3 gScm(Converter::toMatrix3d(R12),Converter::toVector3d(t12),s);
-                    g2o::Sim3 gSmw(Converter::toMatrix3d(pKF->GetRotation()),Converter::toVector3d(pKF->GetTranslation()),1.0);
-                    mg2oScw = gScm*gSmw;
-                    mScw = Converter::toCvMat(mg2oScw);
 
+                    vector<MapPoint*> vpMapPointMatches(vvpMapPointMatches[i].size(), static_cast<MapPoint*>(NULL));
+                    for(size_t j=0, jend=vbInliers.size(); j<jend; j++)
+                    {
+                        if(vbInliers[j])
+                        vpMapPointMatches[j]=vvpMapPointMatches[i][j];
+                    }
+                    const int nInliers = Optimizer::OptimizeSim3(mpCurrentKF, pKF, vpMapPointMatches, gScm, 10, mbFixScale);
+                    // If optimization is succesful stop ransacs and continue
+                    if(nInliers>=20)
+                    {
+                        bMatch = true;
+                        mpMatchedKF = pKF;
+                        g2o::Sim3 gSmw(Converter::toMatrix3d(pKF->GetRotation()),Converter::toVector3d(pKF->GetTranslation()),1.0);
+                        mg2oScw = gScm*gSmw;
+                        mScw = Converter::toCvMat(mg2oScw);
+
+                        mvpCurrentMatchedPoints = vpMapPointMatches;
+                        break;
+                    }
                     cout << "Loopclosing using ICP Pose ... " << endl;
-
-                    break;
                 }
             }
             
