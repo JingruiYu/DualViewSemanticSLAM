@@ -94,9 +94,9 @@ public:
 
     // Match MapPoints tracked in last frame into the current frame.
     // Used to track from previous frame (Tracking)
-    int SearchByMatchBird(Frame &CurrentFrame, const Frame &LastFrame, const int windowSize=10);
+    int SearchByMatchBird(vector<cv::DMatch> &vMatchesInliers12, Frame &CurrentFrame, const Frame &LastFrame, const int windowSize=10);
 
-    int SearchByMatchBird(KeyFrame *pKF, Frame &F, std::vector<MapPointBird*> &vpMapPointMatchesBird, const float r=10);
+    int SearchByMatchBird(KeyFrame *pKF, Frame &F, std::vector<MapPointBird*> &vpMapPointMatchesBird, std::vector<cv::DMatch> &vMatchesInliers12, const float r=10);
 
     int SearchByMatchBird(KeyFrame *pKF1, KeyFrame *pKF2, std::vector<MapPointBird*> &vpMatches12, vector<int> &vnMatches12);
 

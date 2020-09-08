@@ -37,7 +37,7 @@ float Frame::mfGridElementWidthInvBirdview, Frame::mfGridElementHeightInvBirdvie
 cv::Mat Frame::Tbc,Frame::Tcb,Frame::Rro,Frame::tro,Frame::Ror,Frame::tor;
 int Frame::birdviewRows, Frame::birdviewCols;
 
-const double correction = 1;
+const double correction = 1.19;
 const double Frame::pixel2meter = 0.03984*correction;
 const double Frame::meter2pixel = 25.1/correction;
 const double Frame::rear_axle_to_center = 1.393;
@@ -62,7 +62,7 @@ Frame::Frame(const Frame &frame)
      mvuRight(frame.mvuRight), mvDepth(frame.mvDepth), mBowVec(frame.mBowVec), mFeatVec(frame.mFeatVec),
      mBowVecBrid(frame.mBowVecBrid), mFeatVecBrid(frame.mFeatVecBrid), mDescriptors(frame.mDescriptors.clone()), 
      mDescriptorsRight(frame.mDescriptorsRight.clone()), mvpMapPoints(frame.mvpMapPoints), 
-     mvbOutlier(frame.mvbOutlier), mOdomPose(frame.mOdomPose), mnId(frame.mnId), mpReferenceKF(frame.mpReferenceKF), 
+     mvbOutlier(frame.mvbOutlier), mGtPose(frame.mGtPose), mOdomPose(frame.mOdomPose), mnId(frame.mnId), mpReferenceKF(frame.mpReferenceKF), 
      mnScaleLevels(frame.mnScaleLevels), mfScaleFactor(frame.mfScaleFactor), mfLogScaleFactor(frame.mfLogScaleFactor),
      mvScaleFactors(frame.mvScaleFactors), mvInvScaleFactors(frame.mvInvScaleFactors),
      mvLevelSigma2(frame.mvLevelSigma2), mvInvLevelSigma2(frame.mvInvLevelSigma2),

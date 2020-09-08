@@ -1898,7 +1898,7 @@ int ORBmatcher::BirdviewMatch(const Frame &F1, const Frame &F2, vector<int> &vnM
     return nmatches;
 }
 
-int ORBmatcher::SearchByMatchBird(Frame &CurrentFrame, const Frame &LastFrame, const int windowSize)
+int ORBmatcher::SearchByMatchBird(vector<cv::DMatch> &vMatchesInliers12, Frame &CurrentFrame, const Frame &LastFrame, const int windowSize)
 {
     int nmatches = 0;
     std::vector<int> vnMatches12;
@@ -1916,6 +1916,34 @@ int ORBmatcher::SearchByMatchBird(Frame &CurrentFrame, const Frame &LastFrame, c
             nmatches++;
         }
     }
+
+
+    for(int k=0, kend = vnMatches12.size();k<kend;k++)
+    {
+        int idx2 = vnMatches12[k];
+        if(idx2<0)
+        {
+            continue;
+        }
+        
+        if (k >= LastFrame.mDescriptorsBird.rows)
+        {
+            cout << "k: " << k << " -mLastFrame.mDescriptorsBird.rows: " << LastFrame.mDescriptorsBird.rows << " - mLastFrame.mvKeysBird: " << LastFrame.mvKeysBird.size() << endl;
+            continue;
+        }
+        
+        if (idx2 >= CurrentFrame.mDescriptorsBird.rows)
+        {
+            cout << "idx2: " << idx2 << " -mCurrentFrame.mDescriptorsBird.rows: " << CurrentFrame.mDescriptorsBird.rows << " - mCurrentFrame.mvKeysBird: " << CurrentFrame.mvKeysBird.size() << endl;
+            continue;
+        }
+
+        cv::Mat d1 =  LastFrame.mDescriptorsBird.row(k);
+        cv::Mat d2 =  CurrentFrame.mDescriptorsBird.row(idx2);
+        int distance = DescriptorDistance(d1,d2);
+        vMatchesInliers12.push_back(cv::DMatch(k,idx2,distance));
+    }
+
 
     return nmatches;
 }
@@ -1997,11 +2025,12 @@ int ORBmatcher::SearchByProjectionBird(Frame &F, const vector<MapPointBird*> &vp
     return nmatches;
 }
 
-int ORBmatcher::SearchByMatchBird(KeyFrame *pKF, Frame &F, std::vector<MapPointBird*> &vpMapPointMatchesBird, const float r)
+int ORBmatcher::SearchByMatchBird(KeyFrame *pKF, Frame &F, std::vector<MapPointBird*> &vpMapPointMatchesBird, std::vector<cv::DMatch> &vMatchesInliers12, float r)
 {
     const vector<MapPointBird*> vpMapPointsBirdKF = pKF->GetMapPointMatchesBird();
 
     vpMapPointMatchesBird = vector<MapPointBird*>(F.mvKeysBird.size(),static_cast<MapPointBird*>(NULL));
+    std::vector<int> vnMatches12(F.mvKeysBird.size(),-1);
     vector<int> vMatchedDistanceBird(F.mvKeysBird.size(),INT_MAX);
 
     int nmatches=0;
@@ -2074,6 +2103,8 @@ int ORBmatcher::SearchByMatchBird(KeyFrame *pKF, Frame &F, std::vector<MapPointB
                 vpMapPointMatchesBird[bestIdx] = pMPBird;
                 vMatchedDistanceBird[bestIdx] = bestDist;
 
+                vnMatches12[bestIdx] = k;
+
                 if(mbCheckOrientation)
                 {
                     float rot = kp.angle-F.mvKeysBird[bestIdx].angle;
@@ -2105,11 +2136,23 @@ int ORBmatcher::SearchByMatchBird(KeyFrame *pKF, Frame &F, std::vector<MapPointB
             for(size_t j=0, jend=rotHist[i].size(); j<jend; j++)
             {
                 vpMapPointMatchesBird[rotHist[i][j]]=static_cast<MapPointBird*>(NULL);
+                vnMatches12[rotHist[i][j]] = -1;
                 nmatches--;
             }
         }
     }
+
+    for (size_t i = 0; i < vnMatches12.size(); i++)
+    {
+        int idxk = vnMatches12[i];
+        if ( idxk < 0)
+            continue;
+        
+        vMatchesInliers12.push_back(cv::DMatch(idxk,i,vMatchedDistanceBird[i]));
+        
+    }
     
+      
     return nmatches;
 }
 

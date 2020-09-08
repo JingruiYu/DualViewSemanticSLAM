@@ -518,21 +518,45 @@ bool Initializer::ReconstructF(vector<bool> &vbMatchesInliers, cv::Mat &F21, cv:
     // find another R,t by ICP in birdview
     // FindRtICP2D(vbMatchesInliersBird,score,R12,t12);
     mIcp.FindRtICP2D(mvKeysXYBird1,mvKeysXYBird2,mvMatchesBird12,vbMatchesInliersBird,R12,t12,score,sigma);
+    
+
+
+    double x1=mRefFrame.mOdomPose[0],y1=mRefFrame.mOdomPose[1],theta1=mRefFrame.mOdomPose[2];
+    double x2=mCurFrame.mOdomPose[0],y2=mCurFrame.mOdomPose[1],theta2=mCurFrame.mOdomPose[2];
+
+    //pre-integration terms
+    double theta12=theta2-theta1;
+    double x12=(x2-x1)*cos(theta1)+(y2-y1)*sin(theta1);
+    double y12=(y2-y1)*cos(theta1)-(x2-x1)*sin(theta1);
+
+    //T12
+    cv::Mat EncoderT12b=(cv::Mat_<float>(4,4)<<cos(theta12),-sin(theta12),0,x12,
+                                                sin(theta12), cos(theta12),0,y12,
+                                                    0,            0,      1, 0,
+                                                    0,            0,      0, 1);
+
+
+    
     cout<<"Current ICP 2D Score = "<<score<<endl;
     cout<<"R = "<<endl<<R12<<endl<<"t = "<<t12.t()<<endl;
 
     //save ICP 2D results
     file<<setprecision(6)<<mRefFrame.mTimeStamp<<" "<<mCurFrame.mTimeStamp<<" "<<t12.t()<<" "<<atan2(R12.at<float>(0,1),R12.at<float>(0,0))<<endl;
 
-    if(norm(t12)<0.3)
-    {
-        cout<<"t12<0.3"<<endl;
-        return false;
-    }
+    // if(norm(t12)<0.3)
+    // {
+    //     cout<<"t12<0.1 :- "<< norm(t12) <<endl;
+    //     return false;
+    // }
     
     cv::Mat T12b = cv::Mat::eye(4,4,CV_32F);
+
+    // EncoderT12b.rowRange(0,3).colRange(0,3).copyTo(T12b.rowRange(0,3).colRange(0,3));
+    // EncoderT12b.rowRange(0,3).col(3).copyTo(T12b.rowRange(0,3).col(3));
+
     R12.copyTo(T12b.rowRange(0,2).colRange(0,2));
     t12.copyTo(T12b.rowRange(0,2).col(3));
+
     cv::Mat T12c = Frame::Tcb*T12b*Frame::Tbc; // check right
     R12 = T12c.rowRange(0,3).colRange(0,3);
     t12 = T12c.rowRange(0,3).col(3);
@@ -552,13 +576,24 @@ bool Initializer::ReconstructF(vector<bool> &vbMatchesInliers, cv::Mat &F21, cv:
     // project the length of t_icp to t
     cout<<"t = "<<t.t()<<" , length = "<<norm(t)<<endl;
     cout<<"t_icp = "<<t_icp.t()<<" , length = "<<norm(t_icp)<<endl;
-    cout<<"dot(t,t_icp) = "<<t.dot(t_icp)<<endl;
+    cout<<"t.dot(t_icp) = "<<" , length = "<<t.dot(t_icp)<<endl;
+    
+    if (norm(t_icp) < 0.6)
+    {
+        cout << "mRefFrame.mnId: " << mRefFrame.mnId << endl;
+        cout << "mCurFrame.mnId: " << mCurFrame.mnId << endl;
+        cout << "return 1.0 ?????????????????????????????????????" << norm(t_icp) << endl;
+        return false;
+    }
+    
     // cout<<"difference between R1 and R3 = "<<norm(R1*R3.t()-cv::Mat::eye(3,3,CV_32F))<<endl;
     // cout<<"difference between R2 and R3 = "<<norm(R2*R3.t()-cv::Mat::eye(3,3,CV_32F))<<endl;
     cout<<"difference between R1 and R3 = "<<((cv::trace(R1*R3.t()).val[0]-1)/2)<<endl;
     cout<<"difference between R2 and R3 = "<<((cv::trace(R2*R3.t()).val[0]-1)/2)<<endl;
     t = t/norm(t);
-    t = t.dot(t_icp)*t;
+    // t = 0.29*t;
+    t = norm(t_icp)*t;
+    // t = t.dot(t_icp)*t;
 
     cv::Mat t1=t;
     cv::Mat t2=-t;
@@ -607,13 +642,13 @@ bool Initializer::ReconstructF(vector<bool> &vbMatchesInliers, cv::Mat &F21, cv:
     // If there is not a clear winner or not enough triangulated points reject initialization
     if(max(maxGood,maxGoodBird)<nMinGood || nsimilar>1||nsimilarBird>1)
     {
-        // cout<<"maxGood = "<<maxGood<<" , nMinGood = "<<nMinGood<<" , nsimilar = "<<nsimilar<<endl;
+        cout<<"maxGood = "<<maxGood<<" , nMinGood = "<<nMinGood<<" , nsimilar = "<<nsimilar<<endl;
         return false;
     }
 
 
     maxGood = max(maxGood,maxGoodBird);
-
+    bool isTrue = false;
     // If best reconstruction has enough parallax initialize
     if(maxGood==nGood1)
     {
@@ -625,7 +660,8 @@ bool Initializer::ReconstructF(vector<bool> &vbMatchesInliers, cv::Mat &F21, cv:
 
             R1.copyTo(R21);
             t1.copyTo(t21);
-            return true;
+
+            isTrue = true;
         }
     }else if(maxGood==nGood2)
     {
@@ -637,7 +673,7 @@ bool Initializer::ReconstructF(vector<bool> &vbMatchesInliers, cv::Mat &F21, cv:
 
             R2.copyTo(R21);
             t1.copyTo(t21);
-            return true;
+            isTrue = true;
         }
     }else if(maxGood==nGood3)
     {
@@ -649,7 +685,7 @@ bool Initializer::ReconstructF(vector<bool> &vbMatchesInliers, cv::Mat &F21, cv:
 
             R1.copyTo(R21);
             t2.copyTo(t21);
-            return true;
+            isTrue = true;
         }
     }else if(maxGood==nGood4)
     {
@@ -661,7 +697,7 @@ bool Initializer::ReconstructF(vector<bool> &vbMatchesInliers, cv::Mat &F21, cv:
 
             R2.copyTo(R21);
             t2.copyTo(t21);
-            return true;
+            isTrue = true;
         }
     }else if(maxGood==nGood5)
     {
@@ -673,7 +709,7 @@ bool Initializer::ReconstructF(vector<bool> &vbMatchesInliers, cv::Mat &F21, cv:
 
             R3.copyTo(R21);
             t1.copyTo(t21);
-            return true;
+            isTrue = true;
         }
     }else if(maxGood==nGood6)
     {
@@ -685,11 +721,11 @@ bool Initializer::ReconstructF(vector<bool> &vbMatchesInliers, cv::Mat &F21, cv:
 
             R3.copyTo(R21);
             t2.copyTo(t21);
-            return true;
+            isTrue = true;
         }
     }
 
-    return false;
+    return isTrue;
 }
 
 bool Initializer::ReconstructH(vector<bool> &vbMatchesInliers, cv::Mat &H21, cv::Mat &K,

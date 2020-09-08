@@ -65,9 +65,15 @@ int main(int argc, char **argv)
     vTimesTrack.resize(nImages);
 
     cv::Mat mask_img=cv::imread("Examples/Monocular/mask_new_front.png");
+    cv::Mat BirdMask = cv::imread("Examples/Monocular/view_mask.jpg",CV_LOAD_IMAGE_UNCHANGED);
     if(mask_img.empty())
     {
         cerr<<"failed to read mask image."<<endl;
+        return 1;
+    }
+    if(BirdMask.empty())
+    {
+        cerr<<"failed to read BirdMask image."<<endl;
         return 1;
     }
 
@@ -114,7 +120,13 @@ int main(int argc, char **argv)
             return 1;
         }
         else
+        {
+            cv::Mat bird_masked;
+            applyMaskBirdview(birdviewmask,birdviewmask,BirdMask);
+            birdviewmask = bird_masked.clone();
             ConvertMaskBirdview(birdviewmask,birdviewmask);
+        }
+            
         
         if(birdviewContour.empty())
         {
@@ -151,8 +163,8 @@ int main(int argc, char **argv)
 #else
         std::chrono::monotonic_clock::time_point t1 = std::chrono::monotonic_clock::now();
 #endif
-        if (ni % 10 == 0)          
-            cout << endl << "it is frame ... " << ni << endl;
+        // if (ni % 10 == 0)          
+            cout << endl << "it is frame ..................... " << ni << endl;
         // Pass the image to the SLAM system
         //SLAM.TrackMonocular(im,tframe);
         SLAM.TrackMonocularWithBirdviewSem(im,birdview,birdviewmask,birdviewContour,birdviewContourICP,gtPose,odomPose,tframe);
@@ -177,7 +189,6 @@ int main(int argc, char **argv)
         if(ttrack<T)
             usleep((T-ttrack)*1e6);
     }
-    // cv::waitKey(0);
     // Stop all threads
     SLAM.Shutdown();
 
@@ -195,7 +206,7 @@ int main(int argc, char **argv)
     // Save camera trajectory
     // SLAM.SaveTrajectoryTUM("FrameTrajectoryOfMono_Bird-1.txt");
     // SLAM.SaveTrajectoryTUM("TrajectoryTUM.txt");
-    SLAM.SaveKeyFrameTrajectoryOdomTUM("KeyFrameTrajectoryOfSem_Bird-6.txt");
+    SLAM.SaveKeyFrameTrajectoryOdomTUM("KeyFrameTrajectoryOfSem_Bird-0.txt");
 
     return 0;
 }
@@ -253,7 +264,7 @@ void applyMaskBirdview(const cv::Mat& src, cv::Mat& dst, const cv::Mat& mask)
     for (int j = 0; j < src.cols; ++j)
     {
       cv::Vec3b pixel = mask.at<cv::Vec3b>(i, j);
-      if (pixel[1] < 20)
+      if (pixel[0] < 20 && pixel[1] < 20 && pixel[2] < 20)
         dst.at<cv::Vec3b>(i, j) = 0;
     }
 }
