@@ -42,7 +42,7 @@ KeyFrame::KeyFrame(Frame &F, Map *pMap, KeyFrameDatabase *pKFDB):
     mBowVecBrid(F.mBowVecBrid), mFeatVecBrid(F.mFeatVecBrid), mBowVec(F.mBowVec), mFeatVec(F.mFeatVec), mnScaleLevels(F.mnScaleLevels), 
     mfScaleFactor(F.mfScaleFactor), mfLogScaleFactor(F.mfLogScaleFactor), mvScaleFactors(F.mvScaleFactors), 
     mvLevelSigma2(F.mvLevelSigma2), mvInvLevelSigma2(F.mvInvLevelSigma2), mnMinX(F.mnMinX), 
-    mnMinY(F.mnMinY), mnMaxX(F.mnMaxX), mnMaxY(F.mnMaxY), mK(F.mK), mBirdviewContour(F.mBirdviewContour.clone()), 
+    mnMinY(F.mnMinY), mnMaxX(F.mnMaxX), mnMaxY(F.mnMaxY), mK(F.mK), mBirdviewContour(F.mBirdviewContour.clone()), mBirdviewImg(F.mBirdviewImg.clone()), 
     mvMeasurement_p(F.mvMeasurement_p), mvMeasurement_g(F.mvMeasurement_g), mKeyCloud(F.mCloud), local_cloud_pose_(F.current_pose_),
     mvpMapPoints(F.mvpMapPoints), 
     mpKeyFrameDB(pKFDB), mpORBvocabulary(F.mpORBvocabulary), mbFirstConnection(true), mpParent(NULL),

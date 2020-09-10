@@ -2040,11 +2040,14 @@ int ORBmatcher::SearchByMatchBird(KeyFrame *pKF, Frame &F, std::vector<MapPointB
         rotHist[i].reserve(500);
     const float factor = 1.0f/HISTO_LENGTH;
 
+    int sumKFMP = 0;
     for(size_t k=0;k<vpMapPointsBirdKF.size();k++)
     {
         MapPointBird *pMPBird = vpMapPointsBirdKF[k];
         if(!pMPBird)
             continue;
+
+        sumKFMP++;
 
         cv::KeyPoint &kp = pKF->mvKeysBird[k];
         cv::Point2f &pt = kp.pt;
@@ -2120,6 +2123,8 @@ int ORBmatcher::SearchByMatchBird(KeyFrame *pKF, Frame &F, std::vector<MapPointB
             }
         }
     }
+
+    cout << "The mp number of KF is : " << sumKFMP << endl;
 
     if(mbCheckOrientation)
     {

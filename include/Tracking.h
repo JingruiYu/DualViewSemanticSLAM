@@ -52,6 +52,7 @@
 
 #include <mutex>
 #include <unistd.h>
+#include <fstream>
 
 namespace ORB_SLAM2
 {
@@ -90,6 +91,14 @@ public:
     // Use this function if you have deactivated local mapping and you only want to localize the camera.
     void InformOnlyTracking(const bool &flag);
 
+    void DrawerBirdPoint();
+    void DrawerBirdPointGT(const cv::Mat &Twb);
+
+    void computerReprojectError(vector<cv::DMatch> &vMatchesInliers12);
+    cv::Mat Tcw2Twb(cv::Mat &Tcw);
+    cv::Mat deltaTwb(cv::Mat &TwbR, cv::Mat &TwbC);
+    void DrawerMatchCloud(vector<cv::DMatch> &vMatchesInliers12);
+    void changeRT();
 
 public:
 
@@ -105,6 +114,7 @@ public:
     eTrackingState mState;
     eTrackingState mLastProcessedState;
 
+    ofstream unCloosingKFPose;
     // Input sensor
     int mSensor;
 
@@ -151,6 +161,8 @@ public:
     std::vector<Eigen::Matrix4f> trajectory_;
     // viewer
     pcl::visualization::PCLVisualizer::Ptr viewer_ptr_;
+    pcl::visualization::PCLVisualizer::Ptr Twc_ptr_;
+    pcl::visualization::PCLVisualizer::Ptr Cloud_ptr_;
     bool updateKfCloud;
     birdseye_odometry::SemanticCloud::Ptr localCloud;
     Eigen::Matrix4f localCloudPose;
@@ -174,6 +186,7 @@ protected:
     // Map initialization for monocular
     void MonocularInitialization(bool mSemDirect);
     void CreateInitialMapMonocular();
+    bool CreateReInitialMap(vector<int> &ReMatches, vector<int> &ReBirdviewMatches, vector<bool> &ReMatchesInliersBird12);
 
     void CheckReplacedInLastFrame();
     bool TrackReferenceKeyFrame();
@@ -183,6 +196,7 @@ protected:
     bool TrackShotTerm();
 
     bool Relocalization();
+    bool ReInitiation();
 
     void UpdateLocalMap();
     void UpdateLocalPoints();

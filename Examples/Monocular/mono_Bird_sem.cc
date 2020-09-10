@@ -122,9 +122,11 @@ int main(int argc, char **argv)
         else
         {
             cv::Mat bird_masked;
-            applyMaskBirdview(birdviewmask,birdviewmask,BirdMask);
+            applyMaskBirdview(birdviewmask,bird_masked,BirdMask);
             birdviewmask = bird_masked.clone();
             ConvertMaskBirdview(birdviewmask,birdviewmask);
+            
+            // cv::imwrite("/home/yujr/mono_brid_semantic/Data/saved/mask/"+to_string(ni)+".jpg",birdviewmask);
         }
             
         
@@ -190,6 +192,8 @@ int main(int argc, char **argv)
             usleep((T-ttrack)*1e6);
     }
     // Stop all threads
+    cvWaitKey(0);
+    getchar();
     SLAM.Shutdown();
 
     // Tracking time statistics

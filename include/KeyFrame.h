@@ -222,6 +222,7 @@ public:
 
     // for contour
     cv::Mat mBirdviewContour;
+    cv::Mat mBirdviewImg;
     vector<cv::Mat> mvMeasurement_p;
     vector<float> mvMeasurement_g;
     
@@ -261,7 +262,7 @@ protected:
     // Bad flags
     bool mbNotErase;
     bool mbToBeErased;
-    bool mbBad;    
+    bool mbBad;  
 
     float mHalfBaseline; // Only for visualization
 
