@@ -63,6 +63,7 @@ public:
     /********************* Modified Here *********************/
     // Constructor for Monocular cameras with birdview.
     Frame(const cv::Mat &imGray, const cv::Mat &birdviewGray, const cv::Mat &birdviewMask, const double &timeStamp, ORBextractor* extractor,ORBVocabulary* voc, cv::Mat &K, cv::Mat &distCoef, const float &bf, const float &thDepth);
+    Frame(const cv::Mat &imGray, const cv::Mat &birdviewGray, const cv::Mat &birdviewMask, const cv::Vec3d gtPose, const cv::Vec3d odomPose, const double &timeStamp, ORBextractor* extractor,ORBVocabulary* voc, cv::Mat &K, cv::Mat &distCoef, const float &bf, const float &thDepth);
 
     // Extract ORB on the image. 0 for left image and 1 for right image.
     void ExtractORB(int flag, const cv::Mat &im);
@@ -115,6 +116,9 @@ public:
     static cv::Point2f ProjectXYZ2Birdview(const cv::Point3f &p);
     static cv::Point3f TransformPoint3fWithMat(cv::Mat T, cv::Point3f p);
     static cv::Mat InverseTransformSE3(cv::Mat T12);
+
+    /********************* Modified Here *********************/
+    cv::Mat GetGTPoseTwb();
 
 public:
     // Vocabulary used for relocalization.
@@ -216,6 +220,8 @@ public:
     static float mfGridElementHeightInvBirdview;
     std::vector<std::size_t> mGridBirdview[FRAME_GRID_COLS][FRAME_GRID_ROWS];
 
+    cv::Vec3d mGtPose;
+    cv::Vec3d mOdomPose;
     // Camera pose.
     cv::Mat mTcw;
 

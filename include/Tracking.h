@@ -24,6 +24,15 @@
 
 #include<opencv2/core/core.hpp>
 #include<opencv2/features2d/features2d.hpp>
+#include <pcl/filters/voxel_grid.h>
+#include <pcl/io/ply_io.h>
+#include <pcl/kdtree/kdtree_flann.h>
+#include <pcl/point_types.h>
+#include <pcl/point_types_conversion.h>
+#include <pcl/visualization/pcl_visualizer.h>
+#include <pclomp/ndt_omp.h>
+#include <pcl/io/pcd_io.h>
+#include <pcl/registration/icp.h>
 
 #include"Viewer.h"
 #include"FrameDrawer.h"
@@ -66,6 +75,7 @@ public:
     cv::Mat GrabImageMonocular(const cv::Mat &im, const double &timestamp);
     /********************* Modified Here *********************/
     cv::Mat GrabImageMonocularWithBirdview(const cv::Mat &im, const cv::Mat &birdview, const cv::Mat &birdviewmask, const double &timestamp);
+    cv::Mat GrabImageMonocularWithBirdviewSem(const cv::Mat &im, const cv::Mat &birdview, const cv::Mat &birdviewmask, const cv::Mat &birdviewContour, const cv::Mat &birdviewContourICP, const double &timestamp, cv::Vec3d gtPose, cv::Vec3d odomPose);
 
     void SetLocalMapper(LocalMapping* pLocalMapper);
     void SetLoopClosing(LoopClosing* pLoopClosing);
@@ -136,7 +146,16 @@ public:
     // True if local mapping is deactivated and we are performing only localization
     bool mbOnlyTracking;
 
+    /**************** Modify **********************/
+    pcl::visualization::PCLVisualizer::Ptr Twc_ptr_;
+
     void Reset();
+
+    void DrawCurPose(double r, double g, double b, string name);
+    void DrawGT(double r, double g, double b, string name);
+    void DrawTcw(const cv::Mat &Tcw, double r, double g, double b, string name);
+
+    void DrawInTwc_ptr_(const cv::Mat &T, double r, double g, double b, string name);
 
 protected:
 

@@ -54,7 +54,8 @@ Frame::Frame(const Frame &frame)
      mvKeysRight(frame.mvKeysRight), mvKeysUn(frame.mvKeysUn),  mvuRight(frame.mvuRight),
      mvDepth(frame.mvDepth), mBowVec(frame.mBowVec), mFeatVec(frame.mFeatVec),
      mDescriptors(frame.mDescriptors.clone()), mDescriptorsRight(frame.mDescriptorsRight.clone()),
-     mvpMapPoints(frame.mvpMapPoints), mvbOutlier(frame.mvbOutlier), mnId(frame.mnId),
+     mvpMapPoints(frame.mvpMapPoints), mvbOutlier(frame.mvbOutlier), 
+     mGtPose(frame.mGtPose), mOdomPose(frame.mOdomPose), mnId(frame.mnId),
      mpReferenceKF(frame.mpReferenceKF), mnScaleLevels(frame.mnScaleLevels),
      mfScaleFactor(frame.mfScaleFactor), mfLogScaleFactor(frame.mfLogScaleFactor),
      mvScaleFactors(frame.mvScaleFactors), mvInvScaleFactors(frame.mvInvScaleFactors),
@@ -263,6 +264,120 @@ Frame::Frame(const cv::Mat &imGray, const double &timeStamp, ORBextractor* extra
 Frame::Frame(const cv::Mat &imGray, const cv::Mat &birdviewGray, const cv::Mat &birdviewMask, const double &timeStamp, ORBextractor* extractor,ORBVocabulary* voc, cv::Mat &K, cv::Mat &distCoef, const float &bf, const float &thDepth)
     :mpORBvocabulary(voc),mpORBextractorLeft(extractor),mpORBextractorRight(static_cast<ORBextractor*>(NULL)),mpReferenceKFBird(static_cast<KeyFrame*>(NULL)),
      mTimeStamp(timeStamp), mK(K.clone()),mDistCoef(distCoef.clone()), mbf(bf), mThDepth(thDepth),mbHaveBirdview(true)
+{
+    // Frame ID
+    mnId=nNextId++;
+
+    // This is done only for the first Frame (or after a change in the calibration)
+    if(mbInitialComputations)
+    {
+        ComputeImageBounds(imGray);
+
+        cout<<"Image Bounds:"<<endl;
+        cout<<"minX = "<<mnMinX<<" , maxX = "<<mnMaxX<<endl;
+        cout<<"minY = "<<mnMinY<<" , maxY = "<<mnMaxY<<endl;
+
+        mfGridElementWidthInv=static_cast<float>(FRAME_GRID_COLS)/static_cast<float>(mnMaxX-mnMinX);
+        mfGridElementHeightInv=static_cast<float>(FRAME_GRID_ROWS)/static_cast<float>(mnMaxY-mnMinY);
+
+        mfGridElementWidthInvBirdview=static_cast<float>(FRAME_GRID_COLS)/static_cast<float>(birdviewGray.cols);
+        mfGridElementHeightInvBirdview=static_cast<float>(FRAME_GRID_ROWS)/static_cast<float>(birdviewGray.rows);
+
+        birdviewCols = birdviewGray.cols;
+        birdviewRows = birdviewGray.rows;
+
+        fx = K.at<float>(0,0);
+        fy = K.at<float>(1,1);
+        cx = K.at<float>(0,2);
+        cy = K.at<float>(1,2);
+        invfx = 1.0f/fx;
+        invfy = 1.0f/fy;
+
+        CalculateExtrinsics();
+
+        mbInitialComputations=false;
+    }
+
+    mb = mbf/fx;
+
+    // Scale Level Info
+    mnScaleLevels = mpORBextractorLeft->GetLevels();
+    mfScaleFactor = mpORBextractorLeft->GetScaleFactor();
+    mfLogScaleFactor = log(mfScaleFactor);
+    mvScaleFactors = mpORBextractorLeft->GetScaleFactors();
+    mvInvScaleFactors = mpORBextractorLeft->GetInverseScaleFactors();
+    mvLevelSigma2 = mpORBextractorLeft->GetScaleSigmaSquares();
+    mvInvLevelSigma2 = mpORBextractorLeft->GetInverseScaleSigmaSquares();
+
+    // ORB extraction
+    ExtractORB(0,imGray);
+    N = mvKeys.size();
+
+    if(mvKeys.empty())
+        return;
+
+    mBirdviewImg = birdviewGray.clone();
+    mBirdviewMask = birdviewMask.clone();
+
+    // preprocess mask, ignore footprint
+    double boundary = 15.0;
+    double x = birdviewCols / 2 - (vehicle_width / 2 / pixel2meter) - boundary;
+    double y = birdviewRows / 2 - (vehicle_length / 2 / pixel2meter) - boundary;
+    double width = vehicle_width / pixel2meter + 2 * boundary;
+    double height = vehicle_length / pixel2meter + 2 * boundary;
+    cv::rectangle(mBirdviewMask, cv::Rect(x, y, width, height), cv::Scalar(0),-1);
+    // extract ORB for birdview
+    cv::Ptr<cv::ORB> extractorBird = cv::ORB::create(2000);
+    extractorBird->detect(mBirdviewImg,mvKeysBird,mBirdviewMask);
+    vector<cv::Point2f> vKeysBird(mvKeysBird.size());
+    for(int k=0;k<mvKeysBird.size();k++)
+    {
+        vKeysBird[k] = mvKeysBird[k].pt;
+    }
+    cv::TermCriteria criteria = cv::TermCriteria(cv::TermCriteria::EPS+cv::TermCriteria::MAX_ITER,40,0.001);
+    cv::cornerSubPix(mBirdviewImg,vKeysBird,cv::Size(5,5),cv::Size(-1,-1),criteria);
+    for(int k=0;k<mvKeysBird.size();k++)
+    {
+        mvKeysBird[k].pt = vKeysBird[k];
+    }
+    extractorBird->compute(mBirdviewImg,mvKeysBird,mDescriptorsBird);
+    
+    Nbird = mvKeysBird.size();
+    
+    mvpMapPointsBird = vector<MapPointBird*>(mvKeysBird.size(),static_cast<MapPointBird*>(NULL));  
+
+
+    UndistortKeyPoints();
+
+    // Set no stereo information
+    mvuRight = vector<float>(N,-1);
+    mvDepth = vector<float>(N,-1);
+
+    mvpMapPoints = vector<MapPoint*>(N,static_cast<MapPoint*>(NULL));
+    mvbOutlier = vector<bool>(N,false);
+
+    AssignFeaturesToGrid();
+
+    mvKeysBirdCamXYZ.resize(mvKeysBird.size());
+    mvKeysBirdBaseXY.resize(mvKeysBird.size());
+    for(int k=0;k<mvKeysBird.size();k++)
+    {
+        cv::Point3f p3d = BirdviewKP2XYZ(mvKeysBird[k]);
+        cv::Point2f p2d;
+        p2d.x = p3d.x;
+        p2d.y = p3d.y;
+        mvKeysBirdBaseXY[k] = p2d;
+        mvKeysBirdCamXYZ[k] = TransformPoint3fWithMat(Tcb,p3d);
+    }
+    mvnBirdviewMatches21 = vector<int>(mvKeysBird.size(),-1);
+    mvbBirdviewInliers = vector<bool>(mvKeysBird.size(),true);
+
+    // cout<<"Frame "<<mnId<<" Created."<<endl;
+}
+
+Frame::Frame(const cv::Mat &imGray, const cv::Mat &birdviewGray, const cv::Mat &birdviewMask, const cv::Vec3d gtPose, const cv::Vec3d odomPose, const double &timeStamp, ORBextractor* extractor,ORBVocabulary* voc, cv::Mat &K, cv::Mat &distCoef, const float &bf, const float &thDepth)
+    :mpORBvocabulary(voc),mpORBextractorLeft(extractor),mpORBextractorRight(static_cast<ORBextractor*>(NULL)),mpReferenceKFBird(static_cast<KeyFrame*>(NULL)),
+     mTimeStamp(timeStamp), mK(K.clone()),mDistCoef(distCoef.clone()), mbf(bf), mThDepth(thDepth),mbHaveBirdview(true),mGtPose(gtPose), mOdomPose(odomPose)
 {
     // Frame ID
     mnId=nNextId++;
@@ -1029,6 +1144,18 @@ cv::Mat Frame::InverseTransformSE3(cv::Mat T12)
     t21.copyTo(T21.rowRange(0,3).col(3));
 
     return T21.clone();
+}
+
+cv::Mat Frame::GetGTPoseTwb()
+{
+    double x = mGtPose[0], y = mGtPose[1], theta = mGtPose[2];
+
+    cv::Mat Twb=(cv::Mat_<float>(4,4)<< cos(theta),-sin(theta),0,x,
+                                        sin(theta), cos(theta),0,y,
+                                        0,            0,      1, 0,
+                                        0,            0,      0, 1);
+
+    return Twb.clone();
 }
 
 } //namespace ORB_SLAM
