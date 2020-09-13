@@ -59,22 +59,11 @@ public:
     /********************* Modified Here *********************/
     void static BundleAdjustmentWithBirdview(const std::vector<KeyFrame*> &vpKF, const std::vector<MapPoint*> &vpMP,
                             const std::vector<MapPointBird*> &vpMPBird, int nIterations = 5, bool *pbStopFlag=NULL, 
-                            const unsigned long nLoopKF=0, const bool bRobust = true, double wF = 1.0, double wb=0.0);
-
+                            const unsigned long nLoopKF=0, const bool bRobust = true);
     void static GlobalBundleAdjustemntWithBirdview(Map* pMap, int nIterations=5, bool *pbStopFlag=NULL,
-                                       const unsigned long nLoopKF=0, const bool bRobust = true, double wF =1.0, double wb=0.0);
-
-    void static LocalBundleAdjustmentWithBirdview(KeyFrame* pKF, bool *pbStopFlag, Map *pMap, double wF=1.0, double wb=0.0);
-
-    void static LocalBundleAdjustmentWithBirdviewPose(KeyFrame* pKF, bool *pbStopFlag, Map *pMap, double wF=1.0, double wb=0.0);
-
-    int static PoseOptimizationWithBirdview(Frame* pFrame, Frame* pRefFrame=NULL, double wF=1.0, double wb=0.0);
-
-    int static PoseOptimizationWithBirdviewPixel(Frame* pCurFrame, Frame* pRefFrame=NULL, double wF=1.0, double wb=0.0);
-
-    void static poseDirectEstimation(const Frame &ReferenceFrame, const Frame &CurrentFrame, cv::Mat &Tcw );
-
-    int static poseOptimizationFull(Frame* pCurFrame, Frame* pRefFrame);
+                                       const unsigned long nLoopKF=0, const bool bRobust = true);
+    void static LocalBundleAdjustmentWithBirdview(KeyFrame* pKF, bool *pbStopFlag, Map *pMap);
+    int static PoseOptimizationWithBirdview(Frame* pFrame, Frame* pRefFrame=NULL);
 };
 
 } //namespace ORB_SLAM

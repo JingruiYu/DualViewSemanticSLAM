@@ -29,15 +29,8 @@
 #include "Frame.h"
 #include "KeyFrameDatabase.h"
 #include "MapPointBird.h"
-#include "simple_birdseye_odometer.h"
 
 #include <mutex>
-#include <pcl/filters/voxel_grid.h>
-#include <pcl/io/ply_io.h>
-#include <pcl/kdtree/kdtree_flann.h>
-#include <pcl/point_types.h>
-#include <pcl/point_types_conversion.h>
-#include <pcl/visualization/pcl_visualizer.h>
 
 
 namespace ORB_SLAM2
@@ -94,7 +87,6 @@ public:
     void EraseMapPointMatch(const size_t &idx);
     void EraseMapPointMatch(MapPoint* pMP);
     /********************* Modified Here *********************/
-    void EraseMapPointMatchBird(const size_t &idx);
     void EraseMapPointMatchBird(MapPointBird* pMP);
     vector<MapPointBird*> GetMapPointMatchesBird();
     void ReplaceMapPointMatch(const size_t &idx, MapPoint* pMP);
@@ -158,17 +150,12 @@ public:
 
     // Variables used by the keyframe database
     long unsigned int mnLoopQuery;
-    long unsigned int mnLoopQueryBrid;
     int mnLoopWords;
-    int mnLoopWordsBird;
     float mLoopScore;
-    float mLoopScoreBrid;
     long unsigned int mnRelocQuery;
     int mnRelocWords;
     float mRelocScore;
 
-    cv::Vec3d mGtPose;
-    cv::Vec3d mOdomPose;
     // Variables used by loop closing
     cv::Mat mTcwGBA;
     cv::Mat mTcwBefGBA;
@@ -189,16 +176,14 @@ public:
 
     /********************* Modified Here *********************/
     // Birdview Features
+    // bool mbBirdviewRefKF = false;
+    // long unsigned int mnBirdviewRefKFId;
     std::vector<cv::Point3f> mvKeysBirdCamXYZ;
-    std::vector<cv::Point2f> mvKeysBirdBaseXY;
     std::vector<cv::KeyPoint> mvKeysBird;
     vector<int> mvnBirdviewMatches21;
     std::vector<MapPointBird*> mvpMapPointsBird;
-    const cv::Mat mDescriptorsBird;
 
     //BoW
-    DBoW2::BowVector mBowVecBrid;
-    DBoW2::FeatureVector mFeatVecBrid;
     DBoW2::BowVector mBowVec;
     DBoW2::FeatureVector mFeatVec;
 
@@ -220,15 +205,7 @@ public:
     const int mnMaxY;
     const cv::Mat mK;
 
-    // for contour
-    cv::Mat mBirdviewContour;
-    cv::Mat mBirdviewImg;
-    vector<cv::Mat> mvMeasurement_p;
-    vector<float> mvMeasurement_g;
-    
-    birdseye_odometry::SemanticCloud::Ptr mKeyCloud;
-    Eigen::Matrix4f local_cloud_pose_;
-    // pcl::PointCloud<pcl::PointXYZ>::Ptr mKeyCloud;
+
     // The following variables need to be accessed trough a mutex to be thread safe.
 protected:
 
@@ -262,7 +239,7 @@ protected:
     // Bad flags
     bool mbNotErase;
     bool mbToBeErased;
-    bool mbBad;  
+    bool mbBad;    
 
     float mHalfBaseline; // Only for visualization
 

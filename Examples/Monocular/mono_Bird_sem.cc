@@ -17,8 +17,7 @@ const double vehicle_length = 4.63;
 const double vehicle_width = 1.901;
 
 void LoadDataset(const string &strFile, vector<string> &vstrImageFilenames, vector<string> &vstrBirdviewFilenames, 
-                vector<string> &vstrBirdviewMaskFilenames, vector<string> &vstrBirdviewContourFilenames, 
-                vector<string> &vstrBirdviewContourICPFilenames, vector<cv::Vec3d> &vgtPose, vector<double> &vTimestamps);
+                vector<string> &vstrBirdviewMaskFilenames, vector<cv::Vec3d> &vodomPose, vector<double> &vTimestamps);
 void applyMask(const cv::Mat& src, cv::Mat& dst, const cv::Mat& mask);
 void applyMaskBirdview(const cv::Mat& src, cv::Mat& dst, const cv::Mat& mask);
 void ConvertMaskBirdview(const cv::Mat& src, cv::Mat& dst);
@@ -35,25 +34,15 @@ int main(int argc, char **argv)
     vector<string> vstrImageFilenames;
     vector<string> vstrBirdviewFilenames;
     vector<string> vstrBirdviewMaskFilenames;
-    vector<string> vstrBirdviewContourFilenames;
-    vector<string> vstrBirdviewContourICPFilenames;
     vector<double> vTimestamps;
-    vector<cv::Vec3d> vgtPose;
     vector<cv::Vec3d> vodomPose;
 
-    string strFile = string(argv[3])+"/groundtruth.txt";
-    
-    LoadDataset(strFile, vstrImageFilenames, vstrBirdviewFilenames, vstrBirdviewMaskFilenames, vstrBirdviewContourFilenames, vstrBirdviewContourICPFilenames, vgtPose, vTimestamps);
+    string strFile = string(argv[3])+"/associate.txt";
+    // string strFile = string(argv[3])+"/groundtruth.txt";
 
-    vstrImageFilenames.clear();
-    vstrBirdviewFilenames.clear();
-    vstrBirdviewMaskFilenames.clear();
-    vstrBirdviewContourFilenames.clear();
-    vstrBirdviewContourICPFilenames.clear();
-    vTimestamps.clear();
-
-    strFile = string(argv[3])+"/associate.txt";
-    LoadDataset(strFile, vstrImageFilenames, vstrBirdviewFilenames, vstrBirdviewMaskFilenames, vstrBirdviewContourFilenames, vstrBirdviewContourICPFilenames, vodomPose, vTimestamps);
+    //LoadDataset(strFile, vstrImageFilenames, vTimestamps, vodomPos, vodomOri);
+    // LoadDataset(strFile, vstrImageFilenames, vTimestamps, vodomPose);
+    LoadDataset(strFile, vstrImageFilenames, vstrBirdviewFilenames, vstrBirdviewMaskFilenames, vodomPose, vTimestamps);
 
     int nImages = vstrImageFilenames.size();
 
@@ -65,16 +54,9 @@ int main(int argc, char **argv)
     vTimesTrack.resize(nImages);
 
     cv::Mat mask_img=cv::imread("Examples/Monocular/mask_new_front.png");
-    cv::Mat BirdMask = cv::imread("Examples/Monocular/view_mask.jpg",CV_LOAD_IMAGE_UNCHANGED);
     if(mask_img.empty())
     {
         cerr<<"failed to read mask image."<<endl;
-        return 1;
-    }
-    if(BirdMask.empty())
-    {
-        cerr<<"failed to read BirdMask image."<<endl;
-        return 1;
     }
 
     cout << endl << "-------" << endl;
@@ -85,19 +67,15 @@ int main(int argc, char **argv)
     cv::Mat im;
     cv::Mat birdview;
     cv::Mat birdviewmask;
-    cv::Mat birdviewContour;
-    cv::Mat birdviewContourICP;
     for(int ni=0; ni<nImages; ni++)
     {
         // Read image from file
         im = cv::imread(string(argv[3])+"/"+vstrImageFilenames[ni],CV_LOAD_IMAGE_UNCHANGED);
         birdview = cv::imread(string(argv[3])+"/"+vstrBirdviewFilenames[ni], CV_LOAD_IMAGE_UNCHANGED);
+        // birdview = cv::imread(string(argv[3])+"/"+vstrBirdviewFilenames[ni], CV_LOAD_IMAGE_GRAYSCALE);
         birdviewmask = cv::imread(string(argv[3])+"/"+vstrBirdviewMaskFilenames[ni], CV_LOAD_IMAGE_UNCHANGED);
-        birdviewContour = cv::imread(string(argv[3])+"/"+vstrBirdviewContourFilenames[ni], CV_LOAD_IMAGE_UNCHANGED);
-        birdviewContourICP = cv::imread(string(argv[3])+"/"+vstrBirdviewContourICPFilenames[ni], CV_LOAD_IMAGE_UNCHANGED);
         double tframe = vTimestamps[ni];
-        cv::Vec3d gtPose=vgtPose[ni];
-        cv::Vec3d odomPose=vodomPose[ni];
+        // cv::Vec3d odomframe=vodomPose[ni];
 
         if(im.empty())
         {
@@ -105,43 +83,20 @@ int main(int argc, char **argv)
                  << string(argv[3]) << "/" << vstrImageFilenames[ni] << endl;
             return 1;
         }
+        // if(birdview.empty())
+        // {
+        //     cerr<<endl<<"Failed to load birdview image at: "
+        //         <<string(argv[3])<<"/"<<vstrBirdviewFilenames[ni]<<endl
+        //         <<"skip image."<<endl;
+        //     continue;
+        // }
 
-        if(birdview.empty())
+        if(!birdviewmask.empty())
         {
-            cerr << endl << "Failed to load image at: "
-                 << string(argv[3]) << "/" << vstrBirdviewFilenames[ni] << endl;
-            return 1;
-        }
-
-        if(birdviewmask.empty())
-        {
-            cerr << endl << "Failed to load image at: "
-                 << string(argv[3]) << "/" << vstrBirdviewMaskFilenames[ni] << endl;
-            return 1;
-        }
-        else
-        {
-            cv::Mat bird_masked;
-            applyMaskBirdview(birdviewmask,bird_masked,BirdMask);
-            birdviewmask = bird_masked.clone();
+            // cv::Mat birdview_masked;
+            // applyMaskBirdview(birdview,birdview_masked,birdviewmask);
+            // birdview=birdview_masked.clone();
             ConvertMaskBirdview(birdviewmask,birdviewmask);
-            
-            // cv::imwrite("/home/yujr/mono_brid_semantic/Data/saved/mask/"+to_string(ni)+".jpg",birdviewmask);
-        }
-            
-        
-        if(birdviewContour.empty())
-        {
-            cerr << endl << "Failed to load image at: "
-                 << string(argv[3]) << "/" << vstrBirdviewContourFilenames[ni] << endl;
-            return 1;
-        }
-
-        if(birdviewContourICP.empty())
-        {
-            cerr << endl << "Failed to load image at: "
-                 << string(argv[3]) << "/" << vstrBirdviewContourICPFilenames[ni] << endl;
-            return 1;
         }
 
         // apply mask
@@ -165,11 +120,10 @@ int main(int argc, char **argv)
 #else
         std::chrono::monotonic_clock::time_point t1 = std::chrono::monotonic_clock::now();
 #endif
-        // if (ni % 10 == 0)          
-            cout << endl << "it is frame ..................... " << ni << endl;
+
         // Pass the image to the SLAM system
         //SLAM.TrackMonocular(im,tframe);
-        SLAM.TrackMonocularWithBirdviewSem(im,birdview,birdviewmask,birdviewContour,birdviewContourICP,gtPose,odomPose,tframe);
+        SLAM.TrackMonocularWithBirdview(im,birdview,birdviewmask,tframe);
 
 #ifdef COMPILEDWITHC11
         std::chrono::steady_clock::time_point t2 = std::chrono::steady_clock::now();
@@ -191,9 +145,8 @@ int main(int argc, char **argv)
         if(ttrack<T)
             usleep((T-ttrack)*1e6);
     }
+    cv::waitKey(0);
     // Stop all threads
-    cvWaitKey(0);
-    getchar();
     SLAM.Shutdown();
 
     // Tracking time statistics
@@ -208,16 +161,15 @@ int main(int argc, char **argv)
     cout << "mean tracking time: " << totaltime/nImages << endl;
 
     // Save camera trajectory
-    // SLAM.SaveTrajectoryTUM("FrameTrajectoryOfMono_Bird-1.txt");
+    SLAM.SaveKeyFrameTrajectoryTUM("KeyFrameTrajectoryTUM.txt");
     // SLAM.SaveTrajectoryTUM("TrajectoryTUM.txt");
-    SLAM.SaveKeyFrameTrajectoryOdomTUM("KeyFrameTrajectoryOfSem_Bird-0.txt");
+    SLAM.SaveKeyFrameTrajectoryOdomTUM("KeyFrameTrajectoryOdomTUM.txt");
 
     return 0;
 }
 
 void LoadDataset(const string &strFile, vector<string> &vstrImageFilenames, vector<string> &vstrBirdviewFilenames, 
-                vector<string> &vstrBirdviewMaskFilenames, vector<string> &vstrBirdviewContourFilenames,
-                vector<string> &vstrBirdviewContourICPFilenames, vector<cv::Vec3d> &vgtPose, vector<double> &vTimestamps)
+                vector<string> &vstrBirdviewMaskFilenames, vector<cv::Vec3d> &vodomPose, vector<double> &vTimestamps)
 {
     ifstream f;
     f.open(strFile.c_str());
@@ -236,13 +188,11 @@ void LoadDataset(const string &strFile, vector<string> &vstrImageFilenames, vect
             ss >> t;
             vTimestamps.push_back(t);
             ss>>x>>y>>theta;
-            vgtPose.push_back(cv::Vec3d(x,y,theta));
+            vodomPose.push_back(cv::Vec3d(x,y,theta));
             ss >> image;
             vstrImageFilenames.push_back("image/"+image+".jpg");
             vstrBirdviewFilenames.push_back("birdview/"+image+".jpg");
             vstrBirdviewMaskFilenames.push_back("mask/"+image+".jpg");
-            vstrBirdviewContourFilenames.push_back("contourICPWrite/"+image+".bmp");
-            vstrBirdviewContourICPFilenames.push_back("contourICP/"+image+".jpg");
         }
     }
     // double t0=vTimestamps[0];
@@ -268,11 +218,29 @@ void applyMaskBirdview(const cv::Mat& src, cv::Mat& dst, const cv::Mat& mask)
     for (int j = 0; j < src.cols; ++j)
     {
       cv::Vec3b pixel = mask.at<cv::Vec3b>(i, j);
-      if (pixel[0] < 20 && pixel[1] < 20 && pixel[2] < 20)
+      if (pixel[1] < 20)
         dst.at<cv::Vec3b>(i, j) = 0;
     }
 }
 
+// void ConvertMaskBirdview(const cv::Mat& src, cv::Mat& dst)
+// {
+//     if(src.empty())
+//         return;
+
+//     cv::Mat dst_out = cv::Mat(src.rows,src.cols,CV_8UC1);
+//     for (int i = 0; i < src.rows; ++i)
+//         for (int j = 0; j < src.cols; ++j)
+//         {
+//             cv::Vec3b pixel = src.at<cv::Vec3b>(i, j);
+//             if (pixel[1] < 20)
+//                 dst_out.at<uchar>(i, j) = 0;
+//             else
+//                 dst_out.at<uchar>(i, j) = 250;
+//         }
+
+//     dst = dst_out.clone();
+// }
 void ConvertMaskBirdview(const cv::Mat& src, cv::Mat& dst)
 {
     if(src.empty())
@@ -288,13 +256,6 @@ void ConvertMaskBirdview(const cv::Mat& src, cv::Mat& dst)
             else
                 dst_out.at<uchar>(i, j) = 250;
         }
-
-    dst_out = dst_out > 50;
-    int erosion_size = 5;
-    Mat element = getStructuringElement(
-        MORPH_RECT, Size(2 * erosion_size + 1, 2 * erosion_size + 1),
-        Point(erosion_size, erosion_size));
-    cv::erode(dst_out, dst_out, element);
 
     // preprocess mask, ignore footprint
     int birdviewCols=src.cols;

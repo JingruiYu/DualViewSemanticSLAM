@@ -48,24 +48,14 @@ public:
     // Draw last processed frame.
     cv::Mat DrawFrame();
 
-    cv::Mat DrawBird();
-
-    cv::Mat DrawBirdIcp();
-
-    vector<cv::DMatch> mvMatchesInlierBird12;
 protected:
 
     void DrawTextInfo(cv::Mat &im, int nState, cv::Mat &imText);
 
     // Info of the frame to be drawn
     cv::Mat mIm;
-    cv::Mat mbIm;
-    cv::Mat mLastbIm;
-    cv::Mat mICPMat;
     int N;
     vector<cv::KeyPoint> mvCurrentKeys;
-    vector<cv::KeyPoint> mvCurrentKeysBird;
-    vector<cv::KeyPoint> mvLastKeysBird;
     vector<bool> mvbMap, mvbVO;
     bool mbOnlyTracking;
     int mnTracked, mnTrackedVO;

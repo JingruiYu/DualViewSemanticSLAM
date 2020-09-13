@@ -66,7 +66,7 @@ void LoopClosing::Run()
             // Detect loop candidates and check covisibility consistency
             if(DetectLoop())
             {
-                // Compute similarity transformation [sR|t]
+               // Compute similarity transformation [sR|t]
                // In the stereo/RGBD case s=1
                if(ComputeSim3())
                {
@@ -123,31 +123,22 @@ bool LoopClosing::DetectLoop()
     // We will impose loop candidates to have a higher similarity than this
     const vector<KeyFrame*> vpConnectedKeyFrames = mpCurrentKF->GetVectorCovisibleKeyFrames();
     const DBoW2::BowVector &CurrentBowVec = mpCurrentKF->mBowVec;
-    const DBoW2::BowVector &CurrentBowVecBrid = mpCurrentKF->mBowVecBrid;
     float minScore = 1;
-    float minScoreBrid = 1;
     for(size_t i=0; i<vpConnectedKeyFrames.size(); i++)
     {
         KeyFrame* pKF = vpConnectedKeyFrames[i];
         if(pKF->isBad())
             continue;
         const DBoW2::BowVector &BowVec = pKF->mBowVec;
-        const DBoW2::BowVector &BowVecBrid = pKF->mBowVecBrid;
 
         float score = mpORBVocabulary->score(CurrentBowVec, BowVec);
-        float scoreBrid = mpORBVocabulary->score(CurrentBowVecBrid, BowVecBrid);
 
         if(score<minScore)
             minScore = score;
-
-        if(scoreBrid<minScoreBrid)
-        {
-            minScoreBrid = scoreBrid;
-        }
     }
-    
+
     // Query the database imposing the minimum score
-    vector<KeyFrame*> vpCandidateKFs = mpKeyFrameDB->DetectLoopCandidates(mpCurrentKF, minScore, minScoreBrid);
+    vector<KeyFrame*> vpCandidateKFs = mpKeyFrameDB->DetectLoopCandidates(mpCurrentKF, minScore);
 
     // If there are no loop candidates, just add new keyframe and return false
     if(vpCandidateKFs.empty())
@@ -252,19 +243,12 @@ bool LoopClosing::ComputeSim3()
 
     vector<vector<MapPoint*> > vvpMapPointMatches;
     vvpMapPointMatches.resize(nInitialCandidates);
-    vector<vector<MapPointBird*> > vvpMapPointMatchesBrid;
-    vvpMapPointMatchesBrid.resize(nInitialCandidates);
-    vector<vector<int> > vvnMatches12;
-    vvnMatches12.resize(nInitialCandidates);
 
     vector<bool> vbDiscarded;
     vbDiscarded.resize(nInitialCandidates);
 
-    vector<int> vnmatcheBrid;
-    vnmatcheBrid.resize(nInitialCandidates);
-
     int nCandidates=0; //candidates with enough matches
-    int ptmode = 0;
+
     for(int i=0; i<nInitialCandidates; i++)
     {
         KeyFrame* pKF = mvpEnoughConsistentCandidates[i];
@@ -279,26 +263,18 @@ bool LoopClosing::ComputeSim3()
         }
 
         int nmatches = matcher.SearchByBoW(mpCurrentKF,pKF,vvpMapPointMatches[i]);
-        int nmatcheBrid = matcher.SearchByMatchBird(mpCurrentKF,pKF,vvpMapPointMatchesBrid[i],vvnMatches12[i]);
-        
-        if (nmatches >= 20 && nmatcheBrid >= 3)
-            ptmode = 3;
-        else if (nmatches >= 20)
-            ptmode = 1;
-        else if (nmatcheBrid >= 10)
-        {
-            ptmode = 2;
-            vnmatcheBrid[i] = nmatcheBrid;
-        }
-        else
+
+        if(nmatches<20)
         {
             vbDiscarded[i] = true;
             continue;
         }
-
-        Sim3Solver* pSolver = new Sim3Solver(mpCurrentKF,pKF,vvpMapPointMatches[i],vvpMapPointMatchesBrid[i],mbFixScale,ptmode);
-        pSolver->SetRansacParameters(0.99,23,300);
-        vpSim3Solvers[i] = pSolver;
+        else
+        {
+            Sim3Solver* pSolver = new Sim3Solver(mpCurrentKF,pKF,vvpMapPointMatches[i],mbFixScale);
+            pSolver->SetRansacParameters(0.99,20,300);
+            vpSim3Solvers[i] = pSolver;
+        }
 
         nCandidates++;
     }
@@ -318,12 +294,11 @@ bool LoopClosing::ComputeSim3()
 
             // Perform 5 Ransac Iterations
             vector<bool> vbInliers;
-            vector<bool> vbridInliers;
             int nInliers;
             bool bNoMore;
 
             Sim3Solver* pSolver = vpSim3Solvers[i];
-            cv::Mat Scm  = pSolver->iterate(5,bNoMore,vbInliers,vbridInliers,nInliers);
+            cv::Mat Scm  = pSolver->iterate(5,bNoMore,vbInliers,nInliers);
 
             // If Ransac reachs max. iterations discard keyframe
             if(bNoMore)
@@ -363,65 +338,6 @@ bool LoopClosing::ComputeSim3()
                     break;
                 }
             }
-
-            if (Scm.empty() && vnmatcheBrid[i] > 10 && 0)
-            {
-                cout << "Loopclosing using ICP ... " << endl; 
-                IcpSolver* mIcp = new IcpSolver(200);
-                vector<cv::Point2f> mvCurKeysXYBird1 = mpCurrentKF->mvKeysBirdBaseXY;
-                vector<cv::Point2f> mvCurKeysXYBird2 = pKF->mvKeysBirdBaseXY;
-                vector<int> vMatchesBird12;
-                vector<Match> mvMatchesBird12;
-                vector<bool> mvbMatchesInliersBird12;
-                cv::Mat R12,t12;
-                float score = 0.0;
-                float sigma = 1.0*Frame::pixel2meter;
-                
-                for(size_t k=0; k<vvnMatches12[i].size(); k++)
-                {
-                    if(vvnMatches12[i][k] > 0)
-                    {
-                        mvMatchesBird12.push_back(make_pair(k,vvnMatches12[i][k]));
-                    }
-                }
-
-                mIcp->FindRtICP2D(mvCurKeysXYBird1,mvCurKeysXYBird2,mvMatchesBird12,mvbMatchesInliersBird12,R12,t12,score,sigma);
-
-                if (score > 10)
-                {
-                    mpMatchedKF = pKF;
-                    float s = 1;
-                    cv::Mat T12b = cv::Mat::eye(4,4,CV_32F); //check right
-                    R12.copyTo(T12b.rowRange(0,2).colRange(0,2));
-                    t12.copyTo(T12b.rowRange(0,2).col(3));
-                    cv::Mat T12c = Frame::Tcb*T12b*Frame::Tbc;
-                    R12 = T12c.rowRange(0,3).colRange(0,3);
-                    t12 = T12c.rowRange(0,3).col(3);
-                    g2o::Sim3 gScm(Converter::toMatrix3d(R12),Converter::toVector3d(t12),s);
-
-                    vector<MapPoint*> vpMapPointMatches(vvpMapPointMatches[i].size(), static_cast<MapPoint*>(NULL));
-                    for(size_t j=0, jend=vbInliers.size(); j<jend; j++)
-                    {
-                        if(vbInliers[j])
-                        vpMapPointMatches[j]=vvpMapPointMatches[i][j];
-                    }
-                    const int nInliers = Optimizer::OptimizeSim3(mpCurrentKF, pKF, vpMapPointMatches, gScm, 10, mbFixScale);
-                    // If optimization is succesful stop ransacs and continue
-                    if(nInliers>=20)
-                    {
-                        bMatch = true;
-                        mpMatchedKF = pKF;
-                        g2o::Sim3 gSmw(Converter::toMatrix3d(pKF->GetRotation()),Converter::toVector3d(pKF->GetTranslation()),1.0);
-                        mg2oScw = gScm*gSmw;
-                        mScw = Converter::toCvMat(mg2oScw);
-
-                        mvpCurrentMatchedPoints = vpMapPointMatches;
-                        break;
-                    }
-                    cout << "Loopclosing using ICP Pose ... " << endl;
-                }
-            }
-            
         }
     }
 
@@ -584,29 +500,6 @@ void LoopClosing::CorrectLoop()
                 pMPi->UpdateNormalAndDepth();
             }
 
-            //********** modify by Yujr update the bridview points
-            vector<MapPointBird*> vpMpBr = pKFi->GetMapPointMatchesBird();
-            for (size_t iMP = 0, endMP = vpMpBr.size(); iMP < endMP; iMP++)
-            {
-                MapPointBird* pMPBdi = vpMpBr[iMP];
-                if (!pMPBdi)
-                    continue;
-                if(pMPBdi->isBad())
-                    continue;
-                if(pMPBdi->mnCorrectedByKF==mpCurrentKF->mnId)
-                    continue;
-
-                cv::Mat P3Dw = pMPBdi->GetWorldPos();
-                Eigen::Matrix<double,3,1> eigP3Dw = Converter::toVector3d(P3Dw);
-                Eigen::Matrix<double,3,1> eigCorrectedP3Dw = g2oCorrectedSwi.map(g2oSiw.map(eigP3Dw));
-
-                cv::Mat cvCorrectedP3Dw = Converter::toCvMat(eigCorrectedP3Dw);
-                pMPBdi->SetWorldPos(cvCorrectedP3Dw);
-                pMPBdi->mnCorrectedByKF = mpCurrentKF->mnId;
-                pMPBdi->mnCorrectedReference = pKFi->mnId;
-            }
-            
-
             // Update keyframe pose with corrected Sim3. First transform Sim3 to SE3 (scale translation)
             Eigen::Matrix3d eigR = g2oCorrectedSiw.rotation().toRotationMatrix();
             Eigen::Vector3d eigt = g2oCorrectedSiw.translation();
@@ -754,14 +647,14 @@ void LoopClosing::RunGlobalBundleAdjustment(unsigned long nLoopKF)
     cout << "Starting Global Bundle Adjustment" << endl;
 
     int idx =  mnFullBAIdx;
-    if(mpTracker->mbHaveBirdview)
-    {
-        Optimizer::GlobalBundleAdjustemntWithBirdview(mpMap,10,&mbStopGBA,nLoopKF,false);
-    }
-    else
-    {
+    // if(mpTracker->mbHaveBirdview)
+    // {
+    //     Optimizer::GlobalBundleAdjustemntWithBirdview(mpMap,10,&mbStopGBA,nLoopKF,false);
+    // }
+    // else
+    // {
         Optimizer::GlobalBundleAdjustemnt(mpMap,10,&mbStopGBA,nLoopKF,false);
-    }
+    // }
     
     
 

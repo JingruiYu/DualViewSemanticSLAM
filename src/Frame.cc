@@ -21,7 +21,6 @@
 #include "Frame.h"
 #include "Converter.h"
 #include "ORBmatcher.h"
-#include "simple_birdseye_odometer.h"
 #include <thread>
 
 namespace ORB_SLAM2
@@ -34,10 +33,10 @@ float Frame::mnMinX, Frame::mnMinY, Frame::mnMaxX, Frame::mnMaxY;
 float Frame::mfGridElementWidthInv, Frame::mfGridElementHeightInv;
 /********************* Modified Here *********************/
 float Frame::mfGridElementWidthInvBirdview, Frame::mfGridElementHeightInvBirdview;
-cv::Mat Frame::Tbc,Frame::Tcb,Frame::Rro,Frame::tro,Frame::Ror,Frame::tor;
+cv::Mat Frame::Tbc,Frame::Tcb;
 int Frame::birdviewRows, Frame::birdviewCols;
 
-const double correction = 1.19;
+const double correction = 1.0;
 const double Frame::pixel2meter = 0.03984*correction;
 const double Frame::meter2pixel = 25.1/correction;
 const double Frame::rear_axle_to_center = 1.393;
@@ -52,21 +51,18 @@ Frame::Frame(const Frame &frame)
     :mpORBvocabulary(frame.mpORBvocabulary), mpORBextractorLeft(frame.mpORBextractorLeft), mpORBextractorRight(frame.mpORBextractorRight),
      mTimeStamp(frame.mTimeStamp), mK(frame.mK.clone()), mDistCoef(frame.mDistCoef.clone()),
      mbf(frame.mbf), mb(frame.mb), mThDepth(frame.mThDepth), N(frame.N), mvKeys(frame.mvKeys),
-     mvKeysRight(frame.mvKeysRight), mvKeysUn(frame.mvKeysUn), Nbird(frame.Nbird), mbHaveBirdview(frame.mbHaveBirdview),
-     mvKeysBird(frame.mvKeysBird), mDescriptorsBird(frame.mDescriptorsBird.clone()),
-     mvKeysBirdCamXYZ(frame.mvKeysBirdCamXYZ), mvKeysBirdBaseXY(frame.mvKeysBirdBaseXY),
-     mnBirdviewRefFrameId(frame.mnBirdviewRefFrameId), mvnBirdviewMatches21(frame.mvnBirdviewMatches21),
-     mvbBirdviewInliers(frame.mvbBirdviewInliers), mvpMapPointsBird(frame.mvpMapPointsBird),
-     mpReferenceKFBird(frame.mpReferenceKFBird), mBirdviewImg(frame.mBirdviewImg.clone()),
-     mBirdviewMask(frame.mBirdviewMask.clone()), mBirdviewContour(frame.mBirdviewContour.clone()),
-     mvuRight(frame.mvuRight), mvDepth(frame.mvDepth), mBowVec(frame.mBowVec), mFeatVec(frame.mFeatVec),
-     mBowVecBrid(frame.mBowVecBrid), mFeatVecBrid(frame.mFeatVecBrid), mDescriptors(frame.mDescriptors.clone()), 
-     mDescriptorsRight(frame.mDescriptorsRight.clone()), mvpMapPoints(frame.mvpMapPoints), 
-     mvbOutlier(frame.mvbOutlier), mGtPose(frame.mGtPose), mOdomPose(frame.mOdomPose), mnId(frame.mnId), mpReferenceKF(frame.mpReferenceKF), 
-     mnScaleLevels(frame.mnScaleLevels), mfScaleFactor(frame.mfScaleFactor), mfLogScaleFactor(frame.mfLogScaleFactor),
+     mvKeysRight(frame.mvKeysRight), mvKeysUn(frame.mvKeysUn),  mvuRight(frame.mvuRight),
+     mvDepth(frame.mvDepth), mBowVec(frame.mBowVec), mFeatVec(frame.mFeatVec),
+     mDescriptors(frame.mDescriptors.clone()), mDescriptorsRight(frame.mDescriptorsRight.clone()),
+     mvpMapPoints(frame.mvpMapPoints), mvbOutlier(frame.mvbOutlier), mnId(frame.mnId),
+     mpReferenceKF(frame.mpReferenceKF), mnScaleLevels(frame.mnScaleLevels),
+     mfScaleFactor(frame.mfScaleFactor), mfLogScaleFactor(frame.mfLogScaleFactor),
      mvScaleFactors(frame.mvScaleFactors), mvInvScaleFactors(frame.mvInvScaleFactors),
      mvLevelSigma2(frame.mvLevelSigma2), mvInvLevelSigma2(frame.mvInvLevelSigma2),
-     mvMeasurement_p(frame.mvMeasurement_p), mvMeasurement_g(frame.mvMeasurement_g), mCloud(frame.mCloud), current_pose_(frame.current_pose_), current_ICP2D_pose(frame.current_ICP2D_pose)
+     mbHaveBirdview(frame.mbHaveBirdview),mvKeysBird(frame.mvKeysBird),mDescriptorsBird(frame.mDescriptorsBird.clone()),
+    mvKeysBirdCamXYZ(frame.mvKeysBirdCamXYZ),mnBirdviewRefFrameId(frame.mnBirdviewRefFrameId),mvbBirdviewInliers(frame.mvbBirdviewInliers),
+    mvnBirdviewMatches21(frame.mvnBirdviewMatches21),mBirdviewImg(frame.mBirdviewImg.clone()),mBirdviewMask(frame.mBirdviewMask.clone()),
+    mvpMapPointsBird(frame.mvpMapPointsBird),mvKeysBirdBaseXY(frame.mvKeysBirdBaseXY),mpReferenceKFBird(frame.mpReferenceKFBird),Nbird(frame.Nbird)
 {
     for(int i=0;i<FRAME_GRID_COLS;i++)
         for(int j=0; j<FRAME_GRID_ROWS; j++)
@@ -265,8 +261,8 @@ Frame::Frame(const cv::Mat &imGray, const double &timeStamp, ORBextractor* extra
 
 /********************* Modified Here *********************/
 Frame::Frame(const cv::Mat &imGray, const cv::Mat &birdviewGray, const cv::Mat &birdviewMask, const double &timeStamp, ORBextractor* extractor,ORBVocabulary* voc, cv::Mat &K, cv::Mat &distCoef, const float &bf, const float &thDepth)
-    :mpORBvocabulary(voc),mpORBextractorLeft(extractor),mpORBextractorRight(static_cast<ORBextractor*>(NULL)), mTimeStamp(timeStamp), mK(K.clone()),
-     mDistCoef(distCoef.clone()), mbf(bf), mThDepth(thDepth),mbHaveBirdview(true),mpReferenceKFBird(static_cast<KeyFrame*>(NULL))
+    :mpORBvocabulary(voc),mpORBextractorLeft(extractor),mpORBextractorRight(static_cast<ORBextractor*>(NULL)),mpReferenceKFBird(static_cast<KeyFrame*>(NULL)),
+     mTimeStamp(timeStamp), mK(K.clone()),mDistCoef(distCoef.clone()), mbf(bf), mThDepth(thDepth),mbHaveBirdview(true)
 {
     // Frame ID
     mnId=nNextId++;
@@ -275,6 +271,10 @@ Frame::Frame(const cv::Mat &imGray, const cv::Mat &birdviewGray, const cv::Mat &
     if(mbInitialComputations)
     {
         ComputeImageBounds(imGray);
+
+        cout<<"Image Bounds:"<<endl;
+        cout<<"minX = "<<mnMinX<<" , maxX = "<<mnMaxX<<endl;
+        cout<<"minY = "<<mnMinY<<" , maxY = "<<mnMaxY<<endl;
 
         mfGridElementWidthInv=static_cast<float>(FRAME_GRID_COLS)/static_cast<float>(mnMaxX-mnMinX);
         mfGridElementHeightInv=static_cast<float>(FRAME_GRID_ROWS)/static_cast<float>(mnMaxY-mnMinY);
@@ -329,13 +329,13 @@ Frame::Frame(const cv::Mat &imGray, const cv::Mat &birdviewGray, const cv::Mat &
     cv::Ptr<cv::ORB> extractorBird = cv::ORB::create(2000);
     extractorBird->detect(mBirdviewImg,mvKeysBird,mBirdviewMask);
     vector<cv::Point2f> vKeysBird(mvKeysBird.size());
-    for(size_t k=0;k<mvKeysBird.size();k++)
+    for(int k=0;k<mvKeysBird.size();k++)
     {
         vKeysBird[k] = mvKeysBird[k].pt;
     }
     cv::TermCriteria criteria = cv::TermCriteria(cv::TermCriteria::EPS+cv::TermCriteria::MAX_ITER,40,0.001);
     cv::cornerSubPix(mBirdviewImg,vKeysBird,cv::Size(5,5),cv::Size(-1,-1),criteria);
-    for(size_t k=0;k<mvKeysBird.size();k++)
+    for(int k=0;k<mvKeysBird.size();k++)
     {
         mvKeysBird[k].pt = vKeysBird[k];
     }
@@ -359,7 +359,7 @@ Frame::Frame(const cv::Mat &imGray, const cv::Mat &birdviewGray, const cv::Mat &
 
     mvKeysBirdCamXYZ.resize(mvKeysBird.size());
     mvKeysBirdBaseXY.resize(mvKeysBird.size());
-    for(size_t k=0;k<mvKeysBird.size();k++)
+    for(int k=0;k<mvKeysBird.size();k++)
     {
         cv::Point3f p3d = BirdviewKP2XYZ(mvKeysBird[k]);
         cv::Point2f p2d;
@@ -370,125 +370,10 @@ Frame::Frame(const cv::Mat &imGray, const cv::Mat &birdviewGray, const cv::Mat &
     }
     mvnBirdviewMatches21 = vector<int>(mvKeysBird.size(),-1);
     mvbBirdviewInliers = vector<bool>(mvKeysBird.size(),true);
+
+    // cout<<"Frame "<<mnId<<" Created."<<endl;
 }
 
-Frame::Frame(const cv::Mat &imGray, const cv::Mat &birdviewGray, const cv::Mat &birdICP, const cv::Mat &birdviewMask, const cv::Mat &birdviewContour, const cv::Vec3d gtPose, const cv::Vec3d odomPose, const double &timeStamp, ORBextractor* extractor,ORBVocabulary* voc, cv::Mat &K, cv::Mat &distCoef, const float &bf, const float &thDepth)
-    :mpORBvocabulary(voc),mpORBextractorLeft(extractor),mpORBextractorRight(static_cast<ORBextractor*>(NULL)), mTimeStamp(timeStamp), mK(K.clone()),
-     mDistCoef(distCoef.clone()), mbf(bf), mThDepth(thDepth),mbHaveBirdview(true),mpReferenceKFBird(static_cast<KeyFrame*>(NULL)), mGtPose(gtPose), mOdomPose(odomPose), mCloud(new birdseye_odometry::SemanticCloud)
-{
-    // Frame ID
-    mnId=nNextId++;
-
-    // This is done only for the first Frame (or after a change in the calibration)
-    if(mbInitialComputations)
-    {
-        ComputeImageBounds(imGray);
-
-        mfGridElementWidthInv=static_cast<float>(FRAME_GRID_COLS)/static_cast<float>(mnMaxX-mnMinX);
-        mfGridElementHeightInv=static_cast<float>(FRAME_GRID_ROWS)/static_cast<float>(mnMaxY-mnMinY);
-
-        mfGridElementWidthInvBirdview=static_cast<float>(FRAME_GRID_COLS)/static_cast<float>(birdviewGray.cols);
-        mfGridElementHeightInvBirdview=static_cast<float>(FRAME_GRID_ROWS)/static_cast<float>(birdviewGray.rows);
-
-        birdviewCols = birdviewGray.cols;
-        birdviewRows = birdviewGray.rows;
-
-        fx = K.at<float>(0,0);
-        fy = K.at<float>(1,1);
-        cx = K.at<float>(0,2);
-        cy = K.at<float>(1,2);
-        invfx = 1.0f/fx;
-        invfy = 1.0f/fy;
-
-        CalculateExtrinsics();
-
-        mbInitialComputations=false;
-    }
-
-    mb = mbf/fx;
-
-    // Scale Level Info
-    mnScaleLevels = mpORBextractorLeft->GetLevels();
-    mfScaleFactor = mpORBextractorLeft->GetScaleFactor();
-    mfLogScaleFactor = log(mfScaleFactor);
-    mvScaleFactors = mpORBextractorLeft->GetScaleFactors();
-    mvInvScaleFactors = mpORBextractorLeft->GetInverseScaleFactors();
-    mvLevelSigma2 = mpORBextractorLeft->GetScaleSigmaSquares();
-    mvInvLevelSigma2 = mpORBextractorLeft->GetInverseScaleSigmaSquares();
-
-    // ORB extraction
-    ExtractORB(0,imGray);
-    N = mvKeys.size();
-
-    if(mvKeys.empty())
-        return;
-
-    mBirdICP = birdICP.clone();
-    mBirdviewImg = birdviewGray.clone();
-    mBirdviewMask = birdviewMask.clone();
-    mBirdviewContour = birdviewContour.clone();
-    
-    // preprocess mask, ignore footprint
-    double boundary = 15.0;
-    double x = birdviewCols / 2 - (vehicle_width / 2 / pixel2meter) - boundary;
-    double y = birdviewRows / 2 - (vehicle_length / 2 / pixel2meter) - boundary;
-    double width = vehicle_width / pixel2meter + 2 * boundary;
-    double height = vehicle_length / pixel2meter + 2 * boundary;
-    cv::rectangle(mBirdviewMask, cv::Rect(x, y, width, height), cv::Scalar(0),-1);
-    // extract ORB for birdview
-    cv::Ptr<cv::ORB> extractorBird = cv::ORB::create(2000);
-    extractorBird->detect(mBirdviewImg,mvKeysBird,mBirdviewMask);
-    vector<cv::Point2f> vKeysBird(mvKeysBird.size());
-    for(size_t k=0;k<mvKeysBird.size();k++)
-    {
-        vKeysBird[k] = mvKeysBird[k].pt;
-    }
-    cv::TermCriteria criteria = cv::TermCriteria(cv::TermCriteria::EPS+cv::TermCriteria::MAX_ITER,40,0.001);
-    cv::cornerSubPix(mBirdviewImg,vKeysBird,cv::Size(5,5),cv::Size(-1,-1),criteria);
-    for(size_t k=0;k<mvKeysBird.size();k++)
-    {
-        mvKeysBird[k].pt = vKeysBird[k];
-    }
-    extractorBird->compute(mBirdviewImg,mvKeysBird,mDescriptorsBird);
-    
-    Nbird = mvKeysBird.size();
-    
-    mvpMapPointsBird = vector<MapPointBird*>(mvKeysBird.size(),static_cast<MapPointBird*>(NULL));  
-
-    getContourPixels();
-
-    // mCloud = pcl::PointCloud<pcl::PointXYZ>::Ptr(new pcl::PointCloud<pcl::PointXYZ>);
-    
-    getICPEdges();
-
-    current_pose_ = Eigen::Matrix4f::Identity();
-    current_ICP2D_pose = cv::Mat::eye(4,4,CV_32F);
-    
-    UndistortKeyPoints();
-
-    // Set no stereo information
-    mvuRight = vector<float>(N,-1);
-    mvDepth = vector<float>(N,-1);
-
-    mvpMapPoints = vector<MapPoint*>(N,static_cast<MapPoint*>(NULL));
-    mvbOutlier = vector<bool>(N,false);
-
-    AssignFeaturesToGrid();
-
-    mvKeysBirdCamXYZ.resize(mvKeysBird.size());
-    mvKeysBirdBaseXY.resize(mvKeysBird.size());
-    for(size_t k=0;k<mvKeysBird.size();k++)
-    {
-        cv::Point3f p3d = BirdviewKP2XYZ(mvKeysBird[k]);
-        cv::Point2f p2d;
-        p2d.x = p3d.x;
-        p2d.y = p3d.y;
-        mvKeysBirdBaseXY[k] = p2d;
-        mvKeysBirdCamXYZ[k] = TransformPoint3fWithMat(Tcb,p3d);
-    }
-    mvnBirdviewMatches21 = vector<int>(mvKeysBird.size(),-1);
-    mvbBirdviewInliers = vector<bool>(mvKeysBird.size(),true);
-}
 
 void Frame::AssignFeaturesToGrid()
 {
@@ -680,12 +565,6 @@ void Frame::ComputeBoW()
     {
         vector<cv::Mat> vCurrentDesc = Converter::toDescriptorVector(mDescriptors);
         mpORBvocabulary->transform(vCurrentDesc,mBowVec,mFeatVec,4);
-    }
-
-    if(mBowVecBrid.empty())
-    {
-        vector<cv::Mat> vCurrentDescBrid = Converter::toDescriptorVector(mDescriptorsBird);
-        mpORBvocabulary->transform(vCurrentDescBrid,mBowVecBrid,mFeatVecBrid,4);
     }
 }
 
@@ -1064,6 +943,30 @@ vector<size_t> Frame::GetFeaturesInAreaBirdview(const float &x, const float  &y,
     return vIndices;
 }
 
+// void Frame::CalculateExtrinsics()
+// {
+//     // from front camera to base footprint
+//     cv::Mat tbc=(cv::Mat_<float>(3,1)<<-0.012, 2.746, -2.654);
+//     //static cv::Mat qbc=(cv::Mat_<float>(4,1)<<0.631, -0.623, 0.325, 0.330);
+//     float qx=0.631,qy=-0.623,qz=0.325,qw=0.330;
+//     cv::Mat Rcb=(cv::Mat_<float>(3,3)<<1-2*(qy*qy+qz*qz),  2*(qx*qy-qw*qz),    2*(qx*qz+qw*qy),
+//                                                 2*(qx*qy+qw*qz),  1-2*(qx*qx+qz*qz),  2*(qy*qz-qw*qx),
+//                                                 2*(qx*qz-qw*qy),  2*(qy*qz+qw*qx),    1-2*(qx*qx+qy*qy));
+//     // Rcb=Rcb.t();
+//     //Extrinsics : odometer and front camera
+//     Tbc=cv::Mat::eye(4,4,CV_32F);
+//     Tcb=cv::Mat::eye(4,4,CV_32F);
+//     Rcb.copyTo(Tcb.rowRange(0,3).colRange(0,3));
+//     tbc.copyTo(Tcb.rowRange(0,3).col(3));
+//     cv::Mat Rbc=Rcb.t();
+//     cv::Mat tcb=-Rbc*tbc;
+//     Rbc.copyTo(Tbc.rowRange(0,3).colRange(0,3));
+//     tcb.copyTo(Tbc.rowRange(0,3).col(3));
+//     cout<<"extrinsics: "<<endl;
+//     cout<<"Tbc = "<<endl<<Tbc<<endl;
+//     cout<<"Tcb = "<<endl<<Tcb<<endl;
+// }
+
 void Frame::CalculateExtrinsics()
 {
     // from front camera to base footprint
@@ -1085,19 +988,6 @@ void Frame::CalculateExtrinsics()
     cout<<"extrinsics: "<<endl;
     cout<<"Tbc = "<<endl<<Tbc<<endl;
     cout<<"Tcb = "<<endl<<Tcb<<endl;
-
-    // For the Translation between the Pc in the front camera and the Pb in the bridview image
-    Rro = (cv::Mat_<float>(3,3) << 0, -1*pixel2meter, 0,
-                                -1*pixel2meter, 0, 0,
-                                0, 0, 0);
-    
-    tro = (cv::Mat_<float>(3,1) << pixel2meter*birdviewRows/2+rear_axle_to_center, pixel2meter*birdviewCols/2, 0);
-
-    Ror = (cv::Mat_<float>(3,3) << 0, -1*meter2pixel, 0,
-                                -1*meter2pixel, 0, 0,
-                                0, 0, 0);
-    
-    tor = (cv::Mat_<float>(3,1) << birdviewCols/2, birdviewRows/2 + meter2pixel*rear_axle_to_center, 0);
 }
 
 cv::Point3f Frame::BirdviewKP2XYZ(const cv::KeyPoint &kp)
@@ -1139,124 +1029,6 @@ cv::Mat Frame::InverseTransformSE3(cv::Mat T12)
     t21.copyTo(T21.rowRange(0,3).col(3));
 
     return T21.clone();
-}
-
-void Frame::getContourPixels()
-{
-    for (int row = 3; row < mBirdviewContour.rows-3; row++)
-    {
-        for (int col = 3; col < mBirdviewContour.cols-3; col++)
-        {
-            if (mBirdICP.at<uchar>(row,col) > 10)
-            {
-                float grayscale = float (mBirdviewContour.at<cv::Vec3b>(row,col)[0] + mBirdviewContour.at<cv::Vec3b>(row-1,col+1)[0]
-                                        + mBirdviewContour.at<cv::Vec3b>(row-2,col)[0] + mBirdviewContour.at<cv::Vec3b>(row+2,col)[0] 
-                                        + mBirdviewContour.at<cv::Vec3b>(row,col-2)[0] + mBirdviewContour.at<cv::Vec3b>(row,col+2)[0] 
-                                        + mBirdviewContour.at<cv::Vec3b>(row+1,col+1)[0] + mBirdviewContour.at<cv::Vec3b>(row-1,col-1)[0]);
-                       
-                if (grayscale < 10)
-                    continue;
-                
-                cv::Mat delta = cv::Mat::zeros(3,1,CV_32F);
-                delta.at<float>(0,0) = row;
-                delta.at<float>(1,0) = col;
-                
-                // cout << "row: " << row << "  col:  " << col << "  delta: " << delta << endl;
-                cv::Mat p3d = Rro * delta + tro;
-                cv::Mat KeysSemCamXYZ = Tcb.rowRange(0,3).colRange(0,3)*p3d+Tcb.rowRange(0,3).col(3);
-                
-                mvMeasurement_p.push_back(KeysSemCamXYZ);
-                mvMeasurement_g.push_back(grayscale);
-            }           
-        }
-    }
-    
-    // for (int x = 10; x < mBirdviewContour.cols-10; x++)
-    // {
-    //     for (int y = 0; y < mBirdviewContour.rows-10; y++)
-    //     {
-    //         cv::Mat delta = cv::Mat::zeros(3,1,CV_32F);
-    //         delta.at<float>(0,0) = (mBirdviewContour.at<cv::Vec3b>(y,x+1)[0] + mBirdviewContour.at<cv::Vec3b>(y,x+1)[1] + mBirdviewContour.at<cv::Vec3b>(y,x+1)[2])
-    //                                 - (mBirdviewContour.at<cv::Vec3b>(y,x-1)[0] + mBirdviewContour.at<cv::Vec3b>(y,x-1)[1] + mBirdviewContour.at<cv::Vec3b>(y,x-1)[2]);
-    //         delta.at<float>(1,0) = (mBirdviewContour.at<cv::Vec3b>(y+1,x)[0] + mBirdviewContour.at<cv::Vec3b>(y+1,x)[1] + mBirdviewContour.at<cv::Vec3b>(y+1,x)[2])
-    //                                 - (mBirdviewContour.at<cv::Vec3b>(y-1,x)[0] + mBirdviewContour.at<cv::Vec3b>(y-1,x)[1] + mBirdviewContour.at<cv::Vec3b>(y-1,x)[2]);
-            
-    //         if ( cv::norm(delta) < 50)
-    //             continue;
- 
-    //         cv::Mat p3d = Rro * delta + tro;
-    //         cv::Mat KeysSemCamXYZ = Tcb.rowRange(0,3).colRange(0,3)*p3d+Tcb.rowRange(0,3).col(3);
-
-    //         float grayscale = float (mBirdviewContour.at<cv::Vec3b>(y,x)[0] + mBirdviewContour.at<cv::Vec3b>(y,x)[1] + mBirdviewContour.at<cv::Vec3b>(y,x)[2]);
-    //         mvMeasurement_p.push_back(KeysSemCamXYZ);
-    //         mvMeasurement_g.push_back(grayscale);
-    //     }
-    // }
-}
-
-void Frame::getICPEdges()
-{
-    // get image info
-    int frame_width = mBirdICP.cols;
-    int frame_height = mBirdICP.rows;
-
-    // convert pixels to points
-    for (int row = 0; row < frame_height; row++)
-    {
-        for (int col = 0; col < frame_width; col++)
-        {
-            int label = -1;
-            if (mBirdICP.at<uchar>(row,col) < 10)
-                continue;// free
-            else if (mBirdICP.at<uchar>(row,col) < 129)
-                label = 0; // edge
-            else
-                label = 1; // freespace
-            
-            if (label == 1)
-                continue;
-            
-            birdseye_odometry::SemanticPoint point;
-            point.x = (frame_height / 2 - row) * pixel2meter + rear_axle_to_center;
-            point.y = (frame_width / 2 - col) * pixel2meter;
-            point.z = 0.0;
-            point.label = label;
-            
-            mCloud->points.push_back(point);
-        }
-    }
-
-    mCloud->width = mCloud->points.size();
-    mCloud->height = 1;
-    mCloud->is_dense = true;
-}
-
-
-cv::Mat Frame::GetTransformFromOdometer(const cv::Vec3d &odomPose1, const cv::Vec3d &odomPose2)
-{
-    //odometer pose
-    double x1=odomPose1[0],y1=odomPose1[1],theta1=odomPose1[2];
-    double x2=odomPose2[0],y2=odomPose2[1],theta2=odomPose2[2];
-
-    //pre-integration terms
-    double theta12=theta2-theta1;
-    double x12=(x2-x1)*cos(theta1)+(y2-y1)*sin(theta1);
-    double y12=(y2-y1)*cos(theta1)-(x2-x1)*sin(theta1);
-
-    //T12
-    cv::Mat T12b=(cv::Mat_<float>(4,4)<<cos(theta12),-sin(theta12),0,x12,
-                                        sin(theta12), cos(theta12),0,y12,
-                                             0,            0,      1, 0,
-                                             0,            0,      0, 1);
-    cv::Mat T12c=Tcb*T12b*Tbc;
-    return T12c;
-}
-
-cv::Mat Frame::GetTransformFromICP(Eigen::Matrix4f &ICPPose1, Eigen::Matrix4f &ICPPose2)
-{
-    Eigen::Matrix4f Tb12 = ICPPose1.inverse() * ICPPose2;
-    cv::Mat T12c=Tcb*Converter::toCVMat(Tb12)*Tbc;
-    return T12c;
 }
 
 } //namespace ORB_SLAM

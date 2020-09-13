@@ -33,9 +33,6 @@ FrameDrawer::FrameDrawer(Map* pMap):mpMap(pMap)
 {
     mState=Tracking::SYSTEM_NOT_READY;
     mIm = cv::Mat(480,640,CV_8UC3, cv::Scalar(0,0,0));
-    mbIm = cv::Mat(480,640,CV_8UC3, cv::Scalar(0,0,0));
-    mLastbIm = cv::Mat(480,640,CV_8UC3, cv::Scalar(0,0,0));
-    mICPMat = cv::Mat(480,640,CV_8UC3, cv::Scalar(0,0,0));
 }
 
 cv::Mat FrameDrawer::DrawFrame()
@@ -128,33 +125,6 @@ cv::Mat FrameDrawer::DrawFrame()
     return imWithInfo;
 }
 
-cv::Mat FrameDrawer::DrawBird()
-{
-    cv::Mat bIm;
-    
-    {
-        unique_lock<mutex> lock(mMutex);
-        
-        if (mState==Tracking::OK)
-        {
-            cv::drawMatches(mLastbIm,mvLastKeysBird,mbIm,mvCurrentKeysBird,
-            mvMatchesInlierBird12,bIm,cv::Scalar::all(-1),cv::Scalar::all(-1),std::vector<char>(),cv::DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS);
-        }
-        else
-        {
-            mbIm.copyTo(bIm);
-        }
-        
-        
-    }
-
-    return bIm;
-}
-
-cv::Mat FrameDrawer::DrawBirdIcp()
-{
-    return mICPMat.clone();
-}
 
 void FrameDrawer::DrawTextInfo(cv::Mat &im, int nState, cv::Mat &imText)
 {
@@ -197,11 +167,8 @@ void FrameDrawer::DrawTextInfo(cv::Mat &im, int nState, cv::Mat &imText)
 void FrameDrawer::Update(Tracking *pTracker)
 {
     unique_lock<mutex> lock(mMutex);
-    pTracker->mBirdICP.copyTo(mICPMat);
     pTracker->mImGray.copyTo(mIm);
-    pTracker->mCurrentFrame.mBirdviewImg.copyTo(mbIm);
     mvCurrentKeys=pTracker->mCurrentFrame.mvKeys;
-    mvCurrentKeysBird=pTracker->mCurrentFrame.mvKeysBird;
     N = mvCurrentKeys.size();
     mvbVO = vector<bool>(N,false);
     mvbMap = vector<bool>(N,false);
@@ -215,9 +182,6 @@ void FrameDrawer::Update(Tracking *pTracker)
     }
     else if(pTracker->mLastProcessedState==Tracking::OK)
     {
-        pTracker->mLastFrame.mBirdviewImg.copyTo(mLastbIm);
-        mvLastKeysBird = pTracker->mLastFrame.mvKeysBird;
-        pTracker->GetMatchesInliersBird(mvMatchesInlierBird12);
         for(int i=0;i<N;i++)
         {
             MapPoint* pMP = pTracker->mCurrentFrame.mvpMapPoints[i];

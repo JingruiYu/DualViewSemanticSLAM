@@ -46,14 +46,6 @@ g2o::SE3Quat Converter::toSE3Quat(const cv::Mat &cvT)
     return g2o::SE3Quat(R,t);
 }
 
-g2o::Quaterniond Converter::toQuaterniond(const cv::Mat &M)
-{
-    Eigen::Matrix<double,3,3> eigMat = toMatrix3d(M);
-    Eigen::Quaterniond q(eigMat);
-
-    return q;
-}
-
 cv::Mat Converter::toCvMat(const g2o::SE3Quat &SE3)
 {
     Eigen::Matrix<double,4,4> eigMat = SE3.to_homogeneous_matrix();
@@ -88,31 +80,11 @@ cv::Mat Converter::toCvMat(const Eigen::Matrix3d &m)
     return cvMat.clone();
 }
 
-cv::Mat Converter::toCVMat(const Eigen::Matrix4f &m)
-{
-    cv::Mat cvMat(4,4,CV_32F);
-    for (int i = 0; i < 4; i++)
-        for (int j = 0; j < 4; j++)
-            cvMat.at<float>(i,j) = m(i,j);
-    
-    return cvMat.clone();
-}
-
 cv::Mat Converter::toCvMat(const Eigen::Matrix<double,3,1> &m)
 {
     cv::Mat cvMat(3,1,CV_32F);
     for(int i=0;i<3;i++)
             cvMat.at<float>(i)=m(i);
-
-    return cvMat.clone();
-}
-
-cv::Mat Converter::toCvMat(const Eigen::Isometry3d &m)
-{
-    cv::Mat cvMat(4,4,CV_32F);
-    for(int i=0;i<4;i++)
-        for(int j=0; j<4; j++)
-            cvMat.at<float>(i,j)=m(i,j);
 
     return cvMat.clone();
 }
@@ -160,30 +132,6 @@ Eigen::Matrix<double,3,3> Converter::toMatrix3d(const cv::Mat &cvMat3)
          cvMat3.at<float>(2,0), cvMat3.at<float>(2,1), cvMat3.at<float>(2,2);
 
     return M;
-}
-
-Eigen::Matrix<double,4,4> Converter::toMatrix4d(const cv::Mat &cvMat4)
-{
-    Eigen::Matrix<double,4,4> M;
-
-    M << cvMat4.at<float>(0,0), cvMat4.at<float>(0,1), cvMat4.at<float>(0,2),cvMat4.at<float>(0,3),
-         cvMat4.at<float>(1,0), cvMat4.at<float>(1,1), cvMat4.at<float>(1,2),cvMat4.at<float>(1,3),
-         cvMat4.at<float>(2,0), cvMat4.at<float>(2,1), cvMat4.at<float>(2,2),cvMat4.at<float>(2,3),
-         cvMat4.at<float>(3,0), cvMat4.at<float>(3,1), cvMat4.at<float>(3,2),cvMat4.at<float>(3,3);
-
-    return M;
-}
-
-Eigen::Matrix4f Converter::toMatrix4f(const cv::Mat &cvMat4)
-{
-    Eigen::Matrix4f M;
-
-    M << cvMat4.at<float>(0,0), cvMat4.at<float>(0,1), cvMat4.at<float>(0,2), cvMat4.at<float>(0,3),
-         cvMat4.at<float>(1,0), cvMat4.at<float>(1,1), cvMat4.at<float>(1,2), cvMat4.at<float>(1,3),
-         cvMat4.at<float>(2,0), cvMat4.at<float>(2,1), cvMat4.at<float>(2,2), cvMat4.at<float>(2,3),
-         cvMat4.at<float>(3,0), cvMat4.at<float>(3,1), cvMat4.at<float>(3,2), cvMat4.at<float>(3,3);
-
-    return M;         
 }
 
 std::vector<float> Converter::toQuaternion(const cv::Mat &M)

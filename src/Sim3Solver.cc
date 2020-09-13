@@ -34,119 +34,79 @@ namespace ORB_SLAM2
 {
 
 
-Sim3Solver::Sim3Solver(KeyFrame *pKF1, KeyFrame *pKF2, const vector<MapPoint *> &vpMatched12, const vector<MapPointBird*> &vpMatchedBrid12, const bool bFixScale, int mode):
-    mnIterations(0), mnBestInliers(0), mbFixScale(bFixScale), mMode(mode)
+Sim3Solver::Sim3Solver(KeyFrame *pKF1, KeyFrame *pKF2, const vector<MapPoint *> &vpMatched12, const bool bFixScale):
+    mnIterations(0), mnBestInliers(0), mbFixScale(bFixScale)
 {
     mpKF1 = pKF1;
     mpKF2 = pKF2;
+
+    vector<MapPoint*> vpKeyFrameMP1 = pKF1->GetMapPointMatches();
+
+    mN1 = vpMatched12.size();
+
+    mvpMapPoints1.reserve(mN1);
+    mvpMapPoints2.reserve(mN1);
+    mvpMatches12 = vpMatched12;
+    mvnIndices1.reserve(mN1);
+    mvX3Dc1.reserve(mN1);
+    mvX3Dc2.reserve(mN1);
 
     cv::Mat Rcw1 = pKF1->GetRotation();
     cv::Mat tcw1 = pKF1->GetTranslation();
     cv::Mat Rcw2 = pKF2->GetRotation();
     cv::Mat tcw2 = pKF2->GetTranslation();
 
-    if (mMode == 3 || mMode == 1)
+    mvAllIndices.reserve(mN1);
+
+    size_t idx=0;
+    for(int i1=0; i1<mN1; i1++)
     {
-        vector<MapPoint*> vpKeyFrameMP1 = pKF1->GetMapPointMatches();
-
-        mN1 = vpMatched12.size();
-
-        mvpMapPoints1.reserve(mN1);
-        mvpMapPoints2.reserve(mN1);
-        mvpMatches12 = vpMatched12;
-        mvnIndices1.reserve(mN1);
-        mvX3Dc1.reserve(mN1);
-        mvX3Dc2.reserve(mN1);
-
-        mvAllIndices.reserve(mN1);
-
-        size_t idx=0;
-        for(int i1=0; i1<mN1; i1++)
+        if(vpMatched12[i1])
         {
-            if(vpMatched12[i1])
-            {
-                MapPoint* pMP1 = vpKeyFrameMP1[i1];
-                MapPoint* pMP2 = vpMatched12[i1];
+            MapPoint* pMP1 = vpKeyFrameMP1[i1];
+            MapPoint* pMP2 = vpMatched12[i1];
 
-                if(!pMP1)
-                    continue;
+            if(!pMP1)
+                continue;
 
-                if(pMP1->isBad() || pMP2->isBad())
-                    continue;
+            if(pMP1->isBad() || pMP2->isBad())
+                continue;
 
-                int indexKF1 = pMP1->GetIndexInKeyFrame(pKF1);
-                int indexKF2 = pMP2->GetIndexInKeyFrame(pKF2);
+            int indexKF1 = pMP1->GetIndexInKeyFrame(pKF1);
+            int indexKF2 = pMP2->GetIndexInKeyFrame(pKF2);
 
-                if(indexKF1<0 || indexKF2<0)
-                    continue;
+            if(indexKF1<0 || indexKF2<0)
+                continue;
 
-                const cv::KeyPoint &kp1 = pKF1->mvKeysUn[indexKF1];
-                const cv::KeyPoint &kp2 = pKF2->mvKeysUn[indexKF2];
+            const cv::KeyPoint &kp1 = pKF1->mvKeysUn[indexKF1];
+            const cv::KeyPoint &kp2 = pKF2->mvKeysUn[indexKF2];
 
-                const float sigmaSquare1 = pKF1->mvLevelSigma2[kp1.octave];
-                const float sigmaSquare2 = pKF2->mvLevelSigma2[kp2.octave];
+            const float sigmaSquare1 = pKF1->mvLevelSigma2[kp1.octave];
+            const float sigmaSquare2 = pKF2->mvLevelSigma2[kp2.octave];
 
-                mvnMaxError1.push_back(9.210*sigmaSquare1);
-                mvnMaxError2.push_back(9.210*sigmaSquare2);
+            mvnMaxError1.push_back(9.210*sigmaSquare1);
+            mvnMaxError2.push_back(9.210*sigmaSquare2);
 
-                mvpMapPoints1.push_back(pMP1);
-                mvpMapPoints2.push_back(pMP2);
-                mvnIndices1.push_back(i1);
+            mvpMapPoints1.push_back(pMP1);
+            mvpMapPoints2.push_back(pMP2);
+            mvnIndices1.push_back(i1);
 
-                cv::Mat X3D1w = pMP1->GetWorldPos();
-                mvX3Dc1.push_back(Rcw1*X3D1w+tcw1);
+            cv::Mat X3D1w = pMP1->GetWorldPos();
+            mvX3Dc1.push_back(Rcw1*X3D1w+tcw1);
 
-                cv::Mat X3D2w = pMP2->GetWorldPos();
-                mvX3Dc2.push_back(Rcw2*X3D2w+tcw2);
+            cv::Mat X3D2w = pMP2->GetWorldPos();
+            mvX3Dc2.push_back(Rcw2*X3D2w+tcw2);
 
-                mvAllIndices.push_back(idx);
-                idx++;
-            }
-        }
-
-        mK1 = pKF1->mK;
-        mK2 = pKF2->mK;
-
-        FromCameraToImage(mvX3Dc1,mvP1im1,mK1);
-        FromCameraToImage(mvX3Dc2,mvP2im2,mK2);
-    }
-    
-    if (mMode == 3 || mMode == 2)
-    {
-        vector<MapPointBird*> vpKeyFrameMPBd1 = pKF1->GetMapPointMatchesBird();
-
-        mNB1 = vpMatchedBrid12.size();
-
-        mvX3Bc1.reserve(mNB1);
-        mvX3Bc2.reserve(mNB1);
-        mvnBridIndices1.reserve(mNB1);
-        
-        size_t idx = 0;
-        for (int  i1 = 0; i1 < mNB1; i1++)
-        {
-            if (vpMatchedBrid12[i1])
-            {
-                MapPointBird* pMPB1 = vpKeyFrameMPBd1[i1];
-                MapPointBird* pMPB2 = vpMatchedBrid12[i1];
-
-                if (!pMPB1 || !pMPB2)
-                    continue;
-
-                if (pMPB1->isBad() || pMPB2->isBad())
-                    continue;
-
-                mvnBridIndices1.push_back(i1);
-                cv::Mat X3D1w = pMPB1->GetWorldPos();
-                mvX3Bc1.push_back(Rcw1*X3D1w+tcw1);
-
-                cv::Mat X3D2w = pMPB2->GetWorldPos();
-                mvX3Bc2.push_back(Rcw2*X3D2w+tcw2);
-
-                mvAllIndicesBrid.push_back(idx);
-                idx++;                      
-            }
+            mvAllIndices.push_back(idx);
+            idx++;
         }
     }
+
+    mK1 = pKF1->mK;
+    mK2 = pKF2->mK;
+
+    FromCameraToImage(mvX3Dc1,mvP1im1,mK1);
+    FromCameraToImage(mvX3Dc2,mvP2im2,mK2);
 
     SetRansacParameters();
 }
@@ -157,44 +117,33 @@ void Sim3Solver::SetRansacParameters(double probability, int minInliers, int max
     mRansacMinInliers = minInliers;
     mRansacMaxIts = maxIterations;    
 
-    if (mMode == 1 || mMode == 3)
-        N = mvpMapPoints1.size();
-    else
-        N = 0;
-
-    if (mMode == 2 || mMode == 3)
-        NB = mvX3Bc1.size();
-    else
-        NB = 0; 
+    N = mvpMapPoints1.size(); // number of correspondences
 
     mvbInliersi.resize(N);
-    mvbBridInliersi.resize(NB);
-    
-    int NS = N + NB;
+
     // Adjust Parameters according to number of correspondences
-    float epsilon = (float)mRansacMinInliers/NS;
+    float epsilon = (float)mRansacMinInliers/N;
 
     // Set RANSAC iterations according to probability, epsilon, and max iterations
     int nIterations;
 
-    if(mRansacMinInliers==NS)
+    if(mRansacMinInliers==N)
         nIterations=1;
     else
         nIterations = ceil(log(1-mRansacProb)/log(1-pow(epsilon,3)));
-        
+
     mRansacMaxIts = max(1,min(nIterations,mRansacMaxIts));
 
     mnIterations = 0;
 }
 
-cv::Mat Sim3Solver::iterate(int nIterations, bool &bNoMore, vector<bool> &vbInliers, vector<bool> &vbridInliers, int &nInliers)
+cv::Mat Sim3Solver::iterate(int nIterations, bool &bNoMore, vector<bool> &vbInliers, int &nInliers)
 {
     bNoMore = false;
     vbInliers = vector<bool>(mN1,false);
-    vbridInliers = vector<bool>(mNB1,false);
     nInliers=0;
 
-    if(N + NB < mRansacMinInliers)
+    if(N<mRansacMinInliers)
     {
         bNoMore = true;
         return cv::Mat();
@@ -211,70 +160,41 @@ cv::Mat Sim3Solver::iterate(int nIterations, bool &bNoMore, vector<bool> &vbInli
         nCurrentIterations++;
         mnIterations++;
 
-        int randM = DUtils::Random::RandomInt(0, 10);
+        vAvailableIndices = mvAllIndices;
 
         // Get min set of points
-        if ( (mMode == 3 && randM < 5) || mMode == 2 )
+        for(short i = 0; i < 3; ++i)
         {
-            vAvailableIndices = mvAllIndicesBrid;
+            int randi = DUtils::Random::RandomInt(0, vAvailableIndices.size()-1);
 
-            for(short i = 0; i < 3; ++i)
-            {
-                int randi = DUtils::Random::RandomInt(0, vAvailableIndices.size()-1);
+            int idx = vAvailableIndices[randi];
 
-                int idx = vAvailableIndices[randi];
+            mvX3Dc1[idx].copyTo(P3Dc1i.col(i));
+            mvX3Dc2[idx].copyTo(P3Dc2i.col(i));
 
-                mvX3Bc1[idx].copyTo(P3Dc1i.col(i));
-                mvX3Bc2[idx].copyTo(P3Dc2i.col(i));
-
-                vAvailableIndices[randi] = vAvailableIndices.back();
-                vAvailableIndices.pop_back();
-            }
+            vAvailableIndices[randi] = vAvailableIndices.back();
+            vAvailableIndices.pop_back();
         }
-        else
-        {
-            vAvailableIndices = mvAllIndices;
-
-            for(short i = 0; i < 3; ++i)
-            {
-                int randi = DUtils::Random::RandomInt(0, vAvailableIndices.size()-1);
-
-                int idx = vAvailableIndices[randi];
-
-                mvX3Dc1[idx].copyTo(P3Dc1i.col(i));
-                mvX3Dc2[idx].copyTo(P3Dc2i.col(i));
-
-                vAvailableIndices[randi] = vAvailableIndices.back();
-                vAvailableIndices.pop_back();
-            }
-        }      
 
         ComputeSim3(P3Dc1i,P3Dc2i);
 
         CheckInliers();
-        CheckBridInliers();
 
-        if((mnInliersi+mnBridInliersi)>=mnBestInliers)
+        if(mnInliersi>=mnBestInliers)
         {
             mvbBestInliers = mvbInliersi;
-            mvbBestBridInliers = mvbBridInliersi;
-            mnBestInliers = (mnInliersi+mnBridInliersi);
+            mnBestInliers = mnInliersi;
             mBestT12 = mT12i.clone();
             mBestRotation = mR12i.clone();
             mBestTranslation = mt12i.clone();
             mBestScale = ms12i;
 
-            if((mnInliersi+mnBridInliersi)>mRansacMinInliers)
+            if(mnInliersi>mRansacMinInliers)
             {
-                nInliers = (mnInliersi+mnBridInliersi);
+                nInliers = mnInliersi;
                 for(int i=0; i<N; i++)
                     if(mvbInliersi[i])
                         vbInliers[mvnIndices1[i]] = true;
-                
-                for(int i=0; i<NB; i++)
-                    if(mvbBridInliersi[i])
-                        vbridInliers[mvnBridIndices1[i]] = true;
-
                 return mBestT12;
             }
         }
@@ -289,8 +209,7 @@ cv::Mat Sim3Solver::iterate(int nIterations, bool &bNoMore, vector<bool> &vbInli
 cv::Mat Sim3Solver::find(vector<bool> &vbInliers12, int &nInliers)
 {
     bool bFlag;
-    vector<bool> vbridInliers;
-    return iterate(mRansacMaxIts,bFlag,vbInliers12,vbridInliers,nInliers);
+    return iterate(mRansacMaxIts,bFlag,vbInliers12,nInliers);
 }
 
 void Sim3Solver::ComputeCentroid(cv::Mat &P, cv::Mat &Pr, cv::Mat &C)
@@ -420,72 +339,28 @@ void Sim3Solver::ComputeSim3(cv::Mat &P1, cv::Mat &P2)
 
 void Sim3Solver::CheckInliers()
 {
-    if (mMode == 2)
+    vector<cv::Mat> vP1im2, vP2im1;
+    Project(mvX3Dc2,vP2im1,mT12i,mK1);
+    Project(mvX3Dc1,vP1im2,mT21i,mK2);
+
+    mnInliersi=0;
+
+    for(size_t i=0; i<mvP1im1.size(); i++)
     {
-        mnInliersi=0;
-        for (size_t i = 0; i < mvbInliersi.size(); i++)
+        cv::Mat dist1 = mvP1im1[i]-vP2im1[i];
+        cv::Mat dist2 = vP1im2[i]-mvP2im2[i];
+
+        const float err1 = dist1.dot(dist1);
+        const float err2 = dist2.dot(dist2);
+
+        if(err1<mvnMaxError1[i] && err2<mvnMaxError2[i])
+        {
+            mvbInliersi[i]=true;
+            mnInliersi++;
+        }
+        else
             mvbInliersi[i]=false;
     }
-    else
-    {
-        vector<cv::Mat> vP1im2, vP2im1;
-        Project(mvX3Dc2,vP2im1,mT12i,mK1);
-        Project(mvX3Dc1,vP1im2,mT21i,mK2);
-
-        mnInliersi=0;
-
-        for(size_t i=0; i<mvP1im1.size(); i++)
-        {
-            cv::Mat dist1 = mvP1im1[i]-vP2im1[i];
-            cv::Mat dist2 = vP1im2[i]-mvP2im2[i];
-
-            const float err1 = dist1.dot(dist1);
-            const float err2 = dist2.dot(dist2);
-
-            if(err1<mvnMaxError1[i] && err2<mvnMaxError2[i])
-            {
-                mvbInliersi[i]=true;
-                mnInliersi++;
-            }
-            else
-                mvbInliersi[i]=false;
-        }
-    }   
-}
-
-void Sim3Solver::CheckBridInliers()
-{
-    if (mMode == 1)
-    {
-        mnBridInliersi=0;
-        for (size_t i = 0; i < mvbBridInliersi.size(); i++)
-            mvbBridInliersi[i]=false;
-    }
-    else
-    {
-        vector<cv::Mat> vP1im2, vP2im1;
-        ProjectBrid(mvX3Bc2,vP2im1,mT12i,mK1);
-        ProjectBrid(mvX3Bc1,vP1im2,mT21i,mK2);
-        
-        mnBridInliersi=0;
-
-        for(size_t i=0; i<mvX3Bc1.size(); i++)
-        {
-            cv::Mat dist1 = mvX3Bc1[i]-vP2im1[i];
-            cv::Mat dist2 = vP1im2[i]-mvX3Bc2[i];
-            const float err1 = dist1.dot(dist1);
-            const float err2 = dist2.dot(dist2);
-
-            if(err1<5 && err2<5)
-            {
-                mvbBridInliersi[i]=true;
-                mnBridInliersi++;
-            }
-            else
-                mvbBridInliersi[i]=false;
-        }
-    }
-    
 }
 
 
@@ -526,23 +401,6 @@ void Sim3Solver::Project(const vector<cv::Mat> &vP3Dw, vector<cv::Mat> &vP2D, cv
         vP2D.push_back((cv::Mat_<float>(2,1) << fx*x+cx, fy*y+cy));
     }
 }
-
-
-void Sim3Solver::ProjectBrid(const vector<cv::Mat> &vP3Dw, vector<cv::Mat> &vP2D, cv::Mat Tcw, cv::Mat K)
-{
-    cv::Mat Rcw = Tcw.rowRange(0,3).colRange(0,3);
-    cv::Mat tcw = Tcw.rowRange(0,3).col(3);
-
-    vP2D.clear();
-    vP2D.reserve(vP3Dw.size());
-
-    for(size_t i=0, iend=vP3Dw.size(); i<iend; i++)
-    {
-        cv::Mat P3Dc = Rcw*vP3Dw[i]+tcw;
-        vP2D.push_back(P3Dc);
-    }
-}
-
 
 void Sim3Solver::FromCameraToImage(const vector<cv::Mat> &vP3Dc, vector<cv::Mat> &vP2D, cv::Mat K)
 {

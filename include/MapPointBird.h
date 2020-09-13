@@ -28,10 +28,6 @@ public:
     cv::Mat GetWorldPos();
     void SetWorldPos(const cv::Mat &Pos);
     int GetIndexInKeyFrame(KeyFrame* pKF);
-
-    void SetBadFlag();
-    bool isBad();
-
     void ComputeDistinctiveDescriptors();
     cv::Mat GetDescriptor();
     int Observations();
@@ -57,11 +53,6 @@ public:
     // Best descriptor to fast matching
     cv::Mat mDescriptor;
     // int mnScaleLevel;
-
-    long unsigned int mnCorrectedByKF;
-    long unsigned int mnCorrectedReference;
-    
-    bool mbBad;
 
     Map* mpMap;
 

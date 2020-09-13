@@ -79,16 +79,15 @@ void LocalMapping::Run()
                 // Local BA
                 if(mpMap->KeyFramesInMap()>2)
                 {
-                    if(mpTracker->mbHaveBirdview)
-                    {
-                        // Optimizer::LocalBundleAdjustmentWithBirdviewPose(mpCurrentKeyFrame,&mbAbortBA, mpMap);
-                        Optimizer::LocalBundleAdjustmentWithBirdview(mpCurrentKeyFrame,&mbAbortBA, mpMap);
+                    // if(mpTracker->mbHaveBirdview)
+                    // {
+                        // Optimizer::LocalBundleAdjustmentWithBirdview(mpCurrentKeyFrame,&mbAbortBA, mpMap);
                         // Optimizer::LocalBundleAdjustment(mpCurrentKeyFrame,&mbAbortBA, mpMap);
-                    }
-                    else
-                    {
+                    // }
+                    // else
+                    // {
                         Optimizer::LocalBundleAdjustment(mpCurrentKeyFrame,&mbAbortBA, mpMap);
-                    }
+                    // }
                 }
 
                 // Check redundant local Keyframes

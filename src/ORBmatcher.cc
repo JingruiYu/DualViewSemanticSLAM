@@ -1898,13 +1898,13 @@ int ORBmatcher::BirdviewMatch(const Frame &F1, const Frame &F2, vector<int> &vnM
     return nmatches;
 }
 
-int ORBmatcher::SearchByMatchBird(vector<cv::DMatch> &vMatchesInliers12, Frame &CurrentFrame, const Frame &LastFrame, const int windowSize)
+int ORBmatcher::SearchByMatchBird(Frame &CurrentFrame, const Frame &LastFrame, const int windowSize)
 {
     int nmatches = 0;
     std::vector<int> vnMatches12;
     BirdviewMatch(LastFrame,CurrentFrame,vnMatches12,windowSize);
 
-    for(size_t k=0;k<LastFrame.mvKeysBird.size();k++)
+    for(int k=0;k<LastFrame.mvKeysBird.size();k++)
     {
         int idx2 = vnMatches12[k];
         if(idx2<0)
@@ -1917,34 +1917,6 @@ int ORBmatcher::SearchByMatchBird(vector<cv::DMatch> &vMatchesInliers12, Frame &
         }
     }
 
-
-    for(int k=0, kend = vnMatches12.size();k<kend;k++)
-    {
-        int idx2 = vnMatches12[k];
-        if(idx2<0)
-        {
-            continue;
-        }
-        
-        if (k >= LastFrame.mDescriptorsBird.rows)
-        {
-            cout << "k: " << k << " -mLastFrame.mDescriptorsBird.rows: " << LastFrame.mDescriptorsBird.rows << " - mLastFrame.mvKeysBird: " << LastFrame.mvKeysBird.size() << endl;
-            continue;
-        }
-        
-        if (idx2 >= CurrentFrame.mDescriptorsBird.rows)
-        {
-            cout << "idx2: " << idx2 << " -mCurrentFrame.mDescriptorsBird.rows: " << CurrentFrame.mDescriptorsBird.rows << " - mCurrentFrame.mvKeysBird: " << CurrentFrame.mvKeysBird.size() << endl;
-            continue;
-        }
-
-        cv::Mat d1 =  LastFrame.mDescriptorsBird.row(k);
-        cv::Mat d2 =  CurrentFrame.mDescriptorsBird.row(idx2);
-        int distance = DescriptorDistance(d1,d2);
-        vMatchesInliers12.push_back(cv::DMatch(k,idx2,distance));
-    }
-
-
     return nmatches;
 }
 
@@ -1952,7 +1924,7 @@ int ORBmatcher::SearchByProjectionBird(Frame &F, const vector<MapPointBird*> &vp
 {
     int nmatches=0;
 
-    cv::Mat Tbw = Frame::Tbc*F.mTcw; // check right
+    cv::Mat Tbw = Frame::Tbc*F.mTcw;
 
     for(size_t iMP=0; iMP<vpMapPointsBird.size(); iMP++)
     {
@@ -2025,12 +1997,11 @@ int ORBmatcher::SearchByProjectionBird(Frame &F, const vector<MapPointBird*> &vp
     return nmatches;
 }
 
-int ORBmatcher::SearchByMatchBird(KeyFrame *pKF, Frame &F, std::vector<MapPointBird*> &vpMapPointMatchesBird, std::vector<cv::DMatch> &vMatchesInliers12, float r)
+int ORBmatcher::SearchByMatchBird(KeyFrame *pKF, Frame &F, std::vector<MapPointBird*> &vpMapPointMatchesBird, const float r)
 {
     const vector<MapPointBird*> vpMapPointsBirdKF = pKF->GetMapPointMatchesBird();
 
     vpMapPointMatchesBird = vector<MapPointBird*>(F.mvKeysBird.size(),static_cast<MapPointBird*>(NULL));
-    std::vector<int> vnMatches12(F.mvKeysBird.size(),-1);
     vector<int> vMatchedDistanceBird(F.mvKeysBird.size(),INT_MAX);
 
     int nmatches=0;
@@ -2040,14 +2011,11 @@ int ORBmatcher::SearchByMatchBird(KeyFrame *pKF, Frame &F, std::vector<MapPointB
         rotHist[i].reserve(500);
     const float factor = 1.0f/HISTO_LENGTH;
 
-    int sumKFMP = 0;
-    for(size_t k=0;k<vpMapPointsBirdKF.size();k++)
+    for(int k=0;k<vpMapPointsBirdKF.size();k++)
     {
         MapPointBird *pMPBird = vpMapPointsBirdKF[k];
         if(!pMPBird)
             continue;
-
-        sumKFMP++;
 
         cv::KeyPoint &kp = pKF->mvKeysBird[k];
         cv::Point2f &pt = kp.pt;
@@ -2106,8 +2074,6 @@ int ORBmatcher::SearchByMatchBird(KeyFrame *pKF, Frame &F, std::vector<MapPointB
                 vpMapPointMatchesBird[bestIdx] = pMPBird;
                 vMatchedDistanceBird[bestIdx] = bestDist;
 
-                vnMatches12[bestIdx] = k;
-
                 if(mbCheckOrientation)
                 {
                     float rot = kp.angle-F.mvKeysBird[bestIdx].angle;
@@ -2124,8 +2090,6 @@ int ORBmatcher::SearchByMatchBird(KeyFrame *pKF, Frame &F, std::vector<MapPointB
         }
     }
 
-    cout << "The mp number of KF is : " << sumKFMP << endl;
-
     if(mbCheckOrientation)
     {
         int ind1=-1;
@@ -2141,142 +2105,15 @@ int ORBmatcher::SearchByMatchBird(KeyFrame *pKF, Frame &F, std::vector<MapPointB
             for(size_t j=0, jend=rotHist[i].size(); j<jend; j++)
             {
                 vpMapPointMatchesBird[rotHist[i][j]]=static_cast<MapPointBird*>(NULL);
-                vnMatches12[rotHist[i][j]] = -1;
                 nmatches--;
             }
         }
     }
-
-    for (size_t i = 0; i < vnMatches12.size(); i++)
-    {
-        int idxk = vnMatches12[i];
-        if ( idxk < 0)
-            continue;
-        
-        vMatchesInliers12.push_back(cv::DMatch(idxk,i,vMatchedDistanceBird[i]));
-        
-    }
     
-      
     return nmatches;
 }
 
 
 
-int ORBmatcher::SearchByMatchBird(KeyFrame *pKF1, KeyFrame *pKF2, std::vector<MapPointBird*> &vpMapPointMatchesBird, vector<int> &vnMatches12)
-{ 
-    const vector<MapPointBird*> vpMapPointsBirdKF1 = pKF1->GetMapPointMatchesBird();
-    const vector<MapPointBird*> vpMapPointsBirdKF2 = pKF2->GetMapPointMatchesBird();
-    const vector<cv::KeyPoint> vKeysBird1 = pKF1->mvKeysBird;
-    const vector<cv::KeyPoint> vKeysBird2 = pKF2->mvKeysBird;
-    const cv::Mat &Descriptors1 = pKF1->mDescriptorsBird;
-    const cv::Mat &Descriptors2 = pKF2->mDescriptorsBird;
-    
-    vpMapPointMatchesBird = vector<MapPointBird*>(vpMapPointsBirdKF1.size(),static_cast<MapPointBird*>(NULL));
-    vnMatches12 = vector<int>(vKeysBird1.size(),-1);
-    vector<int> vMatchedDistanceBird(vpMapPointsBirdKF2.size(),INT_MAX);
-
-    int nmatches=0;
-
-    vector<int> rotHist[HISTO_LENGTH];
-    for(int i=0;i<HISTO_LENGTH;i++)
-        rotHist[i].reserve(500);
-    const float factor = 1.0f/HISTO_LENGTH;
-
-    for (size_t k = 0; k < vpMapPointsBirdKF1.size(); k++)
-    {
-        MapPointBird *pMPBird1 = vpMapPointsBirdKF1[k];
-        if(!pMPBird1)
-            continue;
-        if(pMPBird1->isBad())
-            continue;
-        
-        const cv::Mat d1 = Descriptors1.row(k);
-
-        if (d1.empty())
-        {
-            std::cout << "=========================================================d1.empty()" << std::endl;
-            continue;
-        }
-
-        int bestDist1=INT_MAX;
-        int bestDist2=INT_MAX;
-        int bestIdx =-1;
-
-        for (size_t i = 0; i < vpMapPointsBirdKF2.size(); i++)
-        {
-            MapPointBird *pMPBird2 = vpMapPointsBirdKF2[i];
-
-            if(!pMPBird2)
-                continue;
-            
-            const cv::Mat d2 = Descriptors2.row(i);
-
-            const int dist = DescriptorDistance(d1,d2);
-
-            //std::cout << dist << std::endl;
-
-            if(vMatchedDistanceBird[i]<=dist)
-                continue;
-
-            if(dist<bestDist1)
-            {
-                bestDist2=bestDist1;
-                bestDist1=dist;
-                bestIdx=i;
-            }
-            else if(dist<bestDist2)
-            {
-                bestDist2=dist;
-            } 
-        }
-
-        if (bestDist1<TH_LOW )
-        {
-            if (static_cast<float>(bestDist1)<mfNNratio*static_cast<float>(bestDist2))
-            {
-                vpMapPointMatchesBird[k] = vpMapPointsBirdKF2[bestIdx];
-                vMatchedDistanceBird[bestIdx] = bestDist1;
-                vnMatches12[k] = bestIdx;
-
-                if(mbCheckOrientation)
-                {
-                    float rot = vKeysBird1[k].angle-vKeysBird2[bestIdx].angle;
-                    if(rot<0.0)
-                        rot+=360.0f;
-                    int bin = round(rot*factor);
-                    if(bin==HISTO_LENGTH)
-                        bin=0;
-                    assert(bin>=0 && bin<HISTO_LENGTH);
-                    rotHist[bin].push_back(k);
-                }
-                nmatches++;
-            }
-        }
-    }
-    
-    if(mbCheckOrientation)
-    {
-        int ind1=-1;
-        int ind2=-1;
-        int ind3=-1;
-
-        ComputeThreeMaxima(rotHist,HISTO_LENGTH,ind1,ind2,ind3);
-
-        for(int i=0; i<HISTO_LENGTH; i++)
-        {
-            if(i==ind1 || i==ind2 || i==ind3)
-                continue;
-            for(size_t j=0, jend=rotHist[i].size(); j<jend; j++)
-            {                
-                vpMapPointMatchesBird[rotHist[i][j]]=static_cast<MapPointBird*>(NULL);
-                vnMatches12[rotHist[i][j]] = -1;
-                nmatches--;
-            }
-        } 
-    } 
-
-    return nmatches;
-}
 
 } //namespace ORB_SLAM

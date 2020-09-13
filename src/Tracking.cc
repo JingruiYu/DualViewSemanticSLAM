@@ -29,10 +29,9 @@
 #include"Converter.h"
 #include"Map.h"
 #include"Initializer.h"
-#include"Converter.h"
+
 #include"Optimizer.h"
 #include"PnPsolver.h"
-#include "simple_birdseye_odometer.h"
 
 #include<iostream>
 #include<fstream>
@@ -47,14 +46,12 @@ namespace ORB_SLAM2
 {
 
 Tracking::Tracking(System *pSys, ORBVocabulary* pVoc, FrameDrawer *pFrameDrawer, MapDrawer *pMapDrawer, Map *pMap, KeyFrameDatabase* pKFDB, const string &strSettingPath, const int sensor):
-    mState(NO_IMAGES_YET), mSensor(sensor),  
-    ndt_aligner_ptr_(new pclomp::NormalDistributionsTransform<birdseye_odometry::SemanticPoint, birdseye_odometry::SemanticPoint>()),      
-    viewer_ptr_(new pcl::visualization::PCLVisualizer("Bird_viewer")), localCloud(new birdseye_odometry::SemanticCloud),
-    mbOnlyTracking(false), mbVO(false), mpORBVocabulary(pVoc),
+    mState(NO_IMAGES_YET), mSensor(sensor), mbOnlyTracking(false), mbVO(false), mpORBVocabulary(pVoc),
     mpKeyFrameDB(pKFDB), mpInitializer(static_cast<Initializer*>(NULL)), mpSystem(pSys), mpViewer(NULL),
     mpFrameDrawer(pFrameDrawer), mpMapDrawer(pMapDrawer), mpMap(pMap), mnLastRelocFrameId(0)
 {
     // Load camera parameters from settings file
+
     cv::FileStorage fSettings(strSettingPath, cv::FileStorage::READ);
     float fx = fSettings["Camera.fx"];
     float fy = fSettings["Camera.fy"];
@@ -151,23 +148,6 @@ Tracking::Tracking(System *pSys, ORBVocabulary* pVoc, FrameDrawer *pFrameDrawer,
             mDepthMapFactor = 1.0f/mDepthMapFactor;
     }
 
-    ndt_aligner_ptr_->setStepSize(0.1);
-    ndt_aligner_ptr_->setResolution(1.0);
-    ndt_aligner_ptr_->setNeighborhoodSearchMethod(pclomp::DIRECT7);
-    ndt_aligner_ptr_->setNumThreads(2);
-
-    int v1(0);
-    viewer_ptr_->createViewPort(0.0, 0.0, 1.0, 1.0, v1);
-    viewer_ptr_->createViewPortCamera(v1);
-    viewer_ptr_->setBackgroundColor(0, 0, 0, v1);
-    // viewer_ptr_->addCube(-(Frame::vehicle_length / 2 - Frame::rear_axle_to_center),
-    //                      Frame::vehicle_length / 2 + Frame::rear_axle_to_center,
-    //                      -Frame::vehicle_width / 2, Frame::vehicle_width / 2, 0.0, 0.2, 128.0,
-    //                      69.0, 0.0, "vehicle", v1);
-    viewer_ptr_->addCoordinateSystem(1.0, 0.0, 0.0, 0.3, "vehicle_frame", v1);
-    viewer_ptr_->addCoordinateSystem(1.0, 0.0, 0.0, 0.0, "map_frame", v1);
-
-    updateKfCloud = false;
 }
 
 void Tracking::SetLocalMapper(LocalMapping *pLocalMapper)
@@ -331,73 +311,67 @@ cv::Mat Tracking::GrabImageMonocularWithBirdview(const cv::Mat &im, const cv::Ma
     else
         mCurrentFrame = Frame(mImGray,mBirdviewGray,birdviewmask,timestamp,mpORBextractorLeft,mpORBVocabulary,mK,mDistCoef,mbf,mThDepth);
 
-    if(!mpmatcherBirdview)
-        mpmatcherBirdview = new ORBmatcher(0.99,true);
-    if(!mIcp)
-        mIcp = new IcpSolver(200);
-    
+    // in the initialization stage, feature match is done in MonocularInitialization().
+    // if(mState==NO_IMAGES_YET||mState==NOT_INITIALIZED)
+    // {
+        // mvPrevMatchedBirdview.resize(mCurrentFrame.mvKeysBird.size());
+        // for(int k=0;k<mCurrentFrame.mvKeysBird.size();k++)
+        // {
+        //     mvPrevMatchedBirdview[k]=mCurrentFrame.mvKeysBird[k].pt;
+        // }
+        // mBirdviewRefFrame = mCurrentFrame;
+        // mnRefNumMatches = std::numeric_limits<float>::max();
+        // mCurrentFrame.mnBirdviewRefFrameId=0;
+        if(!mpmatcherBirdview)
+            mpmatcherBirdview = new ORBmatcher(0.99,true);
+        if(!mIcp)
+            mIcp = new IcpSolver(200);
+    // }
+//     else
+//     {
+//         int nmatches = mpmatcherBirdview->BirdviewMatch(mBirdviewRefFrame,mCurrentFrame,mvnBirdviewMatches12,mvPrevMatchedBirdview,10);
+//         if(nmatches<0.5*mnRefNumMatches)
+//         {
+//             // cout<<"Change RefFrame."<<endl;
+//             // cout<<"RefMatches : "<<mnRefNumMatches<<" , CurrentMatches : "<<nmatches<<endl;
+//             mBirdviewRefFrame = Frame(mLastFrame);
+//             mvPrevMatchedBirdview.resize(mLastFrame.mvKeysBird.size());
+//             for(int k=0;k<mLastFrame.mvKeysBird.size();k++)
+//             {
+//                 mvPrevMatchedBirdview[k]=mLastFrame.mvKeysBird[k].pt;
+//             }
+//             nmatches = mpmatcherBirdview->BirdviewMatch(mBirdviewRefFrame,mCurrentFrame,mvnBirdviewMatches12,mvPrevMatchedBirdview,10);
+//             mnRefNumMatches = nmatches;
+//             // cout<<"After change : "<<nmatches<<" Matches."<<endl;
+//         }
+//         mCurrentFrame.mnBirdviewRefFrameId = mBirdviewRefFrame.mnId;
+// #ifdef DRAW_MATCH
+//         cv::Mat matchesImg;
+//         vector<cv::DMatch> vMatches12;
+//         for(int k=0;k<mvnBirdviewMatches12.size();k++)
+//         {
+//             int idx2 = mvnBirdviewMatches12[k];
+//             if(idx2<0)
+//             {
+//                 continue;
+//             }
+//             cv::Mat d1 =  mBirdviewRefFrame.mDescriptorsBird.row(k);
+//             cv::Mat d2 =  mCurrentFrame.mDescriptorsBird.row(idx2);
+//             int distance = mpmatcherBirdview->DescriptorDistance(d1,d2);
+//             vMatches12.push_back(cv::DMatch(k,idx2,distance));
+//         }
+//         cv::drawMatches(mBirdviewRefFrame.mBirdviewImg,mBirdviewRefFrame.mvKeysBird,mCurrentFrame.mBirdviewImg,mCurrentFrame.mvKeysBird,vMatches12,matchesImg);
+//         // cout<<"Matches between "<<mBirdviewRefFrame.mnId<<" and "<<mCurrentFrame.mnId<<endl;
+//         cv::imshow("birdview matches",matchesImg);
+// #endif
+//     }
 
     Track();
 
-    return mCurrentFrame.mTcw.clone();
-}
-
-cv::Mat Tracking::GrabImageMonocularWithBirdviewSem(const cv::Mat &im, const cv::Mat &birdview, const cv::Mat &birdviewmask, const cv::Mat &birdviewContour, const cv::Mat &birdviewContourICP, const double &timestamp, cv::Vec3d gtPose, cv::Vec3d odomPose)
-{
-    mImGray = im;
-    mBirdviewGray = birdview;
-    mBirdICP = birdviewContourICP;
-    mbHaveBirdview=true;
-
-    if (mBirdICP.channels() == 3)
-        cvtColor(mBirdICP, mBirdICP, CV_RGB2GRAY);
-
-    // Convert front view to grayscale
-    if(mImGray.channels()==3)
-    {
-        if(mbRGB)
-            cvtColor(mImGray,mImGray,CV_RGB2GRAY);
-        else
-            cvtColor(mImGray,mImGray,CV_BGR2GRAY);
-    }
-    else if(mImGray.channels()==4)
-    {
-        if(mbRGB)
-            cvtColor(mImGray,mImGray,CV_RGBA2GRAY);
-        else
-            cvtColor(mImGray,mImGray,CV_BGRA2GRAY);
-    }
-
-    //Convert bird view to grayscale
-    if(mBirdviewGray.channels()==3)
-    {
-        if(mbRGB)
-            cvtColor(mBirdviewGray,mBirdviewGray,CV_RGB2GRAY);
-        else
-            cvtColor(mBirdviewGray,mBirdviewGray,CV_BGR2GRAY);
-    }
-    else if(mBirdviewGray.channels()==4)
-    {
-        if(mbRGB)
-            cvtColor(mBirdviewGray,mBirdviewGray,CV_RGBA2GRAY);
-        else
-            cvtColor(mBirdviewGray,mBirdviewGray,CV_BGRA2GRAY);
-    }
-
-
-    if(mState==NOT_INITIALIZED || mState==NO_IMAGES_YET)
-        mCurrentFrame = Frame(mImGray,mBirdviewGray,mBirdICP,birdviewmask,birdviewContour,gtPose,odomPose,timestamp,mpIniORBextractor,mpORBVocabulary,mK,mDistCoef,mbf,mThDepth);
-    else
-        mCurrentFrame = Frame(mImGray,mBirdviewGray,mBirdICP,birdviewmask,birdviewContour,gtPose,odomPose,timestamp,mpORBextractorLeft,mpORBVocabulary,mK,mDistCoef,mbf,mThDepth);
-
-    
-    if(!mpmatcherBirdview)
-        mpmatcherBirdview = new ORBmatcher(0.99,true);
-    if(!mIcp)
-        mIcp = new IcpSolver(200);
-   
-
-    Track();
+    // if(mState==NOT_INITIALIZED||mState==NO_IMAGES_YET)
+    // {
+    //     mLastFrame = Frame(mCurrentFrame);
+    // }
 
     return mCurrentFrame.mTcw.clone();
 }
@@ -419,7 +393,7 @@ void Tracking::Track()
         if(mSensor==System::STEREO || mSensor==System::RGBD)
             StereoInitialization();
         else
-            MonocularInitialization(true);
+            MonocularInitialization();
 
         mpFrameDrawer->Update(this);
 
@@ -445,56 +419,27 @@ void Tracking::Track()
                 CheckReplacedInLastFrame();
 
                 // Match Birdview Keypoints
-                if (mbHaveBirdview)
+                // MatchAndRetriveBirdMP();
+
+                if(mVelocity.empty() || mCurrentFrame.mnId<mnLastRelocFrameId+2)
                 {
-                   
-                    bOK = TrackingWithICP();
-                    
+                    bOK = TrackReferenceKeyFrame();
                     if(!bOK)
                     {
-                        // cout << "not right ... " << endl;
-                        if (!mVelocity.empty())
-                        {
-                            bOK = TrackWithMotionModel();
-                            if(!bOK)
-                            {
-                                bOK = TrackReferenceKeyFrame();
-                            }
-                        }
-                        else
-                        {
-                            bOK = TrackReferenceKeyFrame();
-                        }                        
-                    } 
-
-                    cv::Mat LastTwc = cv::Mat::eye(4,4,CV_32F);
-                    mLastFrame.GetRotationInverse().copyTo(LastTwc.rowRange(0,3).colRange(0,3));
-                    mLastFrame.GetCameraCenter().copyTo(LastTwc.rowRange(0,3).col(3));
-                    cv::Mat T12c = mCurrentFrame.mTcw*LastTwc;
-                    mVisOnlyTrackTcw = T12c * mVisOnlyTrackTcw;
-                    DrawerVisial(mVisOnlyTrackTcw, 0, 150, 0, "onlyTrack"); 
+                        cout<<"No Motion Model Track Reference KeyFrame failed, tracking lost."<<endl;
+                    }
                 }
                 else
                 {
-                    if(mVelocity.empty() || mCurrentFrame.mnId<mnLastRelocFrameId+2)
+                    bOK = TrackWithMotionModel();
+                    if(!bOK)
                     {
+                        cout<<"Track Motion Model failed, Track with Reference KeyFrame."<<endl;
                         bOK = TrackReferenceKeyFrame();
-                        if (!bOK)
-                        {
-                            cout<<"No Motion Model Track Reference KeyFrame failed, tracking lost."<<endl;
-                        }   
-                    }
-                    else
-                    {
-                        bOK = TrackWithMotionModel();
                         if(!bOK)
                         {
-                            bOK = TrackReferenceKeyFrame();
-                            if (!bOK)
-                            {
-                                cout<<"No Motion Model Track Reference KeyFrame failed, tracking lost."<<endl;
-                            }
-                        }   
+                            cout<<"Track Reference KeyFrame failed, tracking lost."<<endl;
+                        }
                     }
                 }
             }
@@ -503,19 +448,95 @@ void Tracking::Track()
                 bOK = Relocalization();
             }
         }
+        else
+        {
+            // Localization Mode: Local Mapping is deactivated
+
+            if(mState==LOST)
+            {
+                bOK = Relocalization();
+            }
+            else
+            {
+                if(!mbVO)
+                {
+                    // In last frame we tracked enough MapPoints in the map
+
+                    if(!mVelocity.empty())
+                    {
+                        bOK = TrackWithMotionModel();
+                    }
+                    else
+                    {
+                        bOK = TrackReferenceKeyFrame();
+                    }
+                }
+                else
+                {
+                    // In last frame we tracked mainly "visual odometry" points.
+
+                    // We compute two camera poses, one from motion model and one doing relocalization.
+                    // If relocalization is sucessfull we choose that solution, otherwise we retain
+                    // the "visual odometry" solution.
+
+                    bool bOKMM = false;
+                    bool bOKReloc = false;
+                    vector<MapPoint*> vpMPsMM;
+                    vector<bool> vbOutMM;
+                    cv::Mat TcwMM;
+                    if(!mVelocity.empty())
+                    {
+                        bOKMM = TrackWithMotionModel();
+                        vpMPsMM = mCurrentFrame.mvpMapPoints;
+                        vbOutMM = mCurrentFrame.mvbOutlier;
+                        TcwMM = mCurrentFrame.mTcw.clone();
+                    }
+                    bOKReloc = Relocalization();
+
+                    if(bOKMM && !bOKReloc)
+                    {
+                        mCurrentFrame.SetPose(TcwMM);
+                        mCurrentFrame.mvpMapPoints = vpMPsMM;
+                        mCurrentFrame.mvbOutlier = vbOutMM;
+
+                        if(mbVO)
+                        {
+                            for(int i =0; i<mCurrentFrame.N; i++)
+                            {
+                                if(mCurrentFrame.mvpMapPoints[i] && !mCurrentFrame.mvbOutlier[i])
+                                {
+                                    mCurrentFrame.mvpMapPoints[i]->IncreaseFound();
+                                }
+                            }
+                        }
+                    }
+                    else if(bOKReloc)
+                    {
+                        mbVO = false;
+                    }
+
+                    bOK = bOKReloc || bOKMM;
+                }
+            }
+        }
 
         mCurrentFrame.mpReferenceKF = mpReferenceKF;
 
         // If we have an initial estimation of the camera pose and matching. Track the local map.
-        if(bOK)
-            bOK = TrackLocalMap();
-        
-        cv::Mat LastTwc = cv::Mat::eye(4,4,CV_32F);
-        mLastFrame.GetRotationInverse().copyTo(LastTwc.rowRange(0,3).colRange(0,3));
-        mLastFrame.GetCameraCenter().copyTo(LastTwc.rowRange(0,3).col(3));
-        cv::Mat T12c = mCurrentFrame.mTcw*LastTwc;
-        mAfterMapTcw = T12c * mAfterMapTcw;
-        DrawerVisial(mAfterMapTcw, 90, 150, 90, "AfterMap"); 
+        if(!mbOnlyTracking)
+        {
+            if(bOK)
+                bOK = TrackLocalMap();
+        }
+        else
+        {
+            // mbVO true means that there are few matches to MapPoints in the map. We cannot retrieve
+            // a local map and therefore we do not perform TrackLocalMap(). Once the system relocalizes
+            // the camera we will use the local map again.
+            if(bOK && !mbVO)
+                bOK = TrackLocalMap();
+        }
+
 
         if(bOK)
             mState = OK;
@@ -524,11 +545,6 @@ void Tracking::Track()
 
         // Update drawer
         mpFrameDrawer->Update(this);
-
-        // Eigen::Matrix4f Tc12 = Tr.inverse() * Tc;
-        // Eigen::Vector3f Tc12t = Tc12.topRightCorner(3, 1);
-        // cout << "Camera trans: " << Tc12t.norm() << endl;
-        // cout << "Camera T's trans: " << Tc.topRightCorner(3, 1).norm() << endl << endl;
 
         // If tracking were good, check if we insert a keyframe
         if(bOK)
@@ -615,6 +631,7 @@ void Tracking::Track()
         mlFrameTimes.push_back(mlFrameTimes.back());
         mlbLost.push_back(mState==LOST);
     }
+
 }
 
 
@@ -672,7 +689,7 @@ void Tracking::StereoInitialization()
     }
 }
 
-void Tracking::MonocularInitialization(bool mSemDirect)
+void Tracking::MonocularInitialization()
 {
 
     if(!mpInitializer)
@@ -782,29 +799,36 @@ void Tracking::MonocularInitialization(bool mSemDirect)
 
             // // draw matches
             mvbMatchesInliersBird12 = mpInitializer->GetMatchesInliersBird();
-            
+            // cv::Mat matchesImg;
+            // vector<cv::DMatch> vMatches12;
+            // // ORBmatcher matcher(0.99,true);
+            // // cout<<"Match size = "<<vbMatchesInliersBird12.size()<<endl;
+            // for(int k=0;k<mvbMatchesInliersBird12.size();k++)
+            // {
+            //     if(!mvbMatchesInliersBird12[k])
+            //         continue;
+            //     if(mvnBirdviewMatches12[k]<0)
+            //         continue;
+            //     int idx1 = k;
+            //     int idx2 = mvnBirdviewMatches12[k];
+            //     cv::Mat d1 =  mInitialFrame.mDescriptorsBird.row(idx1);
+            //     cv::Mat d2 =  mCurrentFrame.mDescriptorsBird.row(idx2);
+            //     int distance = matcher.DescriptorDistance(d1,d2);
+            //     vMatches12.push_back(cv::DMatch(idx1,idx2,distance));
+            // }
+            // cout<<"Inlier size = "<<vMatches12.size()<<endl;
+            // cv::drawMatches(mInitialFrame.mBirdviewImg,mInitialFrame.mvKeysBird,mCurrentFrame.mBirdviewImg,mCurrentFrame.mvKeysBird,
+            //         vMatches12,matchesImg,cv::Scalar::all(-1),cv::Scalar::all(-1),std::vector<char>(),cv::DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS);
+            // cv::imshow("initial matches inliers",matchesImg);
+            // cv::imwrite("initial_matches.jpg",matchesImg);
+
+
             // Set Frame Poses
             mInitialFrame.SetPose(cv::Mat::eye(4,4,CV_32F));
             cv::Mat Tcw = cv::Mat::eye(4,4,CV_32F);
             Rcw.copyTo(Tcw.rowRange(0,3).colRange(0,3));
             tcw.copyTo(Tcw.rowRange(0,3).col(3));
-
-            /******** Add by Yujr ************/
-            if (mSemDirect && 0)
-            {
-                cout << "Tcw before: " << endl << Tcw << endl;
-                chrono::steady_clock::time_point t1 = chrono::steady_clock::now();
-                Optimizer::poseDirectEstimation( mInitialFrame, mCurrentFrame, Tcw ); 
-                chrono::steady_clock::time_point t2 = chrono::steady_clock::now();
-                chrono::duration<double> time_used = chrono::duration_cast<chrono::duration<double>> ( t2-t1 );
-                cout << "Tcw after: " << endl << Tcw << endl;
-                cout << "time_used : " << time_used.count() << endl;
-            }
-            
             mCurrentFrame.SetPose(Tcw);
-            
-            // add inital pose
-            trajectory_.push_back(Eigen::Matrix4f::Identity());
 
             CreateInitialMapMonocular();
 
@@ -812,20 +836,30 @@ void Tracking::MonocularInitialization(bool mSemDirect)
             mBirdviewRefFrame = Frame(mInitialFrame);
             mnRefNumMatches = nmatchesBird;
             mCurrentFrame.mnBirdviewRefFrameId = mInitialFrame.mnId;
+
+            // // print initialization results
+            // cv::Mat Tbw=Frame::Tbc*Tcw*Frame::Tcb;
+            // cv::Mat R = Tbw.rowRange(0,3).colRange(0,3).t();
+            // vector<float> q = Converter::toQuaternion(R);
+            // cv::Mat t = -R*Tbw.rowRange(0,3).col(3);
+            // ofstream f("Initialization_result.txt");
+            // f<<fixed;
+            // f << setprecision(6) << mInitialFrame.mTimeStamp << " " << mCurrentFrame.mTimeStamp << setprecision(7) << " " << t.at<float>(0) << " " 
+            //     << t.at<float>(1) << " " << t.at<float>(2) << " " << q[0] << " " << q[1] << " " << q[2] << " " << q[3] << endl;
+            // f<<"Length = "<<cv::norm(t)<<endl;
+            // f.close();
+
         }
     }
 }
 
 void Tracking::CreateInitialMapMonocular()
 {
-    // The pose of the KF is getting from Frame and not changed below
     // Create KeyFrames
     KeyFrame* pKFini = new KeyFrame(mInitialFrame,mpMap,mpKeyFrameDB);
     KeyFrame* pKFcur = new KeyFrame(mCurrentFrame,mpMap,mpKeyFrameDB);
-    
-    localCloud = pKFcur->mKeyCloud;
-    localCloudPose = pKFcur->local_cloud_pose_;
-    
+
+
     pKFini->ComputeBoW();
     pKFcur->ComputeBoW();
 
@@ -865,7 +899,7 @@ void Tracking::CreateInitialMapMonocular()
     cout<<"mvnBirdviewMatches12.size() = "<<mvnBirdviewMatches12.size()<<endl;
     cout<<"mvbMatchesInliersBird12.size() = "<<mvbMatchesInliersBird12.size()<<endl;
 
-    for(size_t k=0;k<mvnBirdviewMatches12.size();k++)
+    for(int k=0;k<mvnBirdviewMatches12.size();k++)
     {
         if(mvnBirdviewMatches12[k]<0)
             continue;
@@ -898,20 +932,20 @@ void Tracking::CreateInitialMapMonocular()
     // Bundle Adjustment
     cout << "New Map created with " << mpMap->MapPointsInMap() << " points" << endl;
 
-    if(mbHaveBirdview)
-    {
-        Optimizer::GlobalBundleAdjustemntWithBirdview(mpMap,20);
-        // Optimizer::GlobalBundleAdjustemnt(mpMap,20);
-    }
-    else
-    {
+    // if(mbHaveBirdview)
+    // {
+    //     Optimizer::GlobalBundleAdjustemntWithBirdview(mpMap,20);
+    //     // Optimizer::GlobalBundleAdjustemnt(mpMap,20);
+    // }
+    // else
+    // {
         Optimizer::GlobalBundleAdjustemnt(mpMap,20);
-    }
+    // }
     
 
     // Set median depth to 1
     float medianDepth = pKFini->ComputeSceneMedianDepth(2);
-    // float invMedianDepth = 1.0f/medianDepth;
+    float invMedianDepth = 1.0f/medianDepth;
 
     if(medianDepth<0 || pKFcur->TrackedMapPoints(1)<100)
     {
@@ -921,6 +955,21 @@ void Tracking::CreateInitialMapMonocular()
         return;
     }
 
+    // // Scale initial baseline
+    // cv::Mat Tc2w = pKFcur->GetPose();
+    // Tc2w.col(3).rowRange(0,3) = Tc2w.col(3).rowRange(0,3)*invMedianDepth;
+    // pKFcur->SetPose(Tc2w);
+
+    // // Scale points
+    // vector<MapPoint*> vpAllMapPoints = pKFini->GetMapPointMatches();
+    // for(size_t iMP=0; iMP<vpAllMapPoints.size(); iMP++)
+    // {
+    //     if(vpAllMapPoints[iMP])
+    //     {
+    //         MapPoint* pMP = vpAllMapPoints[iMP];
+    //         pMP->SetWorldPos(pMP->GetWorldPos()*invMedianDepth);
+    //     }
+    // }
 
     mpLocalMapper->InsertKeyFrame(pKFini);
     mpLocalMapper->InsertKeyFrame(pKFcur);
@@ -942,7 +991,6 @@ void Tracking::CreateInitialMapMonocular()
     mCurrentFrame.mpReferenceKF = pKFcur;
 
     mLastFrame = Frame(mCurrentFrame);
-    mKeyBirdFrame = Frame(mCurrentFrame);
 
     mpMap->SetReferenceMapPoints(mvpLocalMapPoints);
 
@@ -951,9 +999,6 @@ void Tracking::CreateInitialMapMonocular()
     mpMap->mvpKeyFrameOrigins.push_back(pKFini);
 
     mState=OK;
-
-    mVisOnlyTrackTcw = mCurrentFrame.mTcw.clone();
-    mAfterMapTcw = mCurrentFrame.mTcw.clone();
 }
 
 void Tracking::CheckReplacedInLastFrame()
@@ -986,7 +1031,7 @@ bool Tracking::TrackReferenceKeyFrame()
 
     int nmatches = matcher.SearchByBoW(mpReferenceKF,mCurrentFrame,vpMapPointMatches);
 
-    cout<< "\033[31m" << "Track Reference KeyFrame, "<<nmatches<<" Matches." << "\033[0m"<<endl;
+    cout<<"Track Reference KeyFrame, "<<nmatches<<" Matches."<<endl;
 
     if(nmatches<15)
         return false;
@@ -994,24 +1039,29 @@ bool Tracking::TrackReferenceKeyFrame()
     mCurrentFrame.mvpMapPoints = vpMapPointMatches;
     mCurrentFrame.SetPose(mLastFrame.mTcw);
 
-    if(mbHaveBirdview)
-    {
-        // cout<<"Search Birdview Matches."<<endl;
-        vector<MapPointBird*> vpMapPointMatchesBird;
-        int nmatchesbird = mpmatcherBirdview->SearchByMatchBird(mpReferenceKF,mCurrentFrame,vpMapPointMatchesBird,15);
-        if(nmatchesbird<15)
-        {
-            nmatchesbird = mpmatcherBirdview->SearchByMatchBird(mpReferenceKF,mCurrentFrame,vpMapPointMatchesBird,30);
-        }
-        mCurrentFrame.mvpMapPointsBird = vpMapPointMatchesBird;
-        cout<<"Track Reference KeyFrame, "<<nmatchesbird<<" Birdview Matches."<<endl;
-        // Optimizer::PoseOptimizationWithBirdviewPixel(&mCurrentFrame);
-        Optimizer::PoseOptimizationWithBirdview(&mCurrentFrame);
-    }
-    else
-    {
+    // if(mbHaveBirdview)
+    // {
+    //     cout<<"Search Birdview Matches."<<endl;
+    //     vector<MapPointBird*> vpMapPointMatchesBird;
+    //     int nmatchesbird = mpmatcherBirdview->SearchByMatchBird(mpReferenceKF,mCurrentFrame,vpMapPointMatchesBird,15);
+    //     if(nmatchesbird<15)
+    //     {
+    //         nmatchesbird = mpmatcherBirdview->SearchByMatchBird(mpReferenceKF,mCurrentFrame,vpMapPointMatchesBird,20);
+    //     }
+    //     mCurrentFrame.mvpMapPointsBird = vpMapPointMatchesBird;
+    //     cout<<"Track Reference KeyFrame, "<<nmatchesbird<<" Birdview Matches."<<endl;
+
+    //     Optimizer::PoseOptimizationWithBirdview(&mCurrentFrame);
+        // MatchAndRetriveBirdMP();
+        // Optimizer::PoseOptimizationWithBirdview(&mCurrentFrame);
+        // Optimizer::PoseOptimization(&mCurrentFrame);
+        // DrawMatchesInliersBird();
+        // Optimizer::PoseOptimizationWithBirdview(&mCurrentFrame,&mBirdviewRefFrame);
+    // }
+    // else
+    // {
         Optimizer::PoseOptimization(&mCurrentFrame);
-    }
+    // }
     
 
     // Discard outliers
@@ -1035,19 +1085,26 @@ bool Tracking::TrackReferenceKeyFrame()
         }
     }
 
-    
+    cout<<"After Optimization, "<<nmatches<<" Matches, "<<nmatchesMap<<" Matches in Map."<<endl;
+
     /********************* Modified Here *********************/
     int nmatchesBirdMap=0;
     if(mbHaveBirdview)
     {
         // Discard outliers for birdview
         // cv::Mat Twc = mCurrentFrame.mTcw.inv();
-        for(size_t k=0;k<mCurrentFrame.mvKeysBird.size();k++)
+        for(int k=0;k<mCurrentFrame.mvKeysBird.size();k++)
         {
             if(mCurrentFrame.mvpMapPointsBird[k])
             {
                 if(!mCurrentFrame.mvbBirdviewInliers[k])
                 {
+                    // cv::Mat localPos = cv::Mat(mCurrentFrame.mvKeysBirdCamXYZ[k]);
+                    // cv::Mat worldPos = Twc.rowRange(0,3).colRange(0,3)*localPos+Twc.rowRange(0,3).col(3);
+                    // MapPointBird *pMPBird = new MapPointBird(worldPos,&mCurrentFrame,mpMap,k);
+                    // mpMap->AddMapPointBird(pMPBird);
+                    // mCurrentFrame.mvpMapPointsBird[k] = pMPBird;
+
                     mCurrentFrame.mvpMapPointsBird[k] = static_cast<MapPointBird*>(NULL);
                     mCurrentFrame.mvbBirdviewInliers[k]=true;
                 }
@@ -1059,8 +1116,6 @@ bool Tracking::TrackReferenceKeyFrame()
             }
         }
     }
-
-    // cout<<"After Track Reference KeyFrame : -Front: "<<nmatches<<" Matches, -Bird: "<<nmatchesBirdMap<<" Matches in Map."<<endl;
 
 
     return nmatchesMap+nmatchesBirdMap>=10;
@@ -1143,6 +1198,13 @@ bool Tracking::TrackWithMotionModel()
     /********************* Modified Here *********************/
     if(mbHaveBirdview)
     {
+        // if(mbTcrBirdUpdated)
+        // {
+        //     mCurrentFrame.SetPose(mTcrBirdc*mBirdviewRefFrame.mTcw);
+        //     mbTcrBirdUpdated = false;
+        //     mpMapDrawer->SetCurrentCameraPose(mCurrentFrame.mTcw);
+        // }
+        // else
         {
             mCurrentFrame.SetPose(mVelocity*mLastFrame.mTcw);
             mpMapDrawer->SetCurrentCameraPose(mCurrentFrame.mTcw);
@@ -1180,28 +1242,28 @@ bool Tracking::TrackWithMotionModel()
         if(nmatchesBird<20)
         {
             fill(mCurrentFrame.mvpMapPointsBird.begin(),mCurrentFrame.mvpMapPointsBird.end(),static_cast<MapPointBird*>(NULL));
-            nmatchesBird = mpmatcherBirdview->SearchByMatchBird(mCurrentFrame,mLastFrame,30);
+            nmatchesBird = mpmatcherBirdview->SearchByMatchBird(mCurrentFrame,mLastFrame,20);
         }
+        cout<<"Track with Motion Model, "<<nmatches<<" Matches and "<<nmatchesBird<<" Birdview Matchces."<<endl;
     }
 
-    cout<<"Track with Motion Model, "<<nmatches<<" Matches and "<<nmatchesBird<<" Birdview Matchces."<<endl;
-
-    if(nmatches<20 || nmatchesBird<20)
+    if(nmatches<20)
         return false;
 
-
-    // Optimize frame pose with all matches
-    if(mbHaveBirdview)
-    {
-        Optimizer::PoseOptimizationWithBirdviewPixel(&mCurrentFrame,1.0);
+    // // Optimize frame pose with all matches
+    // if(mbHaveBirdview)
+    // {
+    //     Optimizer::PoseOptimizationWithBirdview(&mCurrentFrame);
+        // MatchAndRetriveBirdMP();
         // Optimizer::PoseOptimizationWithBirdview(&mCurrentFrame);
         // Optimizer::PoseOptimization(&mCurrentFrame);
+        // DrawMatchesInliersBird();
         // Optimizer::PoseOptimizationWithBirdview(&mCurrentFrame,&mBirdviewRefFrame);
-    }
-    else
-    {
+    // }
+    // else
+    // {
         Optimizer::PoseOptimization(&mCurrentFrame);
-    }
+    // }
     
 
     // Discard outliers
@@ -1225,220 +1287,46 @@ bool Tracking::TrackWithMotionModel()
         }
     }
 
+    cout<<"After Optimization, "<<nmatches<<" Matches and "<<nmatchesMap<<" Matches in Map."<<endl;
+
     if(mbHaveBirdview)
     {
         // Discard outliers for birdview
         // cv::Mat Twc = mCurrentFrame.mTcw.inv();
-        for(size_t k=0;k<mCurrentFrame.mvKeysBird.size();k++)
+        for(int k=0;k<mCurrentFrame.mvKeysBird.size();k++)
         {
             if(mCurrentFrame.mvpMapPointsBird[k])
             {
                 if(!mCurrentFrame.mvbBirdviewInliers[k])
                 {
+                    // cv::Mat localPos = cv::Mat(mCurrentFrame.mvKeysBirdCamXYZ[k]);
+                    // cv::Mat worldPos = Twc.rowRange(0,3).colRange(0,3)*localPos+Twc.rowRange(0,3).col(3);
+                    // MapPointBird *pMPBird = new MapPointBird(worldPos,&mCurrentFrame,mpMap,k);
+                    // mpMap->AddMapPointBird(pMPBird);
+                    // mCurrentFrame.mvpMapPointsBird[k] = pMPBird;
+
                     mCurrentFrame.mvpMapPointsBird[k] = static_cast<MapPointBird*>(NULL);
                     mCurrentFrame.mvbBirdviewInliers[k]=true;
                     nmatchesBird--;
                 }
             }
         }
-        // cout<<"After Optimization, "<<nmatchesBird<<" Birdview Matches."<<endl;    
+        cout<<"After Optimization, "<<nmatchesBird<<" Birdview Matches."<<endl;    
     }
     
-    // cout<<"Track with Motion Model, After Optimization, "<<nmatchesMap<<" Matches and "<<nmatchesBird<<" Birdview Matchces."<<endl;
+
+    if(mbOnlyTracking)
+    {
+        mbVO = nmatchesMap<10;
+        return nmatches>20;
+    }
 
     return nmatchesMap>=10;
 }
 
-bool Tracking::TrackingWithICP()
-{
-    Eigen::Matrix4f finalTransform = Eigen::Matrix4f::Identity();
-    bool isUse = GetCloudICP(finalTransform);
-    mT12b = Converter::toCVMat(finalTransform);
-    
-    if (!isUse)
-        return false;
-    
-    
-    {
-        cv::Mat encPose = GetEncoderPose();
-        cv::Mat gtPose = GetGTPose();
-        // cv::Mat birdICP = GetBirdICP();
-    }
-    
-    
-    ORBmatcher matcher(0.9,true);
-
-    UpdateLastFrame();
-
-    // cout << "Converter: \n" << Converter::toCVMat(finalTransform) << endl;
-
-    cv::Mat T12c = Frame::Tcb * mT12b * Frame::Tbc;
-
-    // cout << "T12c: \n" << T12c << endl;
-
-    mCurrentFrame.SetPose(T12c*mLastFrame.mTcw);
-
-    fill(mCurrentFrame.mvpMapPoints.begin(),mCurrentFrame.mvpMapPoints.end(),static_cast<MapPoint*>(NULL));
-    // Project points seen in previous frame
-    int th=7;
-    int nmatches = matcher.SearchByProjection(mCurrentFrame,mLastFrame,th,mSensor==System::MONOCULAR);
-    // If few matches, uses a wider window search
-    if(nmatches<20)
-    {
-        fill(mCurrentFrame.mvpMapPoints.begin(),mCurrentFrame.mvpMapPoints.end(),static_cast<MapPoint*>(NULL));
-        nmatches = matcher.SearchByProjection(mCurrentFrame,mLastFrame,2*th,mSensor==System::MONOCULAR);
-    }
-
-    // match birdview points.
-    fill(mCurrentFrame.mvpMapPointsBird.begin(),mCurrentFrame.mvpMapPointsBird.end(),static_cast<MapPointBird*>(NULL));
-    int nmatchesBird = mpmatcherBirdview->SearchByMatchBird(mCurrentFrame,mLastFrame,15);
-    if(nmatchesBird<20)
-    {
-        fill(mCurrentFrame.mvpMapPointsBird.begin(),mCurrentFrame.mvpMapPointsBird.end(),static_cast<MapPointBird*>(NULL));
-        nmatchesBird = mpmatcherBirdview->SearchByMatchBird(mCurrentFrame,mLastFrame,20);
-    }
-
-    // cout << "before ICP optimization 1 : " << " -nmatches: " << nmatches << " -nmatchesBird: " << nmatchesBird << endl;
-
-    if(nmatches<20 || nmatchesBird < 20)
-        return false;
-
-    Optimizer::PoseOptimizationWithBirdviewPixel(&mCurrentFrame,1);
-
-    // Optimizer::poseOptimizationFull(&mCurrentFrame, &mLastFrame);
-    // Optimizer::poseOptimizationWeight(&mCurrentFrame, &mLastFrame);
-    // Optimizer::poseOptimizationRotation(&mCurrentFrame, &mLastFrame);
-
-    // Discard outliers
-    int nmatchesMap = 0;
-    for(int i =0; i<mCurrentFrame.N; i++)
-    {
-        if(mCurrentFrame.mvpMapPoints[i])
-        {
-            if(mCurrentFrame.mvbOutlier[i])
-            {
-                MapPoint* pMP = mCurrentFrame.mvpMapPoints[i];
-
-                mCurrentFrame.mvpMapPoints[i]=static_cast<MapPoint*>(NULL);
-                mCurrentFrame.mvbOutlier[i]=false;
-                pMP->mbTrackInView = false;
-                pMP->mnLastFrameSeen = mCurrentFrame.mnId;
-                nmatches--;
-            }
-            else if(mCurrentFrame.mvpMapPoints[i]->Observations()>0)
-                nmatchesMap++;
-        }
-    }
-
-    for(size_t k=0;k<mCurrentFrame.mvKeysBird.size();k++)
-    {
-        if(mCurrentFrame.mvpMapPointsBird[k])
-        {
-            if(!mCurrentFrame.mvbBirdviewInliers[k])
-            {
-                mCurrentFrame.mvpMapPointsBird[k] = static_cast<MapPointBird*>(NULL);
-                mCurrentFrame.mvbBirdviewInliers[k]=true;
-                nmatchesBird--;
-            }
-        }
-    }
-
-    // cout << "after TrackingWithICP : " << " -nmatches: " << nmatches << " -nmatchesBird: " << nmatchesBird << endl;
-
-    bool isTrue = true;
-    if (nmatchesMap < 20 || nmatchesBird < 20)
-    {
-        isTrue = false;
-    }
-    
-    return isTrue;
-}
-
-bool Tracking::TrackShotTerm()
-{
-    cout << "\033[33m" << "TrackShotTerm" << "\033[0m" << endl;
-
-    ORBmatcher matcher(0.9,true);
-
-    cv::Mat T12c = Frame::Tcb * mT12b * Frame::Tbc;
-
-    mCurrentFrame.SetPose(T12c*mLastFrame.mTcw);
-
-    fill(mCurrentFrame.mvpMapPoints.begin(),mCurrentFrame.mvpMapPoints.end(),static_cast<MapPoint*>(NULL));
-    // Project points seen in previous frame
-    int th=40;
-    int nmatches = matcher.SearchByProjection(mCurrentFrame,mLastFrame,th,mSensor==System::MONOCULAR);
-    // If few matches, uses a wider window search
-    if(nmatches<20)
-    {
-        fill(mCurrentFrame.mvpMapPoints.begin(),mCurrentFrame.mvpMapPoints.end(),static_cast<MapPoint*>(NULL));
-        nmatches = matcher.SearchByProjection(mCurrentFrame,mLastFrame,2*th,mSensor==System::MONOCULAR);
-    }
-
-    // match birdview points.
-    fill(mCurrentFrame.mvpMapPointsBird.begin(),mCurrentFrame.mvpMapPointsBird.end(),static_cast<MapPointBird*>(NULL));
-    int nmatchesBird = mpmatcherBirdview->SearchByMatchBird(mCurrentFrame,mLastFrame,15);
-    if(nmatchesBird<20)
-    {
-        fill(mCurrentFrame.mvpMapPointsBird.begin(),mCurrentFrame.mvpMapPointsBird.end(),static_cast<MapPointBird*>(NULL));
-        nmatchesBird = mpmatcherBirdview->SearchByMatchBird(mCurrentFrame,mLastFrame,20);
-    }
-
-    cout << "before TrackShotTerm 1 : " << " -nmatches: " << nmatches << " -nmatchesBird: " << nmatchesBird << endl;
-
-    if(nmatches<20 || nmatchesBird < 20)
-        return false;
-
-    Optimizer::PoseOptimizationWithBirdview(&mCurrentFrame);
-
-    // Discard outliers
-    int nmatchesMap = 0;
-    for(int i =0; i<mCurrentFrame.N; i++)
-    {
-        if(mCurrentFrame.mvpMapPoints[i])
-        {
-            if(mCurrentFrame.mvbOutlier[i])
-            {
-                MapPoint* pMP = mCurrentFrame.mvpMapPoints[i];
-
-                mCurrentFrame.mvpMapPoints[i]=static_cast<MapPoint*>(NULL);
-                mCurrentFrame.mvbOutlier[i]=false;
-                pMP->mbTrackInView = false;
-                pMP->mnLastFrameSeen = mCurrentFrame.mnId;
-                nmatches--;
-            }
-            else if(mCurrentFrame.mvpMapPoints[i]->Observations()>0)
-                nmatchesMap++;
-        }
-    }
-
-    for(size_t k=0;k<mCurrentFrame.mvKeysBird.size();k++)
-    {
-        if(mCurrentFrame.mvpMapPointsBird[k])
-        {
-            if(!mCurrentFrame.mvbBirdviewInliers[k])
-            {
-                mCurrentFrame.mvpMapPointsBird[k] = static_cast<MapPointBird*>(NULL);
-                mCurrentFrame.mvbBirdviewInliers[k]=true;
-                nmatchesBird--;
-            }
-        }
-    }
-
-    cout << "after TrackShotTerm : " << " -nmatches: " << nmatches << " -nmatchesBird: " << nmatchesBird << endl;
-
-    bool isTrue = true;
-    if (nmatchesMap < 20 || nmatchesBird < 20)
-    {
-        isTrue = false;
-    }
-    
-    return isTrue;
-}
-
 bool Tracking::TrackLocalMap()
 {
-    // cout<<"Start Track Local Map."<<endl;
+    cout<<"Start Track Local Map."<<endl;
     // We have an estimation of the camera pose and some map points tracked in the frame.
     // We retrieve the local map and try to find matches to points in the local map.
 
@@ -1448,45 +1336,18 @@ bool Tracking::TrackLocalMap()
 
     // Optimize Pose
     /********************* Modified Here *********************/
-    if(mbHaveBirdview)
-    {
-        // generate more birdview mappoints
-        // MatchAndRetriveBirdMP();
-
-        if (mpReferenceKF->mnId+4 > mCurrentFrame.mnId)
-        {
-            vector<MapPointBird*> vpMapPointMatchesBird;
-            mpmatcherBirdview->SearchByMatchBird(mpReferenceKF,mCurrentFrame,vpMapPointMatchesBird,15);
-            mCurrentFrame.mvpMapPointsBird = vpMapPointMatchesBird;
-        }
-        else
-        {
-            MatchAndRetriveBirdMP();
-        }        
-
-        cv::Mat TcwB = mCurrentFrame.mTcw.clone();
-
-        cv::Mat LastTwc = cv::Mat::eye(4,4,CV_32F);
-        mLastFrame.GetRotationInverse().copyTo(LastTwc.rowRange(0,3).colRange(0,3));
-        mLastFrame.GetCameraCenter().copyTo(LastTwc.rowRange(0,3).col(3));
-        cv::Mat Tc12 = TcwB*LastTwc;
-        // cout << "before TrackMap Tc12 is: " << norm(Tc12.rowRange(0,3).col(3)) << endl;
-
-        Optimizer::PoseOptimizationWithBirdviewPixel(&mCurrentFrame,1.0);
-        // Optimizer::PoseOptimizationWithBirdview(&mCurrentFrame);
-        // Optimizer::poseOptimizationWeight(&mCurrentFrame, &mLastFrame);
-
-        cv::Mat TcwA = mCurrentFrame.mTcw.clone();
-
-        Tc12 = TcwA*LastTwc;
-        // cout << "after TrackMap Tc12 is: " << norm(Tc12.rowRange(0,3).col(3)) << endl;
-
-        // Optimizer::PoseOptimization(&mCurrentFrame);
-    }
-    else
-    {
+    // if(mbHaveBirdview)
+    // {
+    //     // generate more birdview mappoints
+    //     MatchAndRetriveBirdMP();
+    //     Optimizer::PoseOptimizationWithBirdview(&mCurrentFrame);
+    //     DrawMatchesInliersBird();
+    //     // Optimizer::PoseOptimization(&mCurrentFrame);
+    // }
+    // else
+    // {
         Optimizer::PoseOptimization(&mCurrentFrame);
-    }
+    // }
     
     
     mnMatchesInliers = 0;
@@ -1504,8 +1365,8 @@ bool Tracking::TrackLocalMap()
                     if(mCurrentFrame.mvpMapPoints[i]->Observations()>0)
                         mnMatchesInliers++;
                 }
-                // else
-                    // mnMatchesInliers++;
+                else
+                    mnMatchesInliers++;
             }
             else if(mSensor==System::STEREO)
                 mCurrentFrame.mvpMapPoints[i] = static_cast<MapPoint*>(NULL);
@@ -1513,19 +1374,25 @@ bool Tracking::TrackLocalMap()
         }
     }
 
-    // cout<<"Track Local Map, MatchesInliers = "<<mnMatchesInliers<<endl;
+    cout<<"Track Local Map, MatchesInliers = "<<mnMatchesInliers<<endl;
 
     int nMatchesInliersBird=0;
     if(mbHaveBirdview)
     { 
         // Discard outliers for birdview
         // cv::Mat Twc = mCurrentFrame.mTcw.inv();
-        for(size_t k=0;k<mCurrentFrame.mvKeysBird.size();k++)
+        for(int k=0;k<mCurrentFrame.mvKeysBird.size();k++)
         {
             if(mCurrentFrame.mvpMapPointsBird[k])
             {
                 if(!mCurrentFrame.mvbBirdviewInliers[k])
                 {
+                    // cv::Mat localPos = cv::Mat(mCurrentFrame.mvKeysBirdCamXYZ[k]);
+                    // cv::Mat worldPos = Twc.rowRange(0,3).colRange(0,3)*localPos+Twc.rowRange(0,3).col(3);
+                    // MapPointBird *pMPBird = new MapPointBird(worldPos,&mCurrentFrame,mpMap,k);
+                    // mpMap->AddMapPointBird(pMPBird);
+                    // mCurrentFrame.mvpMapPointsBird[k] = pMPBird;
+
                     mCurrentFrame.mvpMapPointsBird[k] = static_cast<MapPointBird*>(NULL);
                     mCurrentFrame.mvbBirdviewInliers[k]=true;
                 }
@@ -1536,17 +1403,17 @@ bool Tracking::TrackLocalMap()
             }
         }  
 
-        // cout<<"Track Local Map, Birdview MatchesInliers = "<<nMatchesInliersBird<<endl;
+        cout<<"Track Local Map, Birdview MatchesInliers = "<<nMatchesInliersBird<<endl;
     }
 
-    // Decide if the tracking was succesful
-    // More restrictive if there was a relocalization recently
-    if(mCurrentFrame.mnId<mnLastRelocFrameId+mMaxFrames && mnMatchesInliers+nMatchesInliersBird<50)
-        return false;
+    // // Decide if the tracking was succesful
+    // // More restrictive if there was a relocalization recently
+    // if(mCurrentFrame.mnId<mnLastRelocFrameId+mMaxFrames && mnMatchesInliers+nMatchesInliersBird<50)
+    //     return false;
 
-    if(mnMatchesInliers+nMatchesInliersBird<30)
+    if(mnMatchesInliers+nMatchesInliersBird<20)
     {
-        cout<<"Inliers less than 30 , tracking lost."<<endl;
+        cout<<"Inliers less than 20 , tracking lost. It is: "<< mnMatchesInliers+nMatchesInliersBird << endl;
         return false;
     } 
     else
@@ -1556,8 +1423,8 @@ bool Tracking::TrackLocalMap()
 
 bool Tracking::NeedNewKeyFrame()
 {
-    // if(mbOnlyTracking)
-        // return false;
+    if(mbOnlyTracking)
+        return false;
 
     // If Local Mapping is freezed by a Loop Closure do not insert keyframes
     if(mpLocalMapper->isStopped() || mpLocalMapper->stopRequested())
@@ -1602,8 +1469,8 @@ bool Tracking::NeedNewKeyFrame()
     if(nKFs<2)
         thRefRatio = 0.4f;
 
-    if(mSensor==System::MONOCULAR)
-        thRefRatio = 0.9f;
+    // if(mSensor==System::MONOCULAR)
+    //     thRefRatio = 0.9f;
 
     // Condition 1a: More than "MaxFrames" have passed from last keyframe insertion
     const bool c1a = mCurrentFrame.mnId>=mnLastKeyFrameId+mMaxFrames;
@@ -1614,7 +1481,9 @@ bool Tracking::NeedNewKeyFrame()
     // Condition 2: Few tracked points compared to reference keyframe. Lots of visual odometry compared to map matches.
     const bool c2 = ((mnMatchesInliers<nRefMatches*thRefRatio|| bNeedToInsertClose) && mnMatchesInliers>15);
 
-    if( (c1a||c1b||c1c)&&c2 )
+    // cout<<"c1a = "<<c1a<<" , c1b = "<<c1b<<" , c1c = "<<c1c<<" , c2 = "<<c2<<", result = "<<((c1a||c1b||c1c)&&c2)<<endl;
+
+    if((c1a||c1b||c1c)&&c2)
     {
         // If the mapping accepts keyframes, insert keyframe.
         // Otherwise send a signal to interrupt BA
@@ -1647,9 +1516,6 @@ void Tracking::CreateNewKeyFrame()
 
     KeyFrame* pKF = new KeyFrame(mCurrentFrame,mpMap,mpKeyFrameDB);
 
-    cv::Mat TcwKF = mpReferenceKF->GetPose();
-    DrawerVisial(TcwKF, 80, 150, 0, "KeyFrame");
-    
     mpReferenceKF = pKF;
     mCurrentFrame.mpReferenceKF = pKF;
 
@@ -1718,7 +1584,7 @@ void Tracking::CreateNewKeyFrame()
     if(mbHaveBirdview)
     {
         int nMPBird=0;
-        for(size_t k=0;k<mCurrentFrame.mvpMapPointsBird.size();k++)
+        for(int k=0;k<mCurrentFrame.mvpMapPointsBird.size();k++)
         {
             MapPointBird *pMPBird = mCurrentFrame.mvpMapPointsBird[k];
             if(pMPBird)
@@ -1730,7 +1596,7 @@ void Tracking::CreateNewKeyFrame()
                 nMPBird++;
             }
         }
-        // cout<<"Insert "<<nMPBird<<" Birdview MapPoints to Map."<<endl;
+        cout<<"Insert "<<nMPBird<<" Birdview MapPoints to Map."<<endl;
     }
 
     mpLocalMapper->InsertKeyFrame(pKF);
@@ -1743,7 +1609,7 @@ void Tracking::CreateNewKeyFrame()
 
 void Tracking::SearchLocalPoints()
 {
-    // cout<<"Start Search Local Points."<<endl;
+    cout<<"Start Search Local Points."<<endl;
     // Do not search map points already matched
     for(vector<MapPoint*>::iterator vit=mCurrentFrame.mvpMapPoints.begin(), vend=mCurrentFrame.mvpMapPoints.end(); vit!=vend; vit++)
     {
@@ -1809,7 +1675,7 @@ void Tracking::SearchLocalPoints()
 
 void Tracking::UpdateLocalMap()
 {
-    // cout<<"Start Update Local Map."<<endl;
+    cout<<"Start Update Local Map."<<endl;
     // This is for visualization
     mpMap->SetReferenceMapPoints(mvpLocalMapPoints);
 
@@ -1820,7 +1686,7 @@ void Tracking::UpdateLocalMap()
 
 void Tracking::UpdateLocalPoints()
 {
-    // cout<<"Start Update Local Point."<<endl;
+    cout<<"Start Update Local Point."<<endl;
     mvpLocalMapPoints.clear();
 
     for(vector<KeyFrame*>::const_iterator itKF=mvpLocalKeyFrames.begin(), itEndKF=mvpLocalKeyFrames.end(); itKF!=itEndKF; itKF++)
@@ -1870,7 +1736,7 @@ void Tracking::UpdateLocalPoints()
 
 void Tracking::UpdateLocalKeyFrames()
 {
-    // cout<<"Start Update Local KeyFrames."<<endl;
+    cout<<"Start Update Local KeyFrames."<<endl;
     // Each map point vote for the keyframes in which it has been observed
     map<KeyFrame*,int> keyframeCounter;
     for(int i=0; i<mCurrentFrame.N; i++)
@@ -2035,7 +1901,6 @@ void Tracking::UpdateLocalKeyFrames()
 
 bool Tracking::Relocalization()
 {
-    cout << "Relocalization:() " << endl;
     // Compute Bag of Words Vector
     mCurrentFrame.ComputeBoW();
 
@@ -2116,8 +1981,7 @@ bool Tracking::Relocalization()
             // If a Camera Pose is computed, optimize
             if(!Tcw.empty())
             {
-                mCurrentFrame.SetPose(Tcw);
-                // Tcw.copyTo(mCurrentFrame.mTcw);
+                Tcw.copyTo(mCurrentFrame.mTcw);
 
                 set<MapPoint*> sFound;
 
@@ -2288,7 +2152,7 @@ void Tracking::InformOnlyTracking(const bool &flag)
 /********************* Modified Here *********************/
 void Tracking::MatchAndRetriveBirdMP()
 {
-    // cout<<"Match and Retrive Bird MapPoint."<<endl;
+    cout<<"Match and Retrive Bird MapPoint."<<endl;
 
     mvnBirdviewMatches12.clear();
     int nmatches = mpmatcherBirdview->BirdviewMatch(mLastFrame,mCurrentFrame,mvnBirdviewMatches12,10);
@@ -2296,7 +2160,7 @@ void Tracking::MatchAndRetriveBirdMP()
     {
         nmatches = mpmatcherBirdview->BirdviewMatch(mLastFrame,mCurrentFrame,mvnBirdviewMatches12,20);
     }
-    // cout<<"Shoul be Track Map, Matched "<<nmatches<<" birdview points."<<endl;
+    cout<<"Matched "<<nmatches<<" birdview points."<<endl;
 
     cv::Mat Twc1 = Frame::InverseTransformSE3(mLastFrame.mTcw);
     cv::Mat Tb2w = Frame::Tbc*mCurrentFrame.mTcw;
@@ -2307,7 +2171,7 @@ void Tracking::MatchAndRetriveBirdMP()
     }
 
     int nMap=0;
-    for(size_t k=0;k<mvnBirdviewMatches12.size();k++)
+    for(int k=0;k<mvnBirdviewMatches12.size();k++)
     {
         int idx2 = mvnBirdviewMatches12[k];
         if(idx2<0)
@@ -2340,276 +2204,122 @@ void Tracking::MatchAndRetriveBirdMP()
             nMap++;
         }
     }
-    // cout<<"Added "<<nMap<<" map points bird"<<endl;
+    cout<<"Added "<<nMap<<" map points bird"<<endl;
 }
-
-
-cv::Mat Tracking::GetEncoderPose()
+/*
+void Tracking::MatchAndRetriveBirdMP()
 {
-    //odometer pose    
-    double x1=mLastFrame.mOdomPose[0],y1=mLastFrame.mOdomPose[1],theta1=mLastFrame.mOdomPose[2];
-    double x2=mCurrentFrame.mOdomPose[0],y2=mCurrentFrame.mOdomPose[1],theta2=mCurrentFrame.mOdomPose[2];
-
+    mvnBirdviewMatches12.clear();
+    int nmatches = mpmatcherBirdview->BirdviewMatch(mBirdviewRefFrame,mCurrentFrame,mvnBirdviewMatches12,mvPrevMatchedBirdview,75);
+    // if matches less than 30, choose a new reference frame.
+    if(nmatches<75)
     {
-        cv::Mat Tgc=(cv::Mat_<float>(4,4)<<cos(theta2),-sin(theta2),0,x2,
-                                            sin(theta2), cos(theta2),0,y2,
-                                                0,            0,      1, 0,
-                                                0,            0,      0, 1);
-        Eigen::Matrix4f Tg = Converter::toMatrix4f(Tgc);
-
-        Eigen::Affine3f vehicle_pose;
-        vehicle_pose.matrix() = Tg;
-        birdseye_odometry::SemanticPoint waypoint;
-        waypoint.x = vehicle_pose.translation()[0];
-        waypoint.y = vehicle_pose.translation()[1];
-        waypoint.z = vehicle_pose.translation()[2];
-        string waypoint_name = "encoder" + to_string(mCurrentFrame.mnId);
-        viewer_ptr_->addSphere(waypoint, 0.1, 150, 0, 150, waypoint_name);
-        viewer_ptr_->spinOnce();
-    }
-
-    //pre-integration terms
-    double theta12=theta2-theta1;
-    double x12=(x2-x1)*cos(theta1)+(y2-y1)*sin(theta1);
-    double y12=(y2-y1)*cos(theta1)-(x2-x1)*sin(theta1);
-
-    //T12
-    cv::Mat T12b=(cv::Mat_<float>(4,4)<<cos(theta12),-sin(theta12),0,x12,
-                                        sin(theta12), cos(theta12),0,y12,
-                                             0,            0,      1, 0,
-                                             0,            0,      0, 1);
-
-    return T12b.clone();
-}
-
-
-cv::Mat Tracking::GetGTPose()
-{
-    //odometer pose    
-    double x1=mLastFrame.mGtPose[0],y1=mLastFrame.mGtPose[1],theta1=mLastFrame.mGtPose[2];
-    double x2=mCurrentFrame.mGtPose[0],y2=mCurrentFrame.mGtPose[1],theta2=mCurrentFrame.mGtPose[2];
-
-    cv::Mat Tgc=(cv::Mat_<float>(4,4)<<cos(theta2),-sin(theta2),0,x2,
-                                        sin(theta2), cos(theta2),0,y2,
-                                             0,            0,      1, 0,
-                                             0,            0,      0, 1);
-    Eigen::Matrix4f Tg = Converter::toMatrix4f(Tgc);
-
-    Eigen::Affine3f vehicle_pose;
-    vehicle_pose.matrix() = Tg;
-    birdseye_odometry::SemanticPoint waypoint;
-    waypoint.x = vehicle_pose.translation()[0];
-    waypoint.y = vehicle_pose.translation()[1];
-    waypoint.z = vehicle_pose.translation()[2];
-    string waypoint_name = "groundTruth" + to_string(mCurrentFrame.mnId);
-    viewer_ptr_->addSphere(waypoint, 0.1, 0, 0, 150, waypoint_name);
-    viewer_ptr_->spinOnce();
-
-    //pre-integration terms
-    double theta12=theta2-theta1;
-    double x12=(x2-x1)*cos(theta1)+(y2-y1)*sin(theta1);
-    double y12=(y2-y1)*cos(theta1)-(x2-x1)*sin(theta1);
-
-    //T12
-    cv::Mat T12b=(cv::Mat_<float>(4,4)<<cos(theta12),-sin(theta12),0,x12,
-                                        sin(theta12), cos(theta12),0,y12,
-                                             0,            0,      1, 0,
-                                             0,            0,      0, 1);
-
-    return T12b.clone();
-}
-
-cv::Mat Tracking::GetBirdICP()
-{
-    cv::Mat T12c;
-
-    if (!mLastFrame.mTcw.empty() )
-    {
-        if (mLastFrame.mnId % 3 == 0)
+        mBirdviewRefFrame = Frame(mLastFrame);
+        mvPrevMatchedBirdview.resize(mLastFrame.mvKeysBird.size());
+        for(int k=0;k<mLastFrame.mvKeysBird.size();k++)
         {
-            mKeyBirdFrame = Frame(mLastFrame);
+            mvPrevMatchedBirdview[k]=mLastFrame.mvKeysBird[k].pt;
         }
+        mvnBirdviewMatches12.clear();
+        nmatches = mpmatcherBirdview->BirdviewMatch(mBirdviewRefFrame,mCurrentFrame,mvnBirdviewMatches12,mvPrevMatchedBirdview,75);
+        mvbMatchesInliersBird12.resize(mvnBirdviewMatches12.size(),false);
+        cout<<"Change Reference : "<<mBirdviewRefFrame.mnId<<" , "<<nmatches<<" matches."<<endl;
     }
-    
-    std::vector<int> vBirdviewMatches12(mvnBirdviewMatches12);
-    vBirdviewMatches12.clear();
-    int nmatches = mpmatcherBirdview->BirdviewMatch(mKeyBirdFrame,mCurrentFrame,vBirdviewMatches12,30);
-    
-    if (nmatches < 20)
-        return T12c.clone();
-        
-    
-    vector<Match> vMatchesBird12;
-    for(size_t k=0;k<vBirdviewMatches12.size();k++)
-    {
-        if(vBirdviewMatches12[k]>=0)
+    // select matches inliers by ICP
+    // if(mCurrentFrame.mnId-mBirdviewRefFrame.mnId>2)
+    // {
+        vector<Match> vMatchesBird;
+        for(int k=0;k<mvnBirdviewMatches12.size();k++)
         {
-            vMatchesBird12.push_back(make_pair(k,vBirdviewMatches12[k]));
+            if(mvnBirdviewMatches12[k]<0)
+                continue;
+            vMatchesBird.push_back(make_pair(k,mvnBirdviewMatches12[k]));
         }
-    }
+        vector<bool> vbMatchesInliers(vMatchesBird.size(),false);
+        cv::Mat R12,t12;
+        float score;
+        float sigma = Frame::pixel2meter;
+        mIcp->FindRtICP2D(mBirdviewRefFrame.mvKeysBirdBaseXY,mCurrentFrame.mvKeysBirdBaseXY,vMatchesBird,vbMatchesInliers,R12,t12,score,sigma);
+        mvbMatchesInliersBird12.resize(mvnBirdviewMatches12.size(),false);
+        for(int k=0;k<vMatchesBird.size();k++)
+        {
+            if(vbMatchesInliers[k])
+            {
+                int idx1 = vMatchesBird[k].first;
+                int idx2 = vMatchesBird[k].second;
+                mvbMatchesInliersBird12[idx1]=true;
+                mCurrentFrame.mvbBirdviewInliers[idx2] = true;
+            }
+        }
+        cv::Mat T12b = cv::Mat::eye(4,4,CV_32F);
+        R12.copyTo(T12b.rowRange(0,2).colRange(0,2));
+        t12.copyTo(T12b.rowRange(0,2).col(3));
+        cv::Mat T12c = Frame::Tcb*T12b*Frame::Tbc;
+        mTcrBirdc = Frame::InverseTransformSE3(T12c);
+        mbTcrBirdUpdated = true;
+        cout<<"Reference = "<<mBirdviewRefFrame.mnId<<" , Current = "<<mCurrentFrame.mnId<<" , score = "<<score<<endl;
+    // }
 
-    vector<bool> vbMatchesInliersBird;
-    cv::Mat R12,t12;
-    float score=0;
-    float sigma = 1.0*Frame::pixel2meter;
-    mIcp->FindRtICP2D(mKeyBirdFrame.mvKeysBirdBaseXY,mCurrentFrame.mvKeysBirdBaseXY,vMatchesBird12,vbMatchesInliersBird,R12,t12,score,sigma);
-
-    cv::Mat T12b = cv::Mat::eye(4,4,CV_32F);
-    R12.copyTo(T12b.rowRange(0,2).colRange(0,2));
-    t12.copyTo(T12b.rowRange(0,2).col(3));
-
-    mCurrentFrame.current_ICP2D_pose = mKeyBirdFrame.current_ICP2D_pose * T12b;
-    Eigen::Matrix4f Ticp = Converter::toMatrix4f(mCurrentFrame.current_ICP2D_pose);
-    Eigen::Affine3f vehicle_pose;
-    vehicle_pose.matrix() = Ticp;
-    birdseye_odometry::SemanticPoint waypoint;
-    waypoint.x = vehicle_pose.translation()[0];
-    waypoint.y = vehicle_pose.translation()[1];
-    waypoint.z = vehicle_pose.translation()[2];
-    string waypoint_name = "ICP2D" + to_string(mCurrentFrame.mnId);
-    viewer_ptr_->addSphere(waypoint, 0.1, 0, 150, 150, waypoint_name);
-    viewer_ptr_->spinOnce();
-   
-
-    return T12b.clone();
-}
-
-bool Tracking::GetCloudICP(Eigen::Matrix4f &finalTransform)
-{
-    Eigen::Matrix4f initTransform = localCloudPose.inverse() * mLastFrame.current_pose_;
-
-    ndt_aligner_ptr_->setInputSource(mCurrentFrame.mCloud);
-    ndt_aligner_ptr_->setInputTarget(localCloud);
-
-    birdseye_odometry::SemanticCloud::Ptr aligned_cloud(new birdseye_odometry::SemanticCloud);
-    ndt_aligner_ptr_->align(*aligned_cloud, initTransform);
-    Eigen::Matrix4f relative_pose = ndt_aligner_ptr_->getFinalTransformation();
-    double score = ndt_aligner_ptr_->getFitnessScore();
-    // cout << "score: " << score << endl;
-
-    mCurrentFrame.current_pose_ = localCloudPose * relative_pose;
-    trajectory_.push_back(mCurrentFrame.current_pose_);
-
-    Eigen::Vector3f relative_trans = relative_pose.topRightCorner(3, 1);
-    Eigen::AngleAxisf relative_rot;
-    relative_rot = Eigen::Matrix3f(relative_pose.topLeftCorner(3, 3));
-
-    Eigen::Matrix4f Tb12 = mLastFrame.current_pose_.inverse() * mCurrentFrame.current_pose_;
-    Eigen::Vector3f Tb12t = Tb12.topRightCorner(3, 1);
-    // cout << "ICP trans: " << Tb12t.norm() << endl;
-    // cout << "ICP T's trans: " << mCurrentFrame.current_pose_.topRightCorner(3, 1).norm() << endl;
-
-    // -- threshold for updating the key cloud
-    // 0.1-0.1-368
-    double key_cloud_range_threshold_ = 0.5;                // m
-    double key_cloud_angle_threshold_ = 5 / 180.0 * M_PI; // rad
-
-    if (relative_trans.norm() > key_cloud_range_threshold_ || fabs(relative_rot.angle()) > key_cloud_angle_threshold_)
+    cv::Mat Twc = Frame::InverseTransformSE3(mBirdviewRefFrame.mTcw);
+    for(int k=0;k<mvnBirdviewMatches12.size();k++)
     {
-        localCloud = mCurrentFrame.mCloud;
-        localCloudPose = mCurrentFrame.current_pose_;
-        updateKfCloud = true;
+        if(mvnBirdviewMatches12[k]<0)
+            continue;
+
+        MapPointBird *pMPBird=NULL;
+
+        if(mBirdviewRefFrame.mvpMapPointsBird[k])
+        {
+            pMPBird = mBirdviewRefFrame.mvpMapPointsBird[k];
+        }
+        else
+        {
+            if(mvbMatchesInliersBird12[k])
+            {
+                cv::Mat localPos(mBirdviewRefFrame.mvKeysBirdCamXYZ[k]);
+                cv::Mat worldPos = Twc.rowRange(0,3).colRange(0,3)*localPos+Twc.rowRange(0,3).col(3);
+                pMPBird = new MapPointBird(worldPos,&mCurrentFrame,mpMap,mvnBirdviewMatches12[k]);
+                mBirdviewRefFrame.mvpMapPointsBird[k] = pMPBird;
+            }  
+        }
+
+        mCurrentFrame.mvpMapPointsBird[mvnBirdviewMatches12[k]] = pMPBird;
+
+        mpMap->AddMapPointBird(pMPBird);
     }
-    else
-    {
-        updateKfCloud = false;
-    }
-        
 
-    {    
-        // -- local
-        //---- convert to map frame
-
-        // SemanticCloud::Ptr local_cloud_in_map(new SemanticCloud);
-        // pcl::transformPointCloud(*localCloud, *local_cloud_in_map, localCloudPose);
-
-        // pcl::visualization::PointCloudColorHandlerCustom<SemanticPoint>
-        //     local_handler(local_cloud_in_map, 255, 255, 255);
-        // string cloud_name = "cloud" + to_string(mCurrentFrame.mnId);
-        // viewer_ptr_->addPointCloud(local_cloud_in_map, cloud_name);
-            
-        // -- vehicle model
-        Eigen::Affine3f vehicle_pose;
-        vehicle_pose.matrix() = trajectory_.back();
-        // viewer_ptr_->updateShapePose("vehicle", vehicle_pose);
-        // viewer_ptr_->updateCoordinateSystemPose("vehicle_frame", vehicle_pose);
-
-        // -- trajectory
-        birdseye_odometry::SemanticPoint waypoint;
-        waypoint.x = vehicle_pose.translation()[0];
-        waypoint.y = vehicle_pose.translation()[1];
-        waypoint.z = vehicle_pose.translation()[2];
-        string waypoint_name = "waypoint" + to_string(trajectory_.size());
-        viewer_ptr_->addSphere(waypoint, 0.1, 150, 0, 0, waypoint_name);
-
-        viewer_ptr_->spinOnce();
-    }    
-       
-    finalTransform = mCurrentFrame.current_pose_.inverse() * mLastFrame.current_pose_;  // check right
-
-    if (score > 0.35)
-        return false;
-    else
-        return true;
+    DrawMatchesInliersBird();
 }
-
-void Tracking::DrawerVisial(cv::Mat &Tcw, double r, double g, double b, string name)
+*/
+void Tracking::DrawMatchesInliersBird()
 {
-    if (!Tcw.empty())
-    {        
-        cv::Mat Rwc = Tcw.rowRange(0,3).colRange(0,3).t(); // checked right
-        cv::Mat twc = -Rwc*Tcw.rowRange(0,3).col(3);
-        cv::Mat Twc = cv::Mat::eye(4,4,CV_32F);
-        Rwc.copyTo(Twc.rowRange(0,3).colRange(0,3));
-        twc.copyTo(Twc.rowRange(0,3).col(3));
-        cv::Mat T_b_wb = Frame::Tbc * Twc * Frame::Tcb;
-        Eigen::Matrix4f Tc = Converter::toMatrix4f(T_b_wb);
-
-        Eigen::Affine3f vehicle_pose;
-        vehicle_pose.matrix() = Tc;
-        birdseye_odometry::SemanticPoint waypoint;
-        waypoint.x = vehicle_pose.translation()[0];
-        waypoint.y = vehicle_pose.translation()[1];
-        waypoint.z = vehicle_pose.translation()[2];
-        string waypoint_name = name + to_string(mCurrentFrame.mnId);
-        viewer_ptr_->addSphere(waypoint, 0.1, r, g, b, waypoint_name);
-        // viewer_ptr_->spinOnce();
-        
-    }
-}
-
-void Tracking::GetMatchesInliersBird(vector<cv::DMatch> &vMatchesInliers12)
-{
-    vMatchesInliers12.clear();
-    
-    for(int k=0, kend = mvnBirdviewMatches12.size();k<kend;k++)
+    // draw matches
+    cv::Mat matchesImg,matchesinliersImg;
+    vector<cv::DMatch> vMatches12,vMatchesInliers12;
+    for(int k=0;k<mvnBirdviewMatches12.size();k++)
     {
         int idx2 = mvnBirdviewMatches12[k];
         if(idx2<0)
         {
             continue;
         }
-        
+        cv::Mat d1 =  mLastFrame.mDescriptorsBird.row(k);
+        cv::Mat d2 =  mCurrentFrame.mDescriptorsBird.row(idx2);
+        int distance = mpmatcherBirdview->DescriptorDistance(d1,d2);
+        vMatches12.push_back(cv::DMatch(k,idx2,distance));
         if(mCurrentFrame.mvbBirdviewInliers[idx2])
         {
-            if (k >= mLastFrame.mDescriptorsBird.rows)
-            {
-                cout << "k: " << k << " -mLastFrame.mDescriptorsBird.rows: " << mLastFrame.mDescriptorsBird.rows << " - mLastFrame.mvKeysBird: " << mLastFrame.mvKeysBird.size() << endl;
-                continue;
-            }
-            
-            if (idx2 >= mCurrentFrame.mDescriptorsBird.rows)
-            {
-                cout << "idx2: " << idx2 << " -mCurrentFrame.mDescriptorsBird.rows: " << mCurrentFrame.mDescriptorsBird.rows << " - mCurrentFrame.mvKeysBird: " << mCurrentFrame.mvKeysBird.size() << endl;
-                continue;
-            }
-
-            cv::Mat d1 =  mLastFrame.mDescriptorsBird.row(k);
-            cv::Mat d2 =  mCurrentFrame.mDescriptorsBird.row(idx2);
-            int distance = mpmatcherBirdview->DescriptorDistance(d1,d2);
             vMatchesInliers12.push_back(cv::DMatch(k,idx2,distance));
         }
     }
+    // cv::drawMatches(mLastFrame.mBirdviewImg,mLastFrame.mvKeysBird,mCurrentFrame.mBirdviewImg,mCurrentFrame.mvKeysBird,
+    //         vMatches12,matchesImg,cv::Scalar::all(-1),cv::Scalar::all(-1),std::vector<char>(),cv::DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS);
+    // cv::drawMatches(mLastFrame.mBirdviewImg,mLastFrame.mvKeysBird,mCurrentFrame.mBirdviewImg,mCurrentFrame.mvKeysBird,
+    //         vMatchesInliers12,matchesinliersImg,cv::Scalar::all(-1),cv::Scalar::all(-1),std::vector<char>(),cv::DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS);
+    // // cout<<"Matches between "<<mBirdviewRefFrame.mnId<<" and "<<mCurrentFrame.mnId<<endl; 
+    // cout<<vMatches12.size()<<" matches, "<<vMatchesInliers12.size()<<" inliers."<<endl; 
+    // cv::imshow("birdview matches",matchesImg);
+    // cv::imshow("birdview matches inliers",matchesinliersImg);
 }
 
 } //namespace ORB_SLAM

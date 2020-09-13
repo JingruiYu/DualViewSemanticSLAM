@@ -31,18 +31,8 @@
 #include "ORBextractor.h"
 /********************* Modified Here *********************/
 #include "MapPointBird.h"
-#include "simple_birdseye_odometer.h"
 
-#include<iostream>
 #include <opencv2/opencv.hpp>
-#include <pcl/filters/voxel_grid.h>
-#include <pcl/io/ply_io.h>
-#include <pcl/kdtree/kdtree_flann.h>
-#include <pcl/point_types.h>
-#include <pcl/point_types_conversion.h>
-#include <pcl/visualization/pcl_visualizer.h>
-
-using namespace std;
 
 namespace ORB_SLAM2
 {
@@ -73,8 +63,6 @@ public:
     /********************* Modified Here *********************/
     // Constructor for Monocular cameras with birdview.
     Frame(const cv::Mat &imGray, const cv::Mat &birdviewGray, const cv::Mat &birdviewMask, const double &timeStamp, ORBextractor* extractor,ORBVocabulary* voc, cv::Mat &K, cv::Mat &distCoef, const float &bf, const float &thDepth);
-    // for contour
-    Frame(const cv::Mat &imGray, const cv::Mat &birdviewGray, const cv::Mat &birdICP, const cv::Mat &birdviewMask, const cv::Mat &birdviewContour, const cv::Vec3d gtPose, const cv::Vec3d odomPose, const double &timeStamp, ORBextractor* extractor,ORBVocabulary* voc, cv::Mat &K, cv::Mat &distCoef, const float &bf, const float &thDepth);
 
     // Extract ORB on the image. 0 for left image and 1 for right image.
     void ExtractORB(int flag, const cv::Mat &im);
@@ -127,12 +115,6 @@ public:
     static cv::Point2f ProjectXYZ2Birdview(const cv::Point3f &p);
     static cv::Point3f TransformPoint3fWithMat(cv::Mat T, cv::Point3f p);
     static cv::Mat InverseTransformSE3(cv::Mat T12);
-    // for contour
-    void getContourPixels();
-    void getICPEdges();
-
-    static cv::Mat GetTransformFromOdometer(const cv::Vec3d &odomPose1, const cv::Vec3d &odomPose2);
-    static cv::Mat GetTransformFromICP(Eigen::Matrix4f &ICPPose1, Eigen::Matrix4f &ICPPose2);
 
 public:
     // Vocabulary used for relocalization.
@@ -155,7 +137,7 @@ public:
     cv::Mat mDistCoef;
     /********************* Modified Here *********************/
     //front camera - odometer extrinsics
-    static cv::Mat Tbc,Tcb,Rro,tro,Ror,tor;
+    static cv::Mat Tbc,Tcb;
 
     // Stereo baseline multiplied by fx.
     float mbf;
@@ -202,11 +184,8 @@ public:
     static const double vehicle_length;
     static const double vehicle_width;
     // birdview images
-    cv::Mat mBirdICP;
     cv::Mat mBirdviewImg;
     cv::Mat mBirdviewMask;
-    // for contour
-    cv::Mat mBirdviewContour;
 
     // Corresponding stereo coordinate and depth for each keypoint.
     // "Monocular" keypoints have a negative value.
@@ -216,8 +195,6 @@ public:
     // Bag of Words Vector structures.
     DBoW2::BowVector mBowVec;
     DBoW2::FeatureVector mFeatVec;
-    DBoW2::BowVector mBowVecBrid;
-    DBoW2::FeatureVector mFeatVecBrid;
 
     // ORB descriptor, each row associated to a keypoint.
     cv::Mat mDescriptors, mDescriptorsRight;
@@ -239,8 +216,6 @@ public:
     static float mfGridElementHeightInvBirdview;
     std::vector<std::size_t> mGridBirdview[FRAME_GRID_COLS][FRAME_GRID_ROWS];
 
-    cv::Vec3d mGtPose;
-    cv::Vec3d mOdomPose;
     // Camera pose.
     cv::Mat mTcw;
 
@@ -267,14 +242,8 @@ public:
     static float mnMaxY;
 
     static bool mbInitialComputations;
-    // for contour
-    vector<cv::Mat> mvMeasurement_p;
-    vector<float> mvMeasurement_g;
 
-    // pcl::PointCloud<pcl::PointXYZ>::Ptr mCloud;
-    birdseye_odometry::SemanticCloud::Ptr mCloud;
-    Eigen::Matrix4f current_pose_;
-    cv::Mat current_ICP2D_pose;
+
 private:
 
     // Undistort keypoints given OpenCV distortion parameters.

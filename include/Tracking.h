@@ -24,15 +24,6 @@
 
 #include<opencv2/core/core.hpp>
 #include<opencv2/features2d/features2d.hpp>
-#include <pcl/filters/voxel_grid.h>
-#include <pcl/io/ply_io.h>
-#include <pcl/kdtree/kdtree_flann.h>
-#include <pcl/point_types.h>
-#include <pcl/point_types_conversion.h>
-#include <pcl/visualization/pcl_visualizer.h>
-#include <pclomp/ndt_omp.h>
-#include <pcl/io/pcd_io.h>
-#include <pcl/registration/icp.h>
 
 #include"Viewer.h"
 #include"FrameDrawer.h"
@@ -48,11 +39,9 @@
 #include "MapDrawer.h"
 #include "System.h"
 #include "IcpSolver.h"
-#include "simple_birdseye_odometer.h"
 
 #include <mutex>
 #include <unistd.h>
-#include <fstream>
 
 namespace ORB_SLAM2
 {
@@ -77,7 +66,6 @@ public:
     cv::Mat GrabImageMonocular(const cv::Mat &im, const double &timestamp);
     /********************* Modified Here *********************/
     cv::Mat GrabImageMonocularWithBirdview(const cv::Mat &im, const cv::Mat &birdview, const cv::Mat &birdviewmask, const double &timestamp);
-    cv::Mat GrabImageMonocularWithBirdviewSem(const cv::Mat &im, const cv::Mat &birdview, const cv::Mat &birdviewmask, const cv::Mat &birdviewContour, const cv::Mat &birdviewContourICP, const double &timestamp, cv::Vec3d gtPose, cv::Vec3d odomPose);
 
     void SetLocalMapper(LocalMapping* pLocalMapper);
     void SetLoopClosing(LoopClosing* pLoopClosing);
@@ -91,14 +79,6 @@ public:
     // Use this function if you have deactivated local mapping and you only want to localize the camera.
     void InformOnlyTracking(const bool &flag);
 
-    void DrawerBirdPoint();
-    void DrawerBirdPointGT(const cv::Mat &Twb);
-
-    void computerReprojectError(vector<cv::DMatch> &vMatchesInliers12);
-    cv::Mat Tcw2Twb(cv::Mat &Tcw);
-    cv::Mat deltaTwb(cv::Mat &TwbR, cv::Mat &TwbC);
-    void DrawerMatchCloud(vector<cv::DMatch> &vMatchesInliers12);
-    void changeRT();
 
 public:
 
@@ -114,19 +94,15 @@ public:
     eTrackingState mState;
     eTrackingState mLastProcessedState;
 
-    ofstream unCloosingKFPose;
     // Input sensor
     int mSensor;
 
     // Current Frame
     Frame mCurrentFrame;
-    Frame mLastFrame;
-    Frame mKeyBirdFrame;
     cv::Mat mImGray;
     /********************* Modified Here *********************/
     typedef pair<int,int> Match;
     cv::Mat mBirdviewGray;
-    cv::Mat mBirdICP;
     cv::Mat mTcrBirdc;
     bool mbTcrBirdUpdated=false;
     bool mbHaveBirdview=false;
@@ -157,23 +133,10 @@ public:
     list<double> mlFrameTimes;
     list<bool> mlbLost;
 
-    pclomp::NormalDistributionsTransform<birdseye_odometry::SemanticPoint, birdseye_odometry::SemanticPoint>::Ptr ndt_aligner_ptr_;
-    std::vector<Eigen::Matrix4f> trajectory_;
-    // viewer
-    pcl::visualization::PCLVisualizer::Ptr viewer_ptr_;
-    pcl::visualization::PCLVisualizer::Ptr Twc_ptr_;
-    pcl::visualization::PCLVisualizer::Ptr Cloud_ptr_;
-    bool updateKfCloud;
-    birdseye_odometry::SemanticCloud::Ptr localCloud;
-    Eigen::Matrix4f localCloudPose;
-
     // True if local mapping is deactivated and we are performing only localization
     bool mbOnlyTracking;
 
     void Reset();
-
-    void GetMatchesInliersBird(vector<cv::DMatch> &vMatchesInliers12);
-    void DrawerVisial(cv::Mat &Tcw, double r, double g, double d, string name);
 
 protected:
 
@@ -184,19 +147,15 @@ protected:
     void StereoInitialization();
 
     // Map initialization for monocular
-    void MonocularInitialization(bool mSemDirect);
+    void MonocularInitialization();
     void CreateInitialMapMonocular();
-    bool CreateReInitialMap(vector<int> &ReMatches, vector<int> &ReBirdviewMatches, vector<bool> &ReMatchesInliersBird12);
 
     void CheckReplacedInLastFrame();
     bool TrackReferenceKeyFrame();
     void UpdateLastFrame();
     bool TrackWithMotionModel();
-    bool TrackingWithICP();
-    bool TrackShotTerm();
 
     bool Relocalization();
-    bool ReInitiation();
 
     void UpdateLocalMap();
     void UpdateLocalPoints();
@@ -210,11 +169,7 @@ protected:
 
     /********************* Modified Here *********************/
     void MatchAndRetriveBirdMP();
-    cv::Mat GetEncoderPose();
-    cv::Mat GetGTPose();
-    cv::Mat GetBirdICP();
-    bool GetCloudICP(Eigen::Matrix4f &finalTransform);
-    
+    void DrawMatchesInliersBird();
 
     // In case of performing only localization, this flag is true when there are no matches to
     // points in the map. Still tracking will continue if there are enough matches with temporal points.
@@ -249,7 +204,6 @@ protected:
     Viewer* mpViewer;
     FrameDrawer* mpFrameDrawer;
     MapDrawer* mpMapDrawer;
-    pcl::visualization::PCLVisualizer vis;
 
     //Map
     Map* mpMap;
@@ -276,14 +230,12 @@ protected:
 
     //Last Frame, KeyFrame and Relocalisation Info
     KeyFrame* mpLastKeyFrame;
+    Frame mLastFrame;
     unsigned int mnLastKeyFrameId;
     unsigned int mnLastRelocFrameId;
 
     //Motion Model
     cv::Mat mVelocity;
-    cv::Mat mT12b;
-    cv::Mat mVisOnlyTrackTcw;
-    cv::Mat mAfterMapTcw;
 
     //Color order (true RGB, false BGR, ignored if grayscale)
     bool mbRGB;

@@ -131,17 +131,11 @@ void Viewer::Run()
             mpMapDrawer->DrawKeyFrames(menuShowKeyFrames,menuShowGraph);
         if(menuShowPoints)
             mpMapDrawer->DrawMapPoints();
-        if (0)
-            mpMapDrawer->DrawCloud();
-        
+
         pangolin::FinishFrame();
 
         cv::Mat im = mpFrameDrawer->DrawFrame();
-        cv::Mat bIm = mpFrameDrawer->DrawBird();
-        cv::Mat icpMat = mpFrameDrawer->DrawBirdIcp();
         cv::imshow("ORB-SLAM2: Current Frame",im);
-        cv::imshow("Birdview Frame",bIm);
-        cv::imshow("Birdview icpMat",icpMat);
         cv::waitKey(mT);
 
         if(menuReset)

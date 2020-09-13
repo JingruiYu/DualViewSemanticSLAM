@@ -334,59 +334,6 @@ cv::Mat System::TrackMonocularWithBirdview(const cv::Mat &im, const cv::Mat &bir
     return Tcw;
 }
 
-cv::Mat System::TrackMonocularWithBirdviewSem(const cv::Mat &im, const cv::Mat &birdview, const cv::Mat &birdviewmask, const cv::Mat &birdviewContour, const cv::Mat &birdviewContourICP, cv::Vec3d gtPose, cv::Vec3d odomPose, const double &timestamp)
-{
-    if(mSensor!=MONOCULAR)
-    {
-        cerr << "ERROR: you called TrackMonocularWithOdom but input sensor was not set to Monocular." << endl;
-        exit(-1);
-    }
-
-    // Check mode change
-    {
-        unique_lock<mutex> lock(mMutexMode);
-        if(mbActivateLocalizationMode)
-        {
-            mpLocalMapper->RequestStop();
-
-            // Wait until Local Mapping has effectively stopped
-            while(!mpLocalMapper->isStopped())
-            {
-                usleep(1000);
-            }
-
-            mpTracker->InformOnlyTracking(true);
-            mbActivateLocalizationMode = false;
-        }
-        if(mbDeactivateLocalizationMode)
-        {
-            mpTracker->InformOnlyTracking(false);
-            mpLocalMapper->Release();
-            mbDeactivateLocalizationMode = false;
-        }
-    }
-
-    // Check reset
-    {
-        unique_lock<mutex> lock(mMutexReset);
-        if(mbReset)
-        {
-            mpTracker->Reset();
-            mbReset = false;
-        }
-    }
-
-    //cv::Mat Tcw = mpTracker->GrabImageMonocular(im,timestamp);
-    cv::Mat Tcw = mpTracker->GrabImageMonocularWithBirdviewSem(im, birdview, birdviewmask, birdviewContour, birdviewContourICP, timestamp, gtPose, odomPose);
-
-    unique_lock<mutex> lock2(mMutexState);
-    mTrackingState = mpTracker->mState;
-    mTrackedMapPoints = mpTracker->mCurrentFrame.mvpMapPoints;
-    mTrackedKeyPointsUn = mpTracker->mCurrentFrame.mvKeysUn;
-
-    return Tcw;
-}
-
 void System::ActivateLocalizationMode()
 {
     unique_lock<mutex> lock(mMutexMode);
@@ -442,6 +389,11 @@ void System::Shutdown()
 void System::SaveTrajectoryTUM(const string &filename)
 {
     cout << endl << "Saving camera trajectory to " << filename << " ..." << endl;
+    if(mSensor==MONOCULAR)
+    {
+        cerr << "ERROR: SaveTrajectoryTUM cannot be used for monocular." << endl;
+        return;
+    }
 
     vector<KeyFrame*> vpKFs = mpMap->GetAllKeyFrames();
     sort(vpKFs.begin(),vpKFs.end(),KeyFrame::lId);
@@ -592,12 +544,11 @@ void System::SaveKeyFrameTrajectoryOdomTUM(const string &filename)
     cout << endl << "Saving keyframe trajectory to " << filename << " ..." << endl;
 
     vector<KeyFrame*> vpKFs = mpMap->GetAllKeyFrames();
-    cout << "vpKFs.size(): " << vpKFs.size() << endl;
     sort(vpKFs.begin(),vpKFs.end(),KeyFrame::lId);
 
     // Transform all keyframes so that the first keyframe is at the origin.
     // After a loop closure the first keyframe might not be at the origin.
-    cv::Mat Two = vpKFs[0]->GetPoseInverse()*Frame::Tcb; //check right
+    cv::Mat Two = vpKFs[0]->GetPoseInverse()*Frame::Tcb;
     cout<<"Two = "<<endl<<Two<<endl;
     cout<<"extrinsics : Tbc = "<<endl<<Frame::Tbc<<endl;
 

@@ -74,7 +74,15 @@ private:
     void DecomposeE(const cv::Mat &E, cv::Mat &R1, cv::Mat &R2, cv::Mat &t);
 
     /********************* Modified Here *********************/
-
+    // bool ComputeRtICP(const vector<cv::Point3f> &vP1, const vector<cv::Point3f> &vP2, cv::Mat &R, cv::Mat &t);
+    // bool ComputeRtICP2D(const vector<cv::Point2f> &vP1, const vector<cv::Point2f> &vP2, cv::Mat &R, cv::Mat &t);
+    // int CheckRtICP(const cv::Mat &R, const cv::Mat &t, const vector<cv::Point3f> &vP3D1, const vector<cv::Point3f> &vP3D2,
+    //                     const vector<Match> &vMatches12, vector<bool> &vbMatchesInliers, float sigma);
+    // int CheckRtICP2D(const cv::Mat &R, const cv::Mat &t, const vector<cv::Point2f> &vP2D1, const vector<cv::Point2f> &vP2D2,
+    //                     const vector<Match> &vMatches12, vector<bool> &vbMatchesInliers, float sigma);
+    // void FindRtICP(vector<bool> &vbMatchesInliers, float &score, cv::Mat &R, cv::Mat &t);
+    // void FindRtICP2D(vector<bool> &vbMatchesInliers, float &score, cv::Mat &R, cv::Mat &t);
+    
     vector<cv::Point3f> mvKeysXYZBird1, mvKeysXYZBird2;
     vector<cv::Point2f> mvKeysXYBird1, mvKeysXYBird2;
     vector<cv::KeyPoint> mvKeysBird1,mvkeysBird2;

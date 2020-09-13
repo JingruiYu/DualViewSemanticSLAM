@@ -67,7 +67,7 @@ bool Initializer::Initialize(const Frame &CurrentFrame, const vector<int> &vMatc
     mvKeysXYBird2 = CurrentFrame.mvKeysBirdBaseXY;
     mvkeysBird2 = CurrentFrame.mvKeysBird;
     mvMatchesBird12.clear();
-    for(size_t k=0;k<vMatchesBird12.size();k++)
+    for(int k=0;k<vMatchesBird12.size();k++)
     {
         if(vMatchesBird12[k]>=0)
         {
@@ -518,51 +518,57 @@ bool Initializer::ReconstructF(vector<bool> &vbMatchesInliers, cv::Mat &F21, cv:
     // find another R,t by ICP in birdview
     // FindRtICP2D(vbMatchesInliersBird,score,R12,t12);
     mIcp.FindRtICP2D(mvKeysXYBird1,mvKeysXYBird2,mvMatchesBird12,vbMatchesInliersBird,R12,t12,score,sigma);
-    
-
-
-    double x1=mRefFrame.mOdomPose[0],y1=mRefFrame.mOdomPose[1],theta1=mRefFrame.mOdomPose[2];
-    double x2=mCurFrame.mOdomPose[0],y2=mCurFrame.mOdomPose[1],theta2=mCurFrame.mOdomPose[2];
-
-    //pre-integration terms
-    double theta12=theta2-theta1;
-    double x12=(x2-x1)*cos(theta1)+(y2-y1)*sin(theta1);
-    double y12=(y2-y1)*cos(theta1)-(x2-x1)*sin(theta1);
-
-    //T12
-    cv::Mat EncoderT12b=(cv::Mat_<float>(4,4)<<cos(theta12),-sin(theta12),0,x12,
-                                                sin(theta12), cos(theta12),0,y12,
-                                                    0,            0,      1, 0,
-                                                    0,            0,      0, 1);
-
-
-    
     cout<<"Current ICP 2D Score = "<<score<<endl;
     cout<<"R = "<<endl<<R12<<endl<<"t = "<<t12.t()<<endl;
 
     //save ICP 2D results
     file<<setprecision(6)<<mRefFrame.mTimeStamp<<" "<<mCurFrame.mTimeStamp<<" "<<t12.t()<<" "<<atan2(R12.at<float>(0,1),R12.at<float>(0,0))<<endl;
 
-    // if(norm(t12)<0.3)
+
+    // // draw matches
+    // cv::Mat matchesImg;
+    // vector<cv::DMatch> vMatches12;
+    // ORBmatcher matcher(0.99,true);
+    // cout<<"Match size = "<<vbMatchesInliersBird.size()<<endl;
+    // for(int k=0;k<mvMatchesBird12.size();k++)
     // {
-    //     cout<<"t12<0.1 :- "<< norm(t12) <<endl;
-    //     return false;
+    //     if(!vbMatchesInliersBird[k])
+    //         continue;
+    //     int idx1 = mvMatchesBird12[k].first;
+    //     int idx2 = mvMatchesBird12[k].second;
+    //     cv::Mat d1 =  mRefFrame.mDescriptorsBird.row(idx1);
+    //     cv::Mat d2 =  mCurFrame.mDescriptorsBird.row(idx2);
+    //     int distance = matcher.DescriptorDistance(d1,d2);
+    //     vMatches12.push_back(cv::DMatch(idx1,idx2,distance));
     // }
+    // cout<<"Inlier size = "<<vMatches12.size()<<"/"<<mvMatchesBird12.size()<<endl;
+    // cv::drawMatches(mRefFrame.mBirdviewImg,mvKeysBird1,mCurFrame.mBirdviewImg,mvkeysBird2,
+    //         vMatches12,matchesImg,cv::Scalar::all(-1),cv::Scalar::all(-1),std::vector<char>(),cv::DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS);
+    // cv::imshow("matches inliers inside",matchesImg);
+    // cv::waitKey(0);
+
+    if(norm(t12)<0.3)
+    {
+        cout<<"t12<0.3"<<endl;
+        return false;
+    }
     
+    // cv::Mat R123D,t123D;
+    // vector<bool> vbMatchesInliersBird3D;
+    // mIcp.FindRtICP(mvKeysXYZBird1,mvKeysXYZBird2,mvMatchesBird12,vbMatchesInliersBird3D,R123D,t123D,score,sigma);
+    // cout<<"Current ICP Score = "<<score<<endl;
+    // cv::Mat R213D = R123D.t();
+    // cv::Mat t213D = -R213D*t123D;
+
     cv::Mat T12b = cv::Mat::eye(4,4,CV_32F);
-
-    // EncoderT12b.rowRange(0,3).colRange(0,3).copyTo(T12b.rowRange(0,3).colRange(0,3));
-    // EncoderT12b.rowRange(0,3).col(3).copyTo(T12b.rowRange(0,3).col(3));
-
     R12.copyTo(T12b.rowRange(0,2).colRange(0,2));
     t12.copyTo(T12b.rowRange(0,2).col(3));
-
-    cv::Mat T12c = Frame::Tcb*T12b*Frame::Tbc; // check right
+    cv::Mat T12c = Frame::Tcb*T12b*Frame::Tbc;
     R12 = T12c.rowRange(0,3).colRange(0,3);
     t12 = T12c.rowRange(0,3).col(3);
     // fill in matches inliers
     mvbMatchesInliersBird12 = vector<bool>(mvKeysBird1.size(),false);
-    for(size_t k=0;k<mvMatchesBird12.size();k++)
+    for(int k=0;k<mvMatchesBird12.size();k++)
     {
         if(!vbMatchesInliersBird[k])
             continue;
@@ -576,24 +582,58 @@ bool Initializer::ReconstructF(vector<bool> &vbMatchesInliers, cv::Mat &F21, cv:
     // project the length of t_icp to t
     cout<<"t = "<<t.t()<<" , length = "<<norm(t)<<endl;
     cout<<"t_icp = "<<t_icp.t()<<" , length = "<<norm(t_icp)<<endl;
-    cout<<"t.dot(t_icp) = "<<" , length = "<<t.dot(t_icp)<<endl;
-    
-    if (norm(t_icp) < 0.6)
-    {
-        cout << "mRefFrame.mnId: " << mRefFrame.mnId << endl;
-        cout << "mCurFrame.mnId: " << mCurFrame.mnId << endl;
-        cout << "return 1.0 ?????????????????????????????????????" << norm(t_icp) << endl;
-        return false;
-    }
-    
+    cout<<"dot(t,t_icp) = "<<t.dot(t_icp)<<endl;
     // cout<<"difference between R1 and R3 = "<<norm(R1*R3.t()-cv::Mat::eye(3,3,CV_32F))<<endl;
     // cout<<"difference between R2 and R3 = "<<norm(R2*R3.t()-cv::Mat::eye(3,3,CV_32F))<<endl;
     cout<<"difference between R1 and R3 = "<<((cv::trace(R1*R3.t()).val[0]-1)/2)<<endl;
     cout<<"difference between R2 and R3 = "<<((cv::trace(R2*R3.t()).val[0]-1)/2)<<endl;
     t = t/norm(t);
-    // t = 0.29*t;
-    t = norm(t_icp)*t;
-    // t = t.dot(t_icp)*t;
+    t = t.dot(t_icp)*t;
+
+
+    // // find homography using birdview points
+    // vector<cv::Point2f> vKeysBird1,vKeysBird2;
+    // for(int k=0;k<mvMatchesBird12.size();k++)
+    // {
+    //     vKeysBird1.push_back(mvKeysBird1[mvMatchesBird12[k].first].pt);
+    //     vKeysBird2.push_back(mvkeysBird2[mvMatchesBird12[k].second].pt);
+    // }
+    // std::vector<uchar> inliersMask(mvMatchesBird12.size());
+    // cv::Mat H21bird = cv::findHomography(vKeysBird1,vKeysBird2,cv::RANSAC,3.0,inliersMask);
+    // cv::Mat invH = H21bird.inv();
+    // int good=0;
+    // for(int k=0;k<inliersMask.size();k++)
+    // {
+    //     if(inliersMask[k])
+    //     {
+    //         good++;
+    //     }
+    // }
+    // cout<<"Homography : "<<inliersMask.size()<<" matches, "<<good<<" inliers."<<endl;
+    // cv::Point2f Ob1,Ob2;
+    // vector<cv::Point2f> vOb1,vOb2;
+    // Ob1.x = Frame::birdviewCols / 2;
+    // Ob1.y = Frame::birdviewRows / 2 + Frame::rear_axle_to_center / Frame::pixel2meter;
+    // vOb1.push_back(Ob1);
+    // cv::perspectiveTransform(vOb1,vOb2,invH);
+    // Ob2 = vOb2[0];
+    // cout<<"Ob1 = "<<Ob1.x<<" "<<Ob1.y<<endl;
+    // cout<<"Ob2 = "<<Ob2.x<<" "<<Ob2.y<<endl;
+    // cv::Point2f dt;
+    // dt.x = (Ob1.y-Ob2.y)*Frame::pixel2meter;
+    // dt.y = (Ob1.x-Ob2.x)*Frame::pixel2meter;
+    // double dth = atan2(H21bird.at<double>(0, 1), H21bird.at<double>(0, 0));
+    // cv::Mat T12b = (cv::Mat_<float>(4,4)<<cos(dth),-sin(dth),0,dt.x,
+    //                                       sin(dth), cos(dth),0,dt.y,
+    //                                         0,        0,    1,  0,
+    //                                         0,        0,    0,  1);
+    // cv::Mat T21c = Frame::Tcb*T12b.inv()*Frame::Tbc;
+    // cv::Mat R3 = T21c.rowRange(0,3).colRange(0,3);
+    // cv::Mat t_bird = T21c.rowRange(0,3).col(3);
+    // t = t/norm(t);
+    // t = t.dot(t_bird)*t;
+    // cout<<"translation = "<<dt.x<<" "<<dt.y<<" , rotation = "<<dth<<endl;
+
 
     cv::Mat t1=t;
     cv::Mat t2=-t;
@@ -642,13 +682,13 @@ bool Initializer::ReconstructF(vector<bool> &vbMatchesInliers, cv::Mat &F21, cv:
     // If there is not a clear winner or not enough triangulated points reject initialization
     if(max(maxGood,maxGoodBird)<nMinGood || nsimilar>1||nsimilarBird>1)
     {
-        cout<<"maxGood = "<<maxGood<<" , nMinGood = "<<nMinGood<<" , nsimilar = "<<nsimilar<<endl;
+        // cout<<"maxGood = "<<maxGood<<" , nMinGood = "<<nMinGood<<" , nsimilar = "<<nsimilar<<endl;
         return false;
     }
 
 
     maxGood = max(maxGood,maxGoodBird);
-    bool isTrue = false;
+
     // If best reconstruction has enough parallax initialize
     if(maxGood==nGood1)
     {
@@ -660,8 +700,7 @@ bool Initializer::ReconstructF(vector<bool> &vbMatchesInliers, cv::Mat &F21, cv:
 
             R1.copyTo(R21);
             t1.copyTo(t21);
-
-            isTrue = true;
+            return true;
         }
     }else if(maxGood==nGood2)
     {
@@ -673,7 +712,7 @@ bool Initializer::ReconstructF(vector<bool> &vbMatchesInliers, cv::Mat &F21, cv:
 
             R2.copyTo(R21);
             t1.copyTo(t21);
-            isTrue = true;
+            return true;
         }
     }else if(maxGood==nGood3)
     {
@@ -685,7 +724,7 @@ bool Initializer::ReconstructF(vector<bool> &vbMatchesInliers, cv::Mat &F21, cv:
 
             R1.copyTo(R21);
             t2.copyTo(t21);
-            isTrue = true;
+            return true;
         }
     }else if(maxGood==nGood4)
     {
@@ -697,7 +736,7 @@ bool Initializer::ReconstructF(vector<bool> &vbMatchesInliers, cv::Mat &F21, cv:
 
             R2.copyTo(R21);
             t2.copyTo(t21);
-            isTrue = true;
+            return true;
         }
     }else if(maxGood==nGood5)
     {
@@ -709,7 +748,7 @@ bool Initializer::ReconstructF(vector<bool> &vbMatchesInliers, cv::Mat &F21, cv:
 
             R3.copyTo(R21);
             t1.copyTo(t21);
-            isTrue = true;
+            return true;
         }
     }else if(maxGood==nGood6)
     {
@@ -721,11 +760,11 @@ bool Initializer::ReconstructF(vector<bool> &vbMatchesInliers, cv::Mat &F21, cv:
 
             R3.copyTo(R21);
             t2.copyTo(t21);
-            isTrue = true;
+            return true;
         }
     }
 
-    return isTrue;
+    return false;
 }
 
 bool Initializer::ReconstructH(vector<bool> &vbMatchesInliers, cv::Mat &H21, cv::Mat &K,
@@ -1087,6 +1126,348 @@ void Initializer::DecomposeE(const cv::Mat &E, cv::Mat &R1, cv::Mat &R2, cv::Mat
         R2=-R2;
 }
 
+
+/********************* Modified Here *********************/
+/*
+// Assume P1 = R * P2 + t, then R = U*Vt (selected)
+// Assume P2 = R * P1 + t, then R = V*Ut
+// Need at least 3 point matches.
+bool Initializer::ComputeRtICP(const vector<cv::Point3f> &vP1, const vector<cv::Point3f> &vP2, cv::Mat &R, cv::Mat &t)
+{
+    int N = vP1.size();
+
+    // centroid
+    cv::Point3f p1=cv::Point3f(),p2=cv::Point3f();
+    for(int k=0;k<N;k++)
+    {
+        p1+=vP1[k];
+        p2+=vP2[k];
+    }
+    p1/=N;
+    p2/=N;
+
+    // minus centroid
+    vector<cv::Point3f> vQ1(N), vQ2(N);
+    for(int k=0;k<N;k++)
+    {
+        vQ1[k] = vP1[k]-p1;
+        vQ2[k] = vP2[k]-p2;
+    }
+
+    cv::Mat W(3,3,CV_32F,cv::Scalar(0));
+    for(int k=0;k<N;k++)
+    {
+        W+=cv::Mat(vQ1[k])*cv::Mat(vQ2[k]).t();
+    }
+
+    cv::Mat u,w,vt;
+
+    cv::SVDecomp(W,w,u,vt,cv::SVD::MODIFY_A | cv::SVD::FULL_UV);
+
+    R = u*vt;
+    if(cv::determinant(R)<0)
+    {
+        u.col(2) = -u.col(2);
+        R = u*vt;
+    }
+
+    t = cv::Mat(p1)-R*cv::Mat(p2);
+
+    return true;
+}
+
+int Initializer::CheckRtICP(const cv::Mat &R, const cv::Mat &t, const vector<cv::Point3f> &vP3D1, const vector<cv::Point3f> &vP3D2,
+                    const vector<Match> &vMatches12, vector<bool> &vbMatchesInliers, float sigma)
+{
+    const int N = vMatches12.size();
+
+    vbMatchesInliers.resize(N,false);
+    // float score = 0;
+    const float th = 7.815;
+    const float invSigmaSquare = 1.0/(sigma*sigma);
+    int nNumInliers = 0;
+
+    for(int i=0;i<N;i++)
+    {
+        bool bIn = true;
+
+        cv::Mat e = cv::Mat(vP3D1[vMatches12[i].first])-(R*cv::Mat(vP3D2[vMatches12[i].second])+t);
+        e = e / Frame::pixel2meter;
+        float ex = e.at<float>(0), ey = e.at<float>(1), ez = e.at<float>(2);
+        float squareDist = ex*ex+ey*ey+ez*ez;
+        float chiSquare = squareDist*invSigmaSquare;
+
+        if(chiSquare>th)
+        {
+            bIn = false;
+        }
+        // else
+        // {
+        //     score+=th-chiSquare;
+        // }
+        
+        if(bIn)
+        {
+            nNumInliers++;
+            vbMatchesInliers[i] = true;
+        }
+        else
+        {
+            vbMatchesInliers[i] = false;
+        }
+    }
+    // cout<<"Current Inliers = "<<nNumInliers<<"/"<<N<<endl; 
+    return nNumInliers;
+}
+
+void Initializer::FindRtICP(vector<bool> &vbMatchesInliers, float &score, cv::Mat &R, cv::Mat &t)
+{
+    const int N = mvMatchesBird12.size();
+
+    // Indices for minimum set selection
+    vector<size_t> vAllIndices;
+    vAllIndices.reserve(N);
+    vector<size_t> vAvailableIndices;
+
+    for(int i=0; i<N; i++)
+    {
+        vAllIndices.push_back(i);
+    }
+
+    // Generate sets of 3 points for each RANSAC iteration
+    vector<vector<size_t> > vSetsBird(mMaxIterations,vector<size_t>(3,0));
+
+    DUtils::Random::SeedRandOnce(0);
+
+    for(int it=0; it<mMaxIterations; it++)
+    {
+        vAvailableIndices = vAllIndices;
+
+        // Select a minimum set
+        for(size_t j=0; j<3; j++)
+        {
+            int randi = DUtils::Random::RandomInt(0,vAvailableIndices.size()-1);
+            int idx = vAvailableIndices[randi];
+
+            vSetsBird[it][j] = idx;
+
+            vAvailableIndices[randi] = vAvailableIndices.back();
+            vAvailableIndices.pop_back();
+        }
+    }
+
+
+    // Best Results variables
+    // score = 0.0;
+    int bestNumInliers=0;
+    vbMatchesInliers = vector<bool>(N,false);
+
+    // Iteration variables
+    vector<cv::Point3f> vP1i(3);
+    vector<cv::Point3f> vP2i(3);
+    cv::Mat Ri,ti;
+    vector<bool> vbCurrentInliers(N,false);
+    // float currentScore;
+    int nNumInliers=0;
+
+    // Perform all RANSAC iterations and save the solution with highest score
+    for(int it=0; it<mMaxIterations; it++)
+    {
+        // Select a minimum set
+        for(int j=0; j<3; j++)
+        {
+            int idx = vSetsBird[it][j];
+
+            vP1i[j] = mvKeysXYZBird1[mvMatchesBird12[idx].first];
+            vP2i[j] = mvKeysXYZBird2[mvMatchesBird12[idx].second];
+        }
+
+        ComputeRtICP(vP1i,vP2i,Ri,ti);
+
+        // currentScore = CheckRtICP(Ri,ti,mvKeysXYZBird1,mvKeysXYZBird2,mvMatchesBird12,vbCurrentInliers,mSigma);
+        nNumInliers = CheckRtICP(Ri,ti,mvKeysXYZBird1,mvKeysXYZBird2,mvMatchesBird12,vbCurrentInliers,mSigma);
+
+        // if(currentScore>score)
+        if(nNumInliers>bestNumInliers)
+        {
+            R = Ri.clone();
+            t = ti.clone();
+            vbMatchesInliers = vbCurrentInliers;
+            // score = currentScore;
+            bestNumInliers = nNumInliers;
+        }
+    }
+    score = bestNumInliers;
+}
+
+// Assume P1 = R * P2 + t, then R = U*Vt (selected)
+// Assume P2 = R * P1 + t, then R = V*Ut
+// Need at least 2 point matches.
+bool Initializer::ComputeRtICP2D(const vector<cv::Point2f> &vP1, const vector<cv::Point2f> &vP2, cv::Mat &R, cv::Mat &t)
+{
+    int N = vP1.size();
+
+    // centroid
+    cv::Point2f p1=cv::Point2f(),p2=cv::Point2f();
+    for(int k=0;k<N;k++)
+    {
+        p1+=vP1[k];
+        p2+=vP2[k];
+    }
+    p1/=N;
+    p2/=N;
+
+    // minus centroid
+    vector<cv::Point2f> vQ1(N), vQ2(N);
+    for(int k=0;k<N;k++)
+    {
+        vQ1[k] = vP1[k]-p1;
+        vQ2[k] = vP2[k]-p2;
+    }
+
+    cv::Mat W(2,2,CV_32F,cv::Scalar(0));
+    for(int k=0;k<N;k++)
+    {
+        W+=cv::Mat(vQ1[k])*cv::Mat(vQ2[k]).t();
+    }
+
+    cv::Mat u,w,vt;
+
+    cv::SVDecomp(W,w,u,vt,cv::SVD::MODIFY_A | cv::SVD::FULL_UV);
+
+    R = u*vt;
+    if(cv::determinant(R)<0)
+    {
+        u.col(1) = -u.col(1);
+        R = u*vt;
+    }
+
+    t = cv::Mat(p1)-R*cv::Mat(p2);
+
+    return true;
+}
+
+int Initializer::CheckRtICP2D(const cv::Mat &R, const cv::Mat &t, const vector<cv::Point2f> &vP2D1, const vector<cv::Point2f> &vP2D2,
+                const vector<Match> &vMatches12, vector<bool> &vbMatchesInliers, float sigma)
+{
+    const int N = vMatches12.size();
+
+    vbMatchesInliers.resize(N,false);
+    // float score = 0;
+    const float th = 5.991;
+    const float invSigmaSquare = 1.0/(sigma*sigma);
+    int nNumInliers = 0;
+
+    for(int i=0;i<N;i++)
+    {
+        bool bIn = true;
+
+        cv::Mat e = cv::Mat(vP2D1[vMatches12[i].first])-(R*cv::Mat(vP2D2[vMatches12[i].second])+t);
+        e = e / Frame::pixel2meter;
+        float ex = e.at<float>(0), ey = e.at<float>(1);
+        float squareDist = ex*ex+ey*ey;
+        float chiSquare = squareDist*invSigmaSquare;
+
+        if(chiSquare>th)
+        {
+            bIn = false;
+        }
+        // else
+        // {
+        //     score+=th-chiSquare;
+        // }
+        
+        if(bIn)
+        {
+            nNumInliers++;
+            vbMatchesInliers[i] = true;
+        }
+        else
+        {
+            vbMatchesInliers[i] = false;
+        }
+    }
+    // cout<<"Current Inliers = "<<nNumInliers<<"/"<<N<<endl; 
+    return nNumInliers;
+}
+
+void Initializer::FindRtICP2D(vector<bool> &vbMatchesInliers, float &score, cv::Mat &R, cv::Mat &t)
+{
+    const int N = mvMatchesBird12.size();
+    // Indices for minimum set selection
+    vector<size_t> vAllIndices;
+    vAllIndices.reserve(N);
+    vector<size_t> vAvailableIndices;
+
+    for(int i=0; i<N; i++)
+    {
+        vAllIndices.push_back(i);
+    }
+
+    // Generate sets of 3 points for each RANSAC iteration
+    vector<vector<size_t> > vSetsBird(mMaxIterations,vector<size_t>(2,0));
+
+    DUtils::Random::SeedRandOnce(0);
+
+    for(int it=0; it<mMaxIterations; it++)
+    {
+        vAvailableIndices = vAllIndices;
+
+        // Select a minimum set
+        for(size_t j=0; j<2; j++)
+        {
+            int randi = DUtils::Random::RandomInt(0,vAvailableIndices.size()-1);
+            int idx = vAvailableIndices[randi];
+
+            vSetsBird[it][j] = idx;
+
+            vAvailableIndices[randi] = vAvailableIndices.back();
+            vAvailableIndices.pop_back();
+        }
+    }
+
+
+    // Best Results variables
+    // score = 0.0;
+    int bestNumInliers=0;
+    vbMatchesInliers = vector<bool>(N,false);
+
+    // Iteration variables
+    vector<cv::Point2f> vP1i(2);
+    vector<cv::Point2f> vP2i(2);
+    cv::Mat Ri,ti;
+    vector<bool> vbCurrentInliers(N,false);
+    // float currentScore;
+    int nNumInliers=0;
+
+    // Perform all RANSAC iterations and save the solution with highest score
+    for(int it=0; it<mMaxIterations; it++)
+    {
+        // Select a minimum set
+        for(int j=0; j<2; j++)
+        {
+            int idx = vSetsBird[it][j];
+
+            vP1i[j] = mvKeysXYBird1[mvMatchesBird12[idx].first];
+            vP2i[j] = mvKeysXYBird2[mvMatchesBird12[idx].second];
+        }
+
+        ComputeRtICP2D(vP1i,vP2i,Ri,ti);
+        // currentScore = CheckRtICP(Ri,ti,mvKeysXYZBird1,mvKeysXYZBird2,mvMatchesBird12,vbCurrentInliers,mSigma);
+        nNumInliers = CheckRtICP2D(Ri,ti,mvKeysXYBird1,mvKeysXYBird2,mvMatchesBird12,vbCurrentInliers,mSigma);
+        // if(currentScore>score)
+        if(nNumInliers>bestNumInliers)
+        {
+            R = Ri.clone();
+            t = ti.clone();
+            vbMatchesInliers = vbCurrentInliers;
+            // score = currentScore;
+            bestNumInliers = nNumInliers;
+        }
+    }
+    score = bestNumInliers;
+}
+*/
 vector<bool> Initializer::GetMatchesInliersBird()
 {
     return mvbMatchesInliersBird12;
