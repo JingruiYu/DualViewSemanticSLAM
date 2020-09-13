@@ -459,6 +459,8 @@ void Tracking::Track()
                         }
                     }
                 }
+
+                DrawCurPose(mCurrentFrame.mTcw,150,150,0,"PoseAfterPoseOptimization");
             }
             else
             {
@@ -554,7 +556,7 @@ void Tracking::Track()
                 bOK = TrackLocalMap();
         }
 
-        DrawCurPose(0,150,0,"PoseAfterLocalMap");
+        DrawCurPose(mCurrentFrame.mTcw,0,150,0,"PoseAfterLocalMap");
         DrawGT(0,0,150,"GroundTruth");
 
         if(bOK)
@@ -746,6 +748,7 @@ void Tracking::MonocularInitialization()
         /********************* Modified Here *********************/
         if((int)mCurrentFrame.mvKeys.size()<=100||(int)mCurrentFrame.mvKeysBird.size()<=100)
         {
+            cout<<"too few points: front = "<<mCurrentFrame.mvKeys.size()<<" , birdview = "<<mCurrentFrame.mvKeysBird.size()<<endl;
             delete mpInitializer;
             mpInitializer = static_cast<Initializer*>(NULL);
             fill(mvIniMatches.begin(),mvIniMatches.end(),-1);
@@ -856,6 +859,8 @@ void Tracking::MonocularInitialization()
             mnRefNumMatches = nmatchesBird;
             mCurrentFrame.mnBirdviewRefFrameId = mInitialFrame.mnId;
 
+            cout << "Init Frame should be 44, norm should be 0.438 " << endl;
+            getchar();
             // // print initialization results
             // cv::Mat Tbw=Frame::Tbc*Tcw*Frame::Tcb;
             // cv::Mat R = Tbw.rowRange(0,3).colRange(0,3).t();
@@ -1534,6 +1539,8 @@ void Tracking::CreateNewKeyFrame()
         return;
 
     KeyFrame* pKF = new KeyFrame(mCurrentFrame,mpMap,mpKeyFrameDB);
+
+    DrawCurPose(mpReferenceKF->GetPose(),0,150,70,"PoseAfterLocalMapping");
 
     mpReferenceKF = pKF;
     mCurrentFrame.mpReferenceKF = pKF;
@@ -2342,10 +2349,9 @@ void Tracking::DrawMatchesInliersBird()
 }
 
 
-void Tracking::DrawCurPose(double r, double g, double b, string name)
+void Tracking::DrawCurPose(const cv::Mat &Tcw, double r, double g, double b, string name)
 {
-    cv::Mat Cur_Tcw = mCurrentFrame.mTcw;
-    cv::Mat Cur_Twb_c = Converter::Tcw2Twb_c(Cur_Tcw);
+    cv::Mat Cur_Twb_c = Converter::Tcw2Twb_c(Tcw);
     string waypoint_name = name + to_string(mCurrentFrame.mnId);
     
     DrawInTwc_ptr_(Cur_Twb_c,r,g,b,waypoint_name);

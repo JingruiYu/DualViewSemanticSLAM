@@ -36,7 +36,7 @@ float Frame::mfGridElementWidthInvBirdview, Frame::mfGridElementHeightInvBirdvie
 cv::Mat Frame::Tbc,Frame::Tcb;
 int Frame::birdviewRows, Frame::birdviewCols;
 
-const double correction = 1.0;
+const double correction = 1.19;
 const double Frame::pixel2meter = 0.03984*correction;
 const double Frame::meter2pixel = 25.1/correction;
 const double Frame::rear_axle_to_center = 1.393;

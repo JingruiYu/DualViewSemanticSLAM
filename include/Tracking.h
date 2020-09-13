@@ -151,9 +151,8 @@ public:
 
     void Reset();
 
-    void DrawCurPose(double r, double g, double b, string name);
+    void DrawCurPose(const cv::Mat &Tcw, double r, double g, double b, string name);
     void DrawGT(double r, double g, double b, string name);
-    void DrawTcw(const cv::Mat &Tcw, double r, double g, double b, string name);
 
     void DrawInTwc_ptr_(const cv::Mat &T, double r, double g, double b, string name);
 

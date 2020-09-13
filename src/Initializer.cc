@@ -547,9 +547,9 @@ bool Initializer::ReconstructF(vector<bool> &vbMatchesInliers, cv::Mat &F21, cv:
     // cv::imshow("matches inliers inside",matchesImg);
     // cv::waitKey(0);
 
-    if(norm(t12)<0.3)
+    if(norm(t12)<0.4)
     {
-        cout<<"t12<0.3"<<endl;
+        cout<<"t12<0.4"<<endl;
         return false;
     }
     
@@ -583,10 +583,10 @@ bool Initializer::ReconstructF(vector<bool> &vbMatchesInliers, cv::Mat &F21, cv:
     cout<<"t = "<<t.t()<<" , length = "<<norm(t)<<endl;
     cout<<"t_icp = "<<t_icp.t()<<" , length = "<<norm(t_icp)<<endl;
     cout<<"dot(t,t_icp) = "<<t.dot(t_icp)<<endl;
-    // cout<<"difference between R1 and R3 = "<<norm(R1*R3.t()-cv::Mat::eye(3,3,CV_32F))<<endl;
-    // cout<<"difference between R2 and R3 = "<<norm(R2*R3.t()-cv::Mat::eye(3,3,CV_32F))<<endl;
+
     cout<<"difference between R1 and R3 = "<<((cv::trace(R1*R3.t()).val[0]-1)/2)<<endl;
     cout<<"difference between R2 and R3 = "<<((cv::trace(R2*R3.t()).val[0]-1)/2)<<endl;
+
     t = t/norm(t);
     t = t.dot(t_icp)*t;
 
