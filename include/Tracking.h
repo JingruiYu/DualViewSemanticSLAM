@@ -148,6 +148,7 @@ public:
 
     /**************** Modify **********************/
     pcl::visualization::PCLVisualizer::Ptr Twc_ptr_;
+    ofstream unCloosingKFPose;
 
     void Reset();
 
@@ -156,6 +157,8 @@ public:
 
     void DrawInTwc_ptr_(const cv::Mat &T, double r, double g, double b, string name);
 
+    void saveUnCloosing();
+    
 protected:
 
     // Main tracking function. It is independent of the input sensor.

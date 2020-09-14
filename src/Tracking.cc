@@ -53,6 +53,9 @@ Tracking::Tracking(System *pSys, ORBVocabulary* pVoc, FrameDrawer *pFrameDrawer,
     mpKeyFrameDB(pKFDB), mpInitializer(static_cast<Initializer*>(NULL)), mpSystem(pSys), mpViewer(NULL),
     mpFrameDrawer(pFrameDrawer), mpMapDrawer(pMapDrawer), mpMap(pMap), mnLastRelocFrameId(0)
 {
+    unCloosingKFPose.open("unCloosingKFPose-7.txt");
+    unCloosingKFPose << fixed;
+
     // Load camera parameters from settings file
 
     cv::FileStorage fSettings(strSettingPath, cv::FileStorage::READ);
@@ -971,7 +974,7 @@ void Tracking::CreateInitialMapMonocular()
     float medianDepth = pKFini->ComputeSceneMedianDepth(2);
     float invMedianDepth = 1.0f/medianDepth;
 
-    if(medianDepth<0 || pKFcur->TrackedMapPoints(1)<100)
+    if(medianDepth<0 || pKFcur->TrackedMapPoints(1)<90)
     {
         cout << "Wrong initialization, reseting..." << endl;
         cout<<"medianDepth = "<<medianDepth<<" , TrackedMapPoint = "<<pKFcur->TrackedMapPoints(1)<<endl;
@@ -1541,6 +1544,8 @@ void Tracking::CreateNewKeyFrame()
     KeyFrame* pKF = new KeyFrame(mCurrentFrame,mpMap,mpKeyFrameDB);
 
     DrawCurPose(mpReferenceKF->GetPose(),0,150,70,"PoseAfterLocalMapping");
+
+    saveUnCloosing();
 
     mpReferenceKF = pKF;
     mCurrentFrame.mpReferenceKF = pKF;
@@ -2375,6 +2380,17 @@ void Tracking::DrawInTwc_ptr_(const cv::Mat &T, double r, double g, double b, st
     Tpoint.y = Draw_pose.translation()[1];
     Tpoint.z = Draw_pose.translation()[2];
     Twc_ptr_->addSphere(Tpoint, 0.1, r, g, b, name);
+}
+
+void Tracking::saveUnCloosing()
+{
+    cv::Mat TcwKF = mpReferenceKF->GetPose();
+    cv::Mat rTbw=Frame::Tbc*TcwKF*Frame::Tcb;
+    cv::Mat rR = rTbw.rowRange(0,3).colRange(0,3).t();
+    vector<float> rq = Converter::toQuaternion(rR);
+    cv::Mat rt = -rR*rTbw.rowRange(0,3).col(3);
+    unCloosingKFPose << setprecision(6) << mpReferenceKF->mTimeStamp << setprecision(7) << " " << rt.at<float>(0) << " " << rt.at<float>(1) << " " << rt.at<float>(2)
+        << " " << rq[0] << " " << rq[1] << " " << rq[2] << " " << rq[3] << endl;
 }
 
 } //namespace ORB_SLAM
