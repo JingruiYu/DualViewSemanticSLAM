@@ -462,7 +462,7 @@ int Optimizer::PoseOptimizationWithBirdview(Frame *pFrame, Frame* pRefFrame, dou
                     // float meter2pixel = 1.0/Frame::pixel2meter;
                     // float meter2pixel2 = meter2pixel*meter2pixel;
                     // e->setInformation(Eigen::Matrix3d::Identity()*invSigma2*(pFrame->mnId-pRefFrame->mnId));
-                    e->setInformation(Eigen::Matrix3d::Identity()*invSigma2);
+                    e->setInformation(Eigen::Matrix3d::Identity()*invSigma2*wB);
                     // e->setInformation(Eigen::Matrix3d::Identity());
                     g2o::RobustKernelHuber* rk = new g2o::RobustKernelHuber;
                     e->setRobustKernel(rk);
@@ -543,8 +543,8 @@ int Optimizer::PoseOptimizationWithBirdview(Frame *pFrame, Frame* pRefFrame, dou
             }
 
             const float chi2 = e->chi2();
-
-            if(chi2>chi2Bird[it])
+            float chi2Bad = chi2Bird[it] * (wB+1e-5);
+            if(chi2>chi2Bad)
             {                
                 pFrame->mvbBirdviewInliers[idx]=false;
                 e->setLevel(1);

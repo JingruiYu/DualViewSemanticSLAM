@@ -119,6 +119,7 @@ public:
 
     /********************* Modified Here *********************/
     cv::Mat GetGTPoseTwb();
+    cv::Mat GetOdomPoseTwb();
 
 public:
     // Vocabulary used for relocalization.

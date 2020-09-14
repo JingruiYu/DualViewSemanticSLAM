@@ -13,3 +13,6 @@ The norm is 0.4, the inited Frame is 44. But the performance is not stable. The 
 
 v0.4:
 The prior of motion model is added. The number of matches and lost is less in 7 experiment.
+
+v0.5:
+Both the front and bird points are added.

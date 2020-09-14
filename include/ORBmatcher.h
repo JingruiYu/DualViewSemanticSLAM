@@ -91,6 +91,7 @@ public:
     // Search matches between Frame keypoints and projected MapPoints. Returns number of matches
     // Used to track the local map (Tracking)
     int SearchByProjectionBird(Frame &F, const std::vector<MapPointBird*> &vpMapPointsBird, const float r=4);
+    int SearchByProjectionBird(Frame &F1, Frame &F2, const float r=10);
 
     // Match MapPoints tracked in last frame into the current frame.
     // Used to track from previous frame (Tracking)

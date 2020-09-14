@@ -1345,8 +1345,8 @@ int ORBmatcher::SearchByProjection(Frame &CurrentFrame, const Frame &LastFrame, 
 
     const cv::Mat tlc = Rlw*twc+tlw;
 
-    const bool bForward = tlc.at<float>(2)>CurrentFrame.mb && !bMono;
-    const bool bBackward = -tlc.at<float>(2)>CurrentFrame.mb && !bMono;
+    const bool bForward = tlc.at<float>(2)>CurrentFrame.mb && !bMono; // for stere
+    const bool bBackward = -tlc.at<float>(2)>CurrentFrame.mb && !bMono; // for stere
 
     for(int i=0; i<LastFrame.N; i++)
     {
@@ -1990,6 +1990,83 @@ int ORBmatcher::SearchByProjectionBird(Frame &F, const vector<MapPointBird*> &vp
                 continue;
 
             F.mvpMapPointsBird[bestIdx]=pMPBird;
+            nmatches++;
+        }
+    }
+
+    return nmatches;
+}
+
+
+int ORBmatcher::SearchByProjectionBird(Frame &F1, Frame &F2, const float r)
+{
+    int nmatches=0;
+
+    cv::Mat Tbw = Frame::Tbc*F2.mTcw;
+
+    for(size_t iMP=0; iMP<F1.mvpMapPointsBird.size(); iMP++)
+    {
+        MapPointBird* pMPBird = F1.mvpMapPointsBird[iMP];
+
+        if (!pMPBird)
+            continue;        
+
+        if(pMPBird->mnLastFrameSeen==F2.mnId)
+            continue;
+
+        cv::Mat worldPos = pMPBird->GetWorldPos();
+        cv::Mat localPos = Tbw.rowRange(0,3).colRange(0,3)*worldPos+Tbw.rowRange(0,3).col(3);
+        if(fabs(localPos.at<float>(2))>0.2)
+            continue;
+        cv::Point2f pt = Frame::ProjectXYZ2Birdview(cv::Point3f(localPos.at<float>(0),localPos.at<float>(1),localPos.at<float>(2)));
+
+        if(pt.x<0||pt.x>=Frame::birdviewCols||pt.y<0||pt.y>=Frame::birdviewRows)
+            continue;
+
+        const vector<size_t> vIndices = F2.GetFeaturesInAreaBirdview(pt.x,pt.y,r);
+
+        if(vIndices.empty())
+            continue;
+
+        const cv::Mat MPdescriptor = pMPBird->GetDescriptor();
+
+        int bestDist=256;
+        int bestLevel= -1;
+        int bestDist2=256;
+        int bestLevel2 = -1;
+        int bestIdx =-1 ;
+
+        // Get best and second matches with near keypoints
+        for(vector<size_t>::const_iterator vit=vIndices.begin(), vend=vIndices.end(); vit!=vend; vit++)
+        {
+            const size_t idx = *vit;
+
+            const cv::Mat &d = F2.mDescriptorsBird.row(idx);
+
+            const int dist = DescriptorDistance(MPdescriptor,d);
+
+            if(dist<bestDist)
+            {
+                bestDist2=bestDist;
+                bestDist=dist;
+                bestLevel2 = bestLevel;
+                bestLevel = F2.mvKeysBird[idx].octave;
+                bestIdx=idx;
+            }
+            else if(dist<bestDist2)
+            {
+                bestLevel2 = F2.mvKeysBird[idx].octave;
+                bestDist2=dist;
+            }
+        }
+
+        // Apply ratio to second match (only if best and second are in the same scale level)
+        if(bestDist<=TH_HIGH)
+        {
+            if(bestLevel==bestLevel2 && bestDist>mfNNratio*bestDist2)
+                continue;
+
+            F2.mvpMapPointsBird[bestIdx]=pMPBird;
             nmatches++;
         }
     }

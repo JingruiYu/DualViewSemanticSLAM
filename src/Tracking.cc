@@ -1216,17 +1216,8 @@ bool Tracking::TrackWithMotionModel()
     /********************* Modified Here *********************/
     if(mbHaveBirdview)
     {
-        // if(mbTcrBirdUpdated)
-        // {
-        //     mCurrentFrame.SetPose(mTcrBirdc*mBirdviewRefFrame.mTcw);
-        //     mbTcrBirdUpdated = false;
-        //     mpMapDrawer->SetCurrentCameraPose(mCurrentFrame.mTcw);
-        // }
-        // else
-        {
-            mCurrentFrame.SetPose(mVelocity*mLastFrame.mTcw);
-            mpMapDrawer->SetCurrentCameraPose(mCurrentFrame.mTcw);
-        }
+        mCurrentFrame.SetPose(mVelocity*mLastFrame.mTcw);
+        mpMapDrawer->SetCurrentCameraPose(mCurrentFrame.mTcw);
     }
     else
     {
@@ -1256,32 +1247,29 @@ bool Tracking::TrackWithMotionModel()
     {
         // match birdview points.
         fill(mCurrentFrame.mvpMapPointsBird.begin(),mCurrentFrame.mvpMapPointsBird.end(),static_cast<MapPointBird*>(NULL));
-        nmatchesBird = mpmatcherBirdview->SearchByMatchBird(mCurrentFrame,mLastFrame,15);
+        // nmatchesBird = mpmatcherBirdview->SearchByMatchBird(mCurrentFrame,mLastFrame,15);
+        nmatchesBird = mpmatcherBirdview->SearchByProjectionBird(mLastFrame,mCurrentFrame,10);
         if(nmatchesBird<20)
         {
             fill(mCurrentFrame.mvpMapPointsBird.begin(),mCurrentFrame.mvpMapPointsBird.end(),static_cast<MapPointBird*>(NULL));
-            nmatchesBird = mpmatcherBirdview->SearchByMatchBird(mCurrentFrame,mLastFrame,20);
+            // nmatchesBird = mpmatcherBirdview->SearchByMatchBird(mCurrentFrame,mLastFrame,20);
+            nmatchesBird = mpmatcherBirdview->SearchByProjectionBird(mLastFrame,mCurrentFrame,20);
         }
-        cout<<"Track with Motion Model, "<<nmatches<<" Matches and "<<nmatchesBird<<" Birdview Matchces."<<endl;
+        cout<<"\033[31m"<<"Track with Motion Model, "<<nmatches<<" Matches and "<<nmatchesBird<<" Birdview Matchces."<<"\033[0m"<<endl;
     }
 
     if(nmatches<20)
         return false;
 
-    // // Optimize frame pose with all matches
-    // if(mbHaveBirdview)
-    // {
-    //     Optimizer::PoseOptimizationWithBirdview(&mCurrentFrame);
-        // MatchAndRetriveBirdMP();
-        // Optimizer::PoseOptimizationWithBirdview(&mCurrentFrame);
-        // Optimizer::PoseOptimization(&mCurrentFrame);
-        // DrawMatchesInliersBird();
-        // Optimizer::PoseOptimizationWithBirdview(&mCurrentFrame,&mBirdviewRefFrame);
-    // }
-    // else
-    // {
+    // Optimize frame pose with all matches
+    if(mbHaveBirdview)
+    {
+        Optimizer::PoseOptimizationWithBirdview(&mCurrentFrame,NULL,1.0,1.0);
+    }
+    else
+    {
         Optimizer::PoseOptimization(&mCurrentFrame);
-    // }
+    }
     
 
     // Discard outliers
@@ -1305,7 +1293,7 @@ bool Tracking::TrackWithMotionModel()
         }
     }
 
-    cout<<"After Optimization, "<<nmatches<<" Matches and "<<nmatchesMap<<" Matches in Map."<<endl;
+    cout<<"After Optimization, "<<nmatchesMap<<" Matches in Map."<<endl;
 
     if(mbHaveBirdview)
     {
@@ -1317,12 +1305,6 @@ bool Tracking::TrackWithMotionModel()
             {
                 if(!mCurrentFrame.mvbBirdviewInliers[k])
                 {
-                    // cv::Mat localPos = cv::Mat(mCurrentFrame.mvKeysBirdCamXYZ[k]);
-                    // cv::Mat worldPos = Twc.rowRange(0,3).colRange(0,3)*localPos+Twc.rowRange(0,3).col(3);
-                    // MapPointBird *pMPBird = new MapPointBird(worldPos,&mCurrentFrame,mpMap,k);
-                    // mpMap->AddMapPointBird(pMPBird);
-                    // mCurrentFrame.mvpMapPointsBird[k] = pMPBird;
-
                     mCurrentFrame.mvpMapPointsBird[k] = static_cast<MapPointBird*>(NULL);
                     mCurrentFrame.mvbBirdviewInliers[k]=true;
                     nmatchesBird--;
@@ -1354,18 +1336,18 @@ bool Tracking::TrackLocalMap()
 
     // Optimize Pose
     /********************* Modified Here *********************/
-    // if(mbHaveBirdview)
-    // {
-    //     // generate more birdview mappoints
-    //     MatchAndRetriveBirdMP();
-    //     Optimizer::PoseOptimizationWithBirdview(&mCurrentFrame);
-    //     DrawMatchesInliersBird();
-    //     // Optimizer::PoseOptimization(&mCurrentFrame);
-    // }
-    // else
-    // {
+    if(mbHaveBirdview)
+    {
+        // generate more birdview mappoints
+        MatchAndRetriveBirdMP();
+        Optimizer::PoseOptimizationWithBirdview(&mCurrentFrame,NULL,1.0,1.0);
+        // DrawMatchesInliersBird();
+        // Optimizer::PoseOptimization(&mCurrentFrame);
+    }
+    else
+    {
         Optimizer::PoseOptimization(&mCurrentFrame);
-    // }
+    }
     
     
     mnMatchesInliers = 0;
@@ -1405,12 +1387,6 @@ bool Tracking::TrackLocalMap()
             {
                 if(!mCurrentFrame.mvbBirdviewInliers[k])
                 {
-                    // cv::Mat localPos = cv::Mat(mCurrentFrame.mvKeysBirdCamXYZ[k]);
-                    // cv::Mat worldPos = Twc.rowRange(0,3).colRange(0,3)*localPos+Twc.rowRange(0,3).col(3);
-                    // MapPointBird *pMPBird = new MapPointBird(worldPos,&mCurrentFrame,mpMap,k);
-                    // mpMap->AddMapPointBird(pMPBird);
-                    // mCurrentFrame.mvpMapPointsBird[k] = pMPBird;
-
                     mCurrentFrame.mvpMapPointsBird[k] = static_cast<MapPointBird*>(NULL);
                     mCurrentFrame.mvbBirdviewInliers[k]=true;
                 }
@@ -1423,11 +1399,6 @@ bool Tracking::TrackLocalMap()
 
         cout<<"Track Local Map, Birdview MatchesInliers = "<<nMatchesInliersBird<<endl;
     }
-
-    // // Decide if the tracking was succesful
-    // // More restrictive if there was a relocalization recently
-    // if(mCurrentFrame.mnId<mnLastRelocFrameId+mMaxFrames && mnMatchesInliers+nMatchesInliersBird<50)
-    //     return false;
 
     if(mnMatchesInliers+nMatchesInliersBird<20)
     {
@@ -2228,6 +2199,7 @@ void Tracking::MatchAndRetriveBirdMP()
     }
     cout<<"Added "<<nMap<<" map points bird"<<endl;
 }
+
 /*
 void Tracking::MatchAndRetriveBirdMP()
 {
@@ -2386,8 +2358,8 @@ void Tracking::saveUnCloosing()
 
 cv::Mat Tracking::GetPriorMotion()
 {
-    cv::Mat Twb_last = mLastFrame.GetGTPoseTwb();
-    cv::Mat Twb_now  = mCurrentFrame.GetGTPoseTwb();
+    cv::Mat Twb_last = mLastFrame.GetGTPoseTwb(); // mLastFrame.GetOdomPoseTwb(); //mLastFrame.GetGTPoseTwb();
+    cv::Mat Twb_now  = mCurrentFrame.GetGTPoseTwb(); // mCurrentFrame.GetOdomPoseTwb(); //mCurrentFrame.GetGTPoseTwb();
     cv::Mat Twc_last = Converter::Twb2Twc(Twb_last);
     cv::Mat Tcw_now = Converter::Twb2Tcw(Twb_now);
 

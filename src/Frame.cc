@@ -1158,4 +1158,16 @@ cv::Mat Frame::GetGTPoseTwb()
     return Twb.clone();
 }
 
+cv::Mat Frame::GetOdomPoseTwb()
+{
+    double x = mOdomPose[0], y = mOdomPose[1], theta = mOdomPose[2];
+
+    cv::Mat Twb=(cv::Mat_<float>(4,4)<< cos(theta),-sin(theta),0,x,
+                                        sin(theta), cos(theta),0,y,
+                                        0,            0,      1, 0,
+                                        0,            0,      0, 1);
+
+    return Twb.clone();
+}
+
 } //namespace ORB_SLAM
