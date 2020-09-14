@@ -54,6 +54,8 @@ public:
 
     static cv::Mat invT(const cv::Mat &T);
     static cv::Mat Twb2Twb_c(const cv::Mat &Twb);
+    static cv::Mat Twb2Twc(const cv::Mat &Twb);
+    static cv::Mat Twb2Tcw(const cv::Mat &Twb);
     static cv::Mat Tcw2Twb_c(const cv::Mat &Tcw);
 };
 

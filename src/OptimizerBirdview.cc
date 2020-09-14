@@ -296,7 +296,7 @@ void Optimizer::BundleAdjustmentWithBirdview(const vector<KeyFrame *> &vpKFs, co
 
 }
 
-int Optimizer::PoseOptimizationWithBirdview(Frame *pFrame, Frame* pRefFrame)
+int Optimizer::PoseOptimizationWithBirdview(Frame *pFrame, Frame* pRefFrame, double wF, double wB)
 {
     g2o::SparseOptimizer optimizer;
     g2o::BlockSolver_6_3::LinearSolverType * linearSolver;
@@ -335,16 +335,8 @@ int Optimizer::PoseOptimizationWithBirdview(Frame *pFrame, Frame* pRefFrame)
     vector<EdgeSE3ProjectXYZ2XYZOnlyPoseQuat*> vpEdgesBird3D;
     vector<size_t> vnIndexEdgeBird3D;
 
-
-    // vector<g2o::EdgeStereoSE3ProjectXYZOnlyPose*> vpEdgesStereo;
-    // vector<size_t> vnIndexEdgeStereo;
-    // vpEdgesStereo.reserve(N);
-    // vnIndexEdgeStereo.reserve(N);
-
     const float deltaMono = sqrt(5.991);
-    // const float deltaStereo = sqrt(7.815);
     const float delta3D = sqrt(7.815);
-
 
     {
     unique_lock<mutex> lock(MapPoint::mGlobalMutex);
@@ -368,7 +360,7 @@ int Optimizer::PoseOptimizationWithBirdview(Frame *pFrame, Frame* pRefFrame)
                 e->setVertex(0, dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertex(0)));
                 e->setMeasurement(obs);
                 const float invSigma2 = pFrame->mvInvLevelSigma2[kpUn.octave];
-                e->setInformation(Eigen::Matrix2d::Identity()*invSigma2);
+                e->setInformation(Eigen::Matrix2d::Identity()*invSigma2*wF);
 
                 g2o::RobustKernelHuber* rk = new g2o::RobustKernelHuber;
                 e->setRobustKernel(rk);
@@ -387,46 +379,6 @@ int Optimizer::PoseOptimizationWithBirdview(Frame *pFrame, Frame* pRefFrame)
 
                 vpEdgesMono.push_back(e);
                 vnIndexEdgeMono.push_back(i);
-            }
-            else  // Stereo observation
-            {
-                // nInitialCorrespondences++;
-                // pFrame->mvbOutlier[i] = false;
-
-                // //SET EDGE
-                // Eigen::Matrix<double,3,1> obs;
-                // const cv::KeyPoint &kpUn = pFrame->mvKeysUn[i];
-                // const float &kp_ur = pFrame->mvuRight[i];
-                // obs << kpUn.pt.x, kpUn.pt.y, kp_ur;
-
-                // g2o::EdgeStereoSE3ProjectXYZOnlyPose* e = new g2o::EdgeStereoSE3ProjectXYZOnlyPose();
-
-                // e->setVertex(0, dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertex(0)));
-                // e->setMeasurement(obs);
-                // const float invSigma2 = pFrame->mvInvLevelSigma2[kpUn.octave];
-                // Eigen::Matrix3d Info = Eigen::Matrix3d::Identity()*invSigma2;
-                // e->setInformation(Info);
-
-                // g2o::RobustKernelHuber* rk = new g2o::RobustKernelHuber;
-                // e->setRobustKernel(rk);
-                // rk->setDelta(deltaStereo);
-
-                // e->fx = pFrame->fx;
-                // e->fy = pFrame->fy;
-                // e->cx = pFrame->cx;
-                // e->cy = pFrame->cy;
-                // e->bf = pFrame->mbf;
-                // cv::Mat Xw = pMP->GetWorldPos();
-                // e->Xw[0] = Xw.at<float>(0);
-                // e->Xw[1] = Xw.at<float>(1);
-                // e->Xw[2] = Xw.at<float>(2);
-
-                // optimizer.addEdge(e);
-
-                // vpEdgesStereo.push_back(e);
-                // vnIndexEdgeStereo.push_back(i);
-
-                //TODO: Add Stereo Types
             }
         }
 
@@ -449,7 +401,7 @@ int Optimizer::PoseOptimizationWithBirdview(Frame *pFrame, Frame* pRefFrame)
             // float scale = Frame::meter2pixel;
             float scale = 3.0;
             const float invSigma2 = pFrame->mvInvLevelSigma2[pFrame->mvKeysBird[k].octave]*scale;
-            e->setInformation(Eigen::Matrix3d::Identity()*invSigma2);
+            e->setInformation(Eigen::Matrix3d::Identity()*invSigma2*wB);
 
             g2o::RobustKernelHuber* rk = new g2o::RobustKernelHuber;
             e->setRobustKernel(rk);
@@ -534,17 +486,10 @@ int Optimizer::PoseOptimizationWithBirdview(Frame *pFrame, Frame* pRefFrame)
     // We perform 4 optimizations, after each optimization we classify observation as inlier/outlier
     // At the next optimization, outliers are not included, but at the end they can be classified as inliers again.
     // const float chi2Mono[4]={3.841,3.841,3.841,3.841};
-    const float chi2Mono[4]={5.991,5.991,5.991,5.991};
-    // const float chi2Mono[4]={7.815,7.815,7.815, 7.815};
-    // const float chi2Mono[4]={9.488,9.488,9.488, 9.488};
-    // const float chi2Stereo[4]={7.815,7.815,7.815, 7.815};
+    const float chi2Mono[4]={5.991,5.991,5.991,5.991};    
     
-    
-    // const float chi2Bird[4]={3.841,3.841,3.841,3.841};
     const float chi2Bird[4]={5.991,5.991,5.991,5.991};
-    // const float chi2Bird[4]={7.815,7.815,7.815, 7.815};
-    // const float chi2Bird[4]={9.488,9.488,9.488, 9.488};
-
+    
     const int its[4]={10,10,10,10};    
 
     int nBad=0;
@@ -614,82 +559,22 @@ int Optimizer::PoseOptimizationWithBirdview(Frame *pFrame, Frame* pRefFrame)
             if(it==2)
                 e->setRobustKernel(0);
         }
-        // cout<<"nGoodBird = "<<nGoodBird<<endl;
-
-        // cout<<"Iteration : "<<it<<" , nGoodBird = "<<nGoodBird<<endl;
-
-        // int nGoodBird = 0;
-        // for(size_t i=0,iend=vpEdgesBird.size();i<iend;i++)
-        // {
-        //     EdgePointTransformSE3Quat *e = vpEdgesBird[i];
-
-        //     const size_t idx = vnIndexEdgeBird[i];
-
-        //     e->computeError();
-
-        //     const float chi2 = e->chi2();
-
-        //     if(chi2>chi2Bird[it])
-        //     {                
-        //         pFrame->mvbBirdviewInliers[idx]=false;
-        //         e->setLevel(1);
-        //     }
-        //     else
-        //     {
-        //         pFrame->mvbBirdviewInliers[idx]=true;
-        //         e->setLevel(0);
-        //         nGoodBird++;
-        //     }
-
-        //     if(it==2)
-        //         e->setRobustKernel(0);
-        // }
-        // cout<<"number of good matches in birdview : "<<nGoodBird<<endl;
-
-        // for(size_t i=0, iend=vpEdgesStereo.size(); i<iend; i++)
-        // {
-        //     g2o::EdgeStereoSE3ProjectXYZOnlyPose* e = vpEdgesStereo[i];
-
-        //     const size_t idx = vnIndexEdgeStereo[i];
-
-        //     if(pFrame->mvbOutlier[idx])
-        //     {
-        //         e->computeError();
-        //     }
-
-        //     const float chi2 = e->chi2();
-
-        //     if(chi2>chi2Stereo[it])
-        //     {
-        //         pFrame->mvbOutlier[idx]=true;
-        //         e->setLevel(1);
-        //         nBad++;
-        //     }
-        //     else
-        //     {                
-        //         e->setLevel(0);
-        //         pFrame->mvbOutlier[idx]=false;
-        //     }
-
-        //     if(it==2)
-        //         e->setRobustKernel(0);
-        // }
 
         if(optimizer.edges().size()<10)
             break;
     }
 
 
-    // vector<MapPointBird*> &vpMapPointsBird = pFrame->mvpMapPointsBird;
-    // for(int k=0;k<vpMapPointsBird.size();k++)
-    // {
-    //     if(vpMapPointsBird[k]&&!pFrame->mvbBirdviewInliers[k])
-    //     {
-    //         MapPointBird *pMPBird = vpMapPointsBird[k];
-    //         pMPBird->mpMap->EraseMapPointBird(pMPBird);
-    //         vpMapPointsBird[k] = static_cast<MapPointBird*>(NULL);
-    //     }
-    // }
+    vector<MapPointBird*> &vpMapPointsBird = pFrame->mvpMapPointsBird;
+    for(int k=0;k<vpMapPointsBird.size();k++)
+    {
+        if(vpMapPointsBird[k]&&!pFrame->mvbBirdviewInliers[k])
+        {
+            MapPointBird *pMPBird = vpMapPointsBird[k];
+            pMPBird->mpMap->EraseMapPointBird(pMPBird);
+            vpMapPointsBird[k] = static_cast<MapPointBird*>(NULL);
+        }
+    }
 
 
     // Recover optimized pose and return number of inliers

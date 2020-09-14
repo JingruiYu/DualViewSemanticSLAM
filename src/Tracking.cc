@@ -441,6 +441,8 @@ void Tracking::Track()
                 // Match Birdview Keypoints
                 // MatchAndRetriveBirdMP();
 
+                mVelocity = GetPriorMotion();
+
                 if(mVelocity.empty() || mCurrentFrame.mnId<mnLastRelocFrameId+2)
                 {
                     bOK = TrackReferenceKeyFrame();
@@ -1058,7 +1060,7 @@ bool Tracking::TrackReferenceKeyFrame()
 
     int nmatches = matcher.SearchByBoW(mpReferenceKF,mCurrentFrame,vpMapPointMatches);
 
-    cout<<"Track Reference KeyFrame, "<<nmatches<<" Matches."<<endl;
+    cout<<"\033[31m"<<"Track Reference KeyFrame, "<<nmatches<<" Matches."<<"\033[0m"<<endl;
 
     if(nmatches<15)
         return false;
@@ -1068,7 +1070,7 @@ bool Tracking::TrackReferenceKeyFrame()
 
     // if(mbHaveBirdview)
     // {
-    //     cout<<"Search Birdview Matches."<<endl;
+    //     cout<<"\033[31m"<<"Search Birdview Matches."<<"\033[0m"<<endl;
     //     vector<MapPointBird*> vpMapPointMatchesBird;
     //     int nmatchesbird = mpmatcherBirdview->SearchByMatchBird(mpReferenceKF,mCurrentFrame,vpMapPointMatchesBird,15);
     //     if(nmatchesbird<15)
@@ -1078,12 +1080,7 @@ bool Tracking::TrackReferenceKeyFrame()
     //     mCurrentFrame.mvpMapPointsBird = vpMapPointMatchesBird;
     //     cout<<"Track Reference KeyFrame, "<<nmatchesbird<<" Birdview Matches."<<endl;
 
-    //     Optimizer::PoseOptimizationWithBirdview(&mCurrentFrame);
-        // MatchAndRetriveBirdMP();
-        // Optimizer::PoseOptimizationWithBirdview(&mCurrentFrame);
-        // Optimizer::PoseOptimization(&mCurrentFrame);
-        // DrawMatchesInliersBird();
-        // Optimizer::PoseOptimizationWithBirdview(&mCurrentFrame,&mBirdviewRefFrame);
+    //     Optimizer::PoseOptimizationWithBirdview(&mCurrentFrame,NULL,1.0,0.0);
     // }
     // else
     // {
@@ -1126,12 +1123,6 @@ bool Tracking::TrackReferenceKeyFrame()
             {
                 if(!mCurrentFrame.mvbBirdviewInliers[k])
                 {
-                    // cv::Mat localPos = cv::Mat(mCurrentFrame.mvKeysBirdCamXYZ[k]);
-                    // cv::Mat worldPos = Twc.rowRange(0,3).colRange(0,3)*localPos+Twc.rowRange(0,3).col(3);
-                    // MapPointBird *pMPBird = new MapPointBird(worldPos,&mCurrentFrame,mpMap,k);
-                    // mpMap->AddMapPointBird(pMPBird);
-                    // mCurrentFrame.mvpMapPointsBird[k] = pMPBird;
-
                     mCurrentFrame.mvpMapPointsBird[k] = static_cast<MapPointBird*>(NULL);
                     mCurrentFrame.mvbBirdviewInliers[k]=true;
                 }
@@ -2391,6 +2382,18 @@ void Tracking::saveUnCloosing()
     cv::Mat rt = -rR*rTbw.rowRange(0,3).col(3);
     unCloosingKFPose << setprecision(6) << mpReferenceKF->mTimeStamp << setprecision(7) << " " << rt.at<float>(0) << " " << rt.at<float>(1) << " " << rt.at<float>(2)
         << " " << rq[0] << " " << rq[1] << " " << rq[2] << " " << rq[3] << endl;
+}
+
+cv::Mat Tracking::GetPriorMotion()
+{
+    cv::Mat Twb_last = mLastFrame.GetGTPoseTwb();
+    cv::Mat Twb_now  = mCurrentFrame.GetGTPoseTwb();
+    cv::Mat Twc_last = Converter::Twb2Twc(Twb_last);
+    cv::Mat Tcw_now = Converter::Twb2Tcw(Twb_now);
+
+    cv::Mat deltaTcw = Tcw_now*Twc_last;
+
+    return deltaTcw.clone();
 }
 
 } //namespace ORB_SLAM

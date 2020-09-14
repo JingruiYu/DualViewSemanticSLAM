@@ -158,6 +158,8 @@ public:
     void DrawInTwc_ptr_(const cv::Mat &T, double r, double g, double b, string name);
 
     void saveUnCloosing();
+
+    cv::Mat GetPriorMotion();
     
 protected:
 

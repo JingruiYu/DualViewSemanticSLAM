@@ -181,6 +181,21 @@ cv::Mat Converter::Twb2Twb_c(const cv::Mat &Twb)
     return Twb_c.clone();
 }
 
+cv::Mat Converter::Twb2Twc(const cv::Mat &Twb)
+{
+    cv::Mat Twc = Frame::Tcb * Twb * Frame::Tbc;
+
+    return Twc.clone();
+}
+
+cv::Mat Converter::Twb2Tcw(const cv::Mat &Twb)
+{
+    cv::Mat Twc = Frame::Tcb * Twb * Frame::Tbc;
+    cv::Mat Tcw = invT(Twc);
+    
+    return Tcw.clone();
+}
+
 cv::Mat Converter::Tcw2Twb_c(const cv::Mat &Tcw)
 {
     cv::Mat Twc_c = invT(Tcw);
