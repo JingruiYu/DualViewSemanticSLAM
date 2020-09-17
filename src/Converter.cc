@@ -135,6 +135,18 @@ Eigen::Matrix<double,3,3> Converter::toMatrix3d(const cv::Mat &cvMat3)
     return M;
 }
 
+Eigen::Matrix<double,4,4> Converter::toMatrix4d(const cv::Mat &cvMat4)
+{
+    Eigen::Matrix<double,4,4> M;
+
+    M << cvMat4.at<float>(0,0), cvMat4.at<float>(0,1), cvMat4.at<float>(0,2),cvMat4.at<float>(0,3),
+         cvMat4.at<float>(1,0), cvMat4.at<float>(1,1), cvMat4.at<float>(1,2),cvMat4.at<float>(1,3),
+         cvMat4.at<float>(2,0), cvMat4.at<float>(2,1), cvMat4.at<float>(2,2),cvMat4.at<float>(2,3),
+         cvMat4.at<float>(3,0), cvMat4.at<float>(3,1), cvMat4.at<float>(3,2),cvMat4.at<float>(3,3);
+
+    return M;
+}
+
 Eigen::Matrix4f Converter::toMatrix4f(const cv::Mat &cvMat4)
 {
     Eigen::Matrix4f M;
@@ -201,6 +213,26 @@ cv::Mat Converter::Tcw2Twb_c(const cv::Mat &Tcw)
     cv::Mat Twc_c = invT(Tcw);
     cv::Mat Twb_c = Frame::Tbc * Twc_c;
     return Twb_c.clone();
+}
+
+cv::Mat Converter::GetDeltaTransformFromOdometer(const cv::Vec3d &Pose1, const cv::Vec3d &Pose2)
+{
+    //odometer pose
+    double x1=Pose1[0],y1=Pose1[1],theta1=Pose1[2];
+    double x2=Pose2[0],y2=Pose2[1],theta2=Pose2[2];
+
+    //pre-integration terms
+    double theta12=theta2-theta1;
+    double x12=(x2-x1)*cos(theta1)+(y2-y1)*sin(theta1);
+    double y12=(y2-y1)*cos(theta1)-(x2-x1)*sin(theta1);
+
+    //T12
+    cv::Mat T12b=(cv::Mat_<float>(4,4)<<cos(theta12),-sin(theta12),0,x12,
+                                        sin(theta12), cos(theta12),0,y12,
+                                             0,            0,      1, 0,
+                                             0,            0,      0, 1);
+    cv::Mat T12c=Frame::Tcb*T12b*Frame::Tbc;
+    return T12c.clone();
 }
 
 } //namespace ORB_SLAM

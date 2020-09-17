@@ -162,26 +162,24 @@ Matrix6d EdgeSE3Quat::JRInv(Vector6d e)
 	Matrix6d J;
 	J.block(0, 0, 3, 3) = skew(e.head(3));
 	J.block(3, 3, 3, 3) = skew(e.head(3));
-	J.block(3, 0, 3, 3) = skew(e.tail(3));
-	J.block(0, 3, 3, 3) = Eigen::Matrix3d::Zero();
+	J.block(0, 3, 3, 3) = skew(e.tail(3));
+	J.block(3, 0, 3, 3) = Eigen::Matrix3d::Zero();
 	
 	J = 0.5 * J + Matrix6d::Identity();
 	return J;
 }
+
 void EdgeSE3Quat::linearizeOplus()
 {
-	g2o::SE3Quat v1 = (static_cast<VertexSE3Quat*> (_vertices[0]))->estimate();
-	g2o::SE3Quat v2 = (static_cast<VertexSE3Quat*> (_vertices[1]))->estimate();
-//  Sophus::SE3 e = _measurement.inverse() * v1.inverse() * v2;
+	g2o::SE3Quat v1 = (static_cast<g2o::VertexSE3Expmap*> (_vertices[0]))->estimate();
+	g2o::SE3Quat v2 = (static_cast<g2o::VertexSE3Expmap*> (_vertices[1]))->estimate();
 	g2o::SE3Quat e = _measurement.inverse() * v1 * v2.inverse();
 	Matrix6d J = JRInv(e.log());
 
-//   _jacobianOplusXi = -J * v2.inverse().Adj();
-//   _jacobianOplusXj = J * v2.inverse().Adj();
-
-_jacobianOplusXi = J*v2.adj()*v1.inverse().adj();
-_jacobianOplusXj = -J;
+	_jacobianOplusXi = J*v2.adj()*v1.inverse().adj();
+	_jacobianOplusXj = -J;
 }
+
 Matrix3d EdgeSE3Quat::skew(Vector3d phi)
 {
 	Matrix3d Phi;

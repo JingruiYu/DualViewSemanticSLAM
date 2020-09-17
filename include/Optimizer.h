@@ -59,9 +59,11 @@ public:
     /********************* Modified Here *********************/
     void static BundleAdjustmentWithBirdview(const std::vector<KeyFrame*> &vpKF, const std::vector<MapPoint*> &vpMP,
                             const std::vector<MapPointBird*> &vpMPBird, int nIterations = 5, bool *pbStopFlag=NULL, 
-                            const unsigned long nLoopKF=0, const bool bRobust = true);
+                            const unsigned long nLoopKF=0, const bool bRobust = true, const double wPC = 1e3);
     void static GlobalBundleAdjustemntWithBirdview(Map* pMap, int nIterations=5, bool *pbStopFlag=NULL,
                                        const unsigned long nLoopKF=0, const bool bRobust = true);
+    void static LocalBundleAdjustmentWithPoseGraph(KeyFrame* pKF, bool *pbStopFlag, Map *pMap, double wPC = 1e3);
+    void static TestPoseGraph(KeyFrame *pKF, bool* pbStopFlag, Map* pMap, double wPC = 1e3);
     void static LocalBundleAdjustmentWithBirdview(KeyFrame* pKF, bool *pbStopFlag, Map *pMap);
     int static PoseOptimizationWithBirdview(Frame* pFrame, Frame* pRefFrame=NULL, double wF = 1.0, double wB = 0.0);
 };

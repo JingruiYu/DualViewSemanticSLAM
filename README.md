@@ -16,3 +16,6 @@ The prior of motion model is added. The number of matches and lost is less in 7 
 
 v0.5:
 Both the front and bird points are added.
+
+v0.6:
+The bird points are removed. The pose graph are added in both localMapping and GlobalBA.

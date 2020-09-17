@@ -652,6 +652,20 @@ void Optimizer::LocalBundleAdjustment(KeyFrame *pKF, bool* pbStopFlag, Map* pMap
         }
     }
 
+    // vector<KeyFrame*> vLocalKeyFrames(lLocalKeyFrames.begin(),lLocalKeyFrames.end());
+    // sort(vLocalKeyFrames.begin(),vLocalKeyFrames.end(),[](KeyFrame* a,KeyFrame* b){return (a->mnId<b->mnId);});
+    // for(vector<KeyFrame*>::iterator KFit=vLocalKeyFrames.begin(),KFnext=KFit+1;KFnext!=vLocalKeyFrames.end();KFit++,KFnext++)
+    // {
+    //     KeyFrame *KF1=*KFit;
+    //     KeyFrame *KF2=*KFnext;
+    //     Eigen::Matrix4d T12=Converter::toMatrix4d(Converter::GetDeltaTransformFromOdometer(KF1->mGtPose,KF2->mGtPose));
+    //     g2o::SE3Quat v1 = Converter::toSE3Quat(KF1->GetPose());
+    //     g2o::SE3Quat v2 = Converter::toSE3Quat(KF2->GetPose());
+    //     g2o::SE3Quat T12_g2o = g2o::SE3Quat(T12.block(0,0,3,3),T12.block(0,3,3,1));
+    //     g2o::Vector6d e_original = (T12_g2o.inverse()*v1*v2.inverse()).log();
+    //     cout << "before: " << e_original << endl;
+    // }
+
     if(pbStopFlag)
         if(*pbStopFlag)
             return;

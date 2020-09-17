@@ -1243,7 +1243,7 @@ bool Tracking::TrackWithMotionModel()
     }
 
     int nmatchesBird = 0;
-    if(mbHaveBirdview)
+    if(mbHaveBirdview && false)
     {
         // match birdview points.
         fill(mCurrentFrame.mvpMapPointsBird.begin(),mCurrentFrame.mvpMapPointsBird.end(),static_cast<MapPointBird*>(NULL));
@@ -1262,7 +1262,7 @@ bool Tracking::TrackWithMotionModel()
         return false;
 
     // Optimize frame pose with all matches
-    if(mbHaveBirdview)
+    if(mbHaveBirdview && false)
     {
         Optimizer::PoseOptimizationWithBirdview(&mCurrentFrame,NULL,1.0,1.0);
     }
@@ -1336,7 +1336,7 @@ bool Tracking::TrackLocalMap()
 
     // Optimize Pose
     /********************* Modified Here *********************/
-    if(mbHaveBirdview)
+    if(mbHaveBirdview && false)
     {
         // generate more birdview mappoints
         MatchAndRetriveBirdMP();
@@ -1400,9 +1400,9 @@ bool Tracking::TrackLocalMap()
         cout<<"Track Local Map, Birdview MatchesInliers = "<<nMatchesInliersBird<<endl;
     }
 
-    if(mnMatchesInliers+nMatchesInliersBird<20)
+    if(mnMatchesInliers+nMatchesInliersBird<15)
     {
-        cout<<"Inliers less than 20 , tracking lost. It is: "<< mnMatchesInliers+nMatchesInliersBird << endl;
+        cout<<"Inliers less than 15 , tracking lost. It is: "<< mnMatchesInliers+nMatchesInliersBird << endl;
         return false;
     } 
     else

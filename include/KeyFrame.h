@@ -205,6 +205,8 @@ public:
     const int mnMaxY;
     const cv::Mat mK;
 
+    cv::Vec3d mGtPose;
+    cv::Vec3d mOdomPose;
 
     // The following variables need to be accessed trough a mutex to be thread safe.
 protected:

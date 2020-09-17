@@ -82,11 +82,12 @@ void LocalMapping::Run()
                     // if(mpTracker->mbHaveBirdview)
                     // {
                         // Optimizer::LocalBundleAdjustmentWithBirdview(mpCurrentKeyFrame,&mbAbortBA, mpMap);
-                        // Optimizer::LocalBundleAdjustment(mpCurrentKeyFrame,&mbAbortBA, mpMap);
+                        Optimizer::LocalBundleAdjustmentWithPoseGraph(mpCurrentKeyFrame,&mbAbortBA, mpMap);
                     // }
                     // else
                     // {
-                        Optimizer::LocalBundleAdjustment(mpCurrentKeyFrame,&mbAbortBA, mpMap);
+                        // Optimizer::LocalBundleAdjustment(mpCurrentKeyFrame,&mbAbortBA, mpMap);
+                        // Optimizer::TestPoseGraph(mpCurrentKeyFrame,&mbAbortBA, mpMap);
                     // }
                 }
 

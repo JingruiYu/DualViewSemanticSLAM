@@ -151,7 +151,7 @@ public:
 };
 
 //templete params: BaseBinaryEdge<ErrorDimension,MeasurementType,Vertex1,Vertex2>
-class EdgeSE3Quat : public g2o::BaseBinaryEdge<6, g2o::SE3Quat, VertexSE3Quat, VertexSE3Quat>
+class EdgeSE3Quat : public g2o::BaseBinaryEdge<6, g2o::SE3Quat, g2o::VertexSE3Expmap, g2o::VertexSE3Expmap>
 {
 public:
 	EIGEN_MAKE_ALIGNED_OPERATOR_NEW
@@ -159,9 +159,8 @@ public:
 	bool write(std::ostream& os) const{return false;}
 	virtual void computeError()
 	{
-		g2o::SE3Quat v1 = (static_cast<VertexSE3Quat*> (_vertices[0]))->estimate();
-		g2o::SE3Quat v2 = (static_cast<VertexSE3Quat*> (_vertices[1]))->estimate();
-	//   _error = (_measurement.inverse()*v1.inverse()*v2).log();
+		g2o::SE3Quat v1 = (static_cast<g2o::VertexSE3Expmap*> (_vertices[0]))->estimate();
+		g2o::SE3Quat v2 = (static_cast<g2o::VertexSE3Expmap*> (_vertices[1]))->estimate();
 		_error = (_measurement.inverse()*v1*v2.inverse()).log();
 	}
 	virtual void linearizeOplus();
