@@ -18,4 +18,6 @@ v0.5:
 Both the front and bird points are added.
 
 v0.6:
-The bird points are removed. The pose graph are added in both localMapping and GlobalBA.
+The bird points are removed. The pose graph are added in both localMapping and GlobalBA. The weight of PoseGraph should not larger than 2e3.
+If the weight of PoseGraph is larger, tracking will be lost. So, the rebuilt map is needed for tracking lost.
+Check why the pure front slam don't have good shape?
