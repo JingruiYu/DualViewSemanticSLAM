@@ -188,6 +188,7 @@ public:
     static const double rear_axle_to_center;
     static const double vehicle_length;
     static const double vehicle_width;
+    cv::Mat mImg;
     // birdview images
     cv::Mat mBirdviewImg;
     cv::Mat mBirdviewMask;

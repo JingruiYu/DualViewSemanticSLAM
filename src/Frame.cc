@@ -62,7 +62,7 @@ Frame::Frame(const Frame &frame)
      mvLevelSigma2(frame.mvLevelSigma2), mvInvLevelSigma2(frame.mvInvLevelSigma2),
      mbHaveBirdview(frame.mbHaveBirdview),mvKeysBird(frame.mvKeysBird),mDescriptorsBird(frame.mDescriptorsBird.clone()),
     mvKeysBirdCamXYZ(frame.mvKeysBirdCamXYZ),mnBirdviewRefFrameId(frame.mnBirdviewRefFrameId),mvbBirdviewInliers(frame.mvbBirdviewInliers),
-    mvnBirdviewMatches21(frame.mvnBirdviewMatches21),mBirdviewImg(frame.mBirdviewImg.clone()),mBirdviewMask(frame.mBirdviewMask.clone()),
+    mvnBirdviewMatches21(frame.mvnBirdviewMatches21),mImg(frame.mImg),mBirdviewImg(frame.mBirdviewImg.clone()),mBirdviewMask(frame.mBirdviewMask.clone()),
     mvpMapPointsBird(frame.mvpMapPointsBird),mvKeysBirdBaseXY(frame.mvKeysBirdBaseXY),mpReferenceKFBird(frame.mpReferenceKFBird),Nbird(frame.Nbird)
 {
     for(int i=0;i<FRAME_GRID_COLS;i++)
@@ -430,6 +430,7 @@ Frame::Frame(const cv::Mat &imGray, const cv::Mat &birdviewGray, const cv::Mat &
     if(mvKeys.empty())
         return;
 
+    mImg = imGray.clone();
     mBirdviewImg = birdviewGray.clone();
     mBirdviewMask = birdviewMask.clone();
 

@@ -525,40 +525,12 @@ bool Initializer::ReconstructF(vector<bool> &vbMatchesInliers, cv::Mat &F21, cv:
     file<<setprecision(6)<<mRefFrame.mTimeStamp<<" "<<mCurFrame.mTimeStamp<<" "<<t12.t()<<" "<<atan2(R12.at<float>(0,1),R12.at<float>(0,0))<<endl;
 
 
-    // // draw matches
-    // cv::Mat matchesImg;
-    // vector<cv::DMatch> vMatches12;
-    // ORBmatcher matcher(0.99,true);
-    // cout<<"Match size = "<<vbMatchesInliersBird.size()<<endl;
-    // for(int k=0;k<mvMatchesBird12.size();k++)
-    // {
-    //     if(!vbMatchesInliersBird[k])
-    //         continue;
-    //     int idx1 = mvMatchesBird12[k].first;
-    //     int idx2 = mvMatchesBird12[k].second;
-    //     cv::Mat d1 =  mRefFrame.mDescriptorsBird.row(idx1);
-    //     cv::Mat d2 =  mCurFrame.mDescriptorsBird.row(idx2);
-    //     int distance = matcher.DescriptorDistance(d1,d2);
-    //     vMatches12.push_back(cv::DMatch(idx1,idx2,distance));
-    // }
-    // cout<<"Inlier size = "<<vMatches12.size()<<"/"<<mvMatchesBird12.size()<<endl;
-    // cv::drawMatches(mRefFrame.mBirdviewImg,mvKeysBird1,mCurFrame.mBirdviewImg,mvkeysBird2,
-    //         vMatches12,matchesImg,cv::Scalar::all(-1),cv::Scalar::all(-1),std::vector<char>(),cv::DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS);
-    // cv::imshow("matches inliers inside",matchesImg);
-    // cv::waitKey(0);
-
     if(norm(t12)<0.4)
     {
         cout<<"t12<0.4"<<endl;
         return false;
     }
     
-    // cv::Mat R123D,t123D;
-    // vector<bool> vbMatchesInliersBird3D;
-    // mIcp.FindRtICP(mvKeysXYZBird1,mvKeysXYZBird2,mvMatchesBird12,vbMatchesInliersBird3D,R123D,t123D,score,sigma);
-    // cout<<"Current ICP Score = "<<score<<endl;
-    // cv::Mat R213D = R123D.t();
-    // cv::Mat t213D = -R213D*t123D;
 
     cv::Mat T12b = cv::Mat::eye(4,4,CV_32F);
     R12.copyTo(T12b.rowRange(0,2).colRange(0,2));
@@ -589,50 +561,6 @@ bool Initializer::ReconstructF(vector<bool> &vbMatchesInliers, cv::Mat &F21, cv:
 
     t = t/norm(t);
     t = t.dot(t_icp)*t;
-
-
-    // // find homography using birdview points
-    // vector<cv::Point2f> vKeysBird1,vKeysBird2;
-    // for(int k=0;k<mvMatchesBird12.size();k++)
-    // {
-    //     vKeysBird1.push_back(mvKeysBird1[mvMatchesBird12[k].first].pt);
-    //     vKeysBird2.push_back(mvkeysBird2[mvMatchesBird12[k].second].pt);
-    // }
-    // std::vector<uchar> inliersMask(mvMatchesBird12.size());
-    // cv::Mat H21bird = cv::findHomography(vKeysBird1,vKeysBird2,cv::RANSAC,3.0,inliersMask);
-    // cv::Mat invH = H21bird.inv();
-    // int good=0;
-    // for(int k=0;k<inliersMask.size();k++)
-    // {
-    //     if(inliersMask[k])
-    //     {
-    //         good++;
-    //     }
-    // }
-    // cout<<"Homography : "<<inliersMask.size()<<" matches, "<<good<<" inliers."<<endl;
-    // cv::Point2f Ob1,Ob2;
-    // vector<cv::Point2f> vOb1,vOb2;
-    // Ob1.x = Frame::birdviewCols / 2;
-    // Ob1.y = Frame::birdviewRows / 2 + Frame::rear_axle_to_center / Frame::pixel2meter;
-    // vOb1.push_back(Ob1);
-    // cv::perspectiveTransform(vOb1,vOb2,invH);
-    // Ob2 = vOb2[0];
-    // cout<<"Ob1 = "<<Ob1.x<<" "<<Ob1.y<<endl;
-    // cout<<"Ob2 = "<<Ob2.x<<" "<<Ob2.y<<endl;
-    // cv::Point2f dt;
-    // dt.x = (Ob1.y-Ob2.y)*Frame::pixel2meter;
-    // dt.y = (Ob1.x-Ob2.x)*Frame::pixel2meter;
-    // double dth = atan2(H21bird.at<double>(0, 1), H21bird.at<double>(0, 0));
-    // cv::Mat T12b = (cv::Mat_<float>(4,4)<<cos(dth),-sin(dth),0,dt.x,
-    //                                       sin(dth), cos(dth),0,dt.y,
-    //                                         0,        0,    1,  0,
-    //                                         0,        0,    0,  1);
-    // cv::Mat T21c = Frame::Tcb*T12b.inv()*Frame::Tbc;
-    // cv::Mat R3 = T21c.rowRange(0,3).colRange(0,3);
-    // cv::Mat t_bird = T21c.rowRange(0,3).col(3);
-    // t = t/norm(t);
-    // t = t.dot(t_bird)*t;
-    // cout<<"translation = "<<dt.x<<" "<<dt.y<<" , rotation = "<<dth<<endl;
 
 
     cv::Mat t1=t;
@@ -1103,6 +1031,126 @@ int Initializer::CheckRT(const cv::Mat &R, const cv::Mat &t, const vector<cv::Ke
 
     return nGood;
 }
+
+
+int Initializer::ReInitCheckRT(const cv::Mat &Tcw1, const cv::Mat &Tcw2, const vector<cv::KeyPoint> &vKeys1, const vector<cv::KeyPoint> &vKeys2,
+                       const vector<int> &vMatches12, const cv::Mat &K, vector<cv::Point3f> &vP3D, float th2, vector<bool> &vbGood, float &parallax)
+{
+    cv::Mat Rcw1 = Tcw1.rowRange(0,3).colRange(0,3).clone();
+    cv::Mat tcw1 = Tcw1.rowRange(0,3).col(3).clone();
+    cv::Mat Rcw2 = Tcw2.rowRange(0,3).colRange(0,3).clone();
+    cv::Mat tcw2 = Tcw2.rowRange(0,3).col(3).clone();
+
+    // Calibration parameters
+    const float fx = K.at<float>(0,0);
+    const float fy = K.at<float>(1,1);
+    const float cx = K.at<float>(0,2);
+    const float cy = K.at<float>(1,2);
+
+    vbGood = vector<bool>(vKeys1.size(),false);
+    vP3D.resize(vKeys1.size());
+
+    vector<float> vCosParallax;
+    vCosParallax.reserve(vKeys1.size());
+
+    // Camera 1 Projection Matrix K[R|t]
+    cv::Mat P1(3,4,CV_32F,cv::Scalar(0));
+    Rcw1.copyTo(P1.rowRange(0,3).colRange(0,3));
+    tcw1.copyTo(P1.rowRange(0,3).col(3));
+    P1 = K*P1;
+
+    cv::Mat O1 = -Rcw1.t()*tcw1;
+
+    // Camera 2 Projection Matrix K[R|t]
+    cv::Mat P2(3,4,CV_32F);
+    Rcw2.copyTo(P2.rowRange(0,3).colRange(0,3));
+    tcw2.copyTo(P2.rowRange(0,3).col(3));
+    P2 = K*P2;
+
+    cv::Mat O2 = -Rcw2.t()*tcw2;
+
+    int nGood=0;
+
+    for(size_t i=0, iend=vMatches12.size();i<iend;i++)
+    {
+        if (vMatches12[i] < 0)
+            continue;
+        
+        const cv::KeyPoint &kp1 = vKeys1[i];
+        const cv::KeyPoint &kp2 = vKeys2[vMatches12[i]];
+        cv::Mat p3dC;
+
+        Triangulate(kp1,kp2,P1,P2,p3dC);
+
+        if(!isfinite(p3dC.at<float>(0)) || !isfinite(p3dC.at<float>(1)) || !isfinite(p3dC.at<float>(2)))
+        {
+            vbGood[i]=false;
+            continue;
+        }
+
+        // Check parallax
+        cv::Mat normal1 = p3dC - O1;
+        float dist1 = cv::norm(normal1);
+
+        cv::Mat normal2 = p3dC - O2;
+        float dist2 = cv::norm(normal2);
+
+        float cosParallax = normal1.dot(normal2)/(dist1*dist2);
+
+        cv::Mat p3dC1 = Rcw1*p3dC+tcw1;
+        // Check depth in front of first camera (only if enough parallax, as "infinite" points can easily go to negative depth)
+        if(p3dC1.at<float>(2)<=0 && cosParallax<0.99998)
+            continue;
+
+        // Check depth in front of second camera (only if enough parallax, as "infinite" points can easily go to negative depth)
+        cv::Mat p3dC2 = Rcw2*p3dC+tcw2;
+
+        if(p3dC2.at<float>(2)<=0 && cosParallax<0.99998)
+            continue;
+
+        // Check reprojection error in first image
+        float im1x, im1y;
+        float invZ1 = 1.0/p3dC1.at<float>(2);
+        im1x = fx*p3dC1.at<float>(0)*invZ1+cx;
+        im1y = fy*p3dC1.at<float>(1)*invZ1+cy;
+
+        float squareError1 = (im1x-kp1.pt.x)*(im1x-kp1.pt.x)+(im1y-kp1.pt.y)*(im1y-kp1.pt.y);
+
+        if(squareError1>th2)
+            continue;
+
+        // Check reprojection error in second image
+        float im2x, im2y;
+        float invZ2 = 1.0/p3dC2.at<float>(2);
+        im2x = fx*p3dC2.at<float>(0)*invZ2+cx;
+        im2y = fy*p3dC2.at<float>(1)*invZ2+cy;
+
+        float squareError2 = (im2x-kp2.pt.x)*(im2x-kp2.pt.x)+(im2y-kp2.pt.y)*(im2y-kp2.pt.y);
+
+        if(squareError2>th2)
+            continue;
+
+        vCosParallax.push_back(cosParallax);
+        vP3D[i] = cv::Point3f(p3dC.at<float>(0),p3dC.at<float>(1),p3dC.at<float>(2));
+        nGood++;
+
+        if(cosParallax<0.99998)
+            vbGood[i]=true;
+    }
+
+    if(nGood>0)
+    {
+        sort(vCosParallax.begin(),vCosParallax.end());
+
+        size_t idx = min(50,int(vCosParallax.size()-1));
+        parallax = acos(vCosParallax[idx])*180/CV_PI;
+    }
+    else
+        parallax=0;
+
+    return nGood;
+}
+
 
 void Initializer::DecomposeE(const cv::Mat &E, cv::Mat &R1, cv::Mat &R2, cv::Mat &t)
 {

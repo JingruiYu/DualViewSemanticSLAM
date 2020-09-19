@@ -179,7 +179,8 @@ protected:
     bool TrackWithMotionModel();
 
     bool Relocalization();
-
+    bool ReInitiation();
+    
     void UpdateLocalMap();
     void UpdateLocalPoints();
     void UpdateLocalKeyFrames();

@@ -45,6 +45,9 @@ public:
             cv::Mat &R21, cv::Mat &t21, vector<cv::Point3f> &vP3D, vector<bool> &vbTriangulated);
     vector<bool> GetMatchesInliersBird();
 
+    int ReInitCheckRT(const cv::Mat &Tcw1, const cv::Mat &Tcw2, const vector<cv::KeyPoint> &vKeys1, const vector<cv::KeyPoint> &vKeys2,
+                       const vector<int> &vMatches12, const cv::Mat &K, vector<cv::Point3f> &vP3D, float th2, vector<bool> &vbGood, float &parallax);
+
 private:
 
     void FindHomography(vector<bool> &vbMatchesInliers, float &score, cv::Mat &H21);

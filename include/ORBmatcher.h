@@ -51,6 +51,8 @@ public:
     // Used to track from previous frame (Tracking)
     int SearchByProjection(Frame &CurrentFrame, const Frame &LastFrame, const float th, const bool bMono);
 
+    int SearchByProjectionDraw(Frame &CurrentFrame, const Frame &LastFrame, const float th, vector<cv::DMatch> &vMatches12);
+
     // Project MapPoints seen in KeyFrame into the Frame and search matches.
     // Used in relocalisation (Tracking)
     int SearchByProjection(Frame &CurrentFrame, KeyFrame* pKF, const std::set<MapPoint*> &sAlreadyFound, const float th, const int ORBdist);
@@ -63,10 +65,12 @@ public:
     // Brute force constrained to ORB that belong to the same vocabulary node (at a certain level)
     // Used in Relocalisation and Loop Detection
     int SearchByBoW(KeyFrame *pKF, Frame &F, std::vector<MapPoint*> &vpMapPointMatches);
+    int SearchByBoWDraw(KeyFrame *pKF, Frame &F, std::vector<MapPoint*> &vpMapPointMatches, vector<cv::DMatch> &vMatches12);
     int SearchByBoW(KeyFrame *pKF1, KeyFrame* pKF2, std::vector<MapPoint*> &vpMatches12);
 
     // Matching for the Map Initialization (only used in the monocular case)
     int SearchForInitialization(Frame &F1, Frame &F2, std::vector<cv::Point2f> &vbPrevMatched, std::vector<int> &vnMatches12, int windowSize=10);
+    int SearchForReInitiationDraw(Frame &F1, Frame &F2, vector<int> &vnMatches12, vector<cv::DMatch> &vMatches12, int windowSize=10);
 
     // Matching to triangulate new MapPoints. Check Epipolar Constraint.
     int SearchForTriangulation(KeyFrame *pKF1, KeyFrame* pKF2, cv::Mat F12,

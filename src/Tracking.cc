@@ -469,11 +469,13 @@ void Tracking::Track()
             }
             else
             {
-                bOK = Relocalization();
+                // bOK = Relocalization();
+                bOK = ReInitiation();
             }
         }
         else
         {
+            cout << "\033[32m" << "mbOnlyTracking is true! " << "\033[0m" << endl;
             // Localization Mode: Local Mapping is deactivated
 
             if(mState==LOST)
@@ -634,6 +636,28 @@ void Tracking::Track()
             }
         }
 
+        if (mState==LOST)
+        {
+            if (mCurrentFrame.mTcw.empty())
+            {
+                cout << "\033[36m" << "When lost, the Tcw is empty! " << "\033[0m" << endl;
+            }
+            else
+            {
+                cout << "When lost, the Tcw is not empty! " << endl;
+            }
+
+            int num = 0;
+            for (size_t i = 0; i < mCurrentFrame.mvpMapPoints.size(); i++)
+            {
+                MapPoint * mp = mCurrentFrame.mvpMapPoints[i];
+                if (mp)
+                    num++;                
+            }
+
+            cout << "\033[36m" << "When lost, the number of mappoints is : " << num << "\033[0m" << endl;
+        }
+        
         if(!mCurrentFrame.mpReferenceKF)
             mCurrentFrame.mpReferenceKF = mpReferenceKF;
 
@@ -657,7 +681,6 @@ void Tracking::Track()
         mlFrameTimes.push_back(mlFrameTimes.back());
         mlbLost.push_back(mState==LOST);
     }
-
 }
 
 
@@ -1057,10 +1080,15 @@ bool Tracking::TrackReferenceKeyFrame()
     // If enough matches are found we setup a PnP solver
     ORBmatcher matcher(0.7,true);
     vector<MapPoint*> vpMapPointMatches;
-
-    int nmatches = matcher.SearchByBoW(mpReferenceKF,mCurrentFrame,vpMapPointMatches);
+    vector<cv::DMatch> vMatches12;
+    int nmatches = matcher.SearchByBoWDraw(mpReferenceKF,mCurrentFrame,vpMapPointMatches,vMatches12);
 
     cout<<"\033[31m"<<"Track Reference KeyFrame, "<<nmatches<<" Matches."<<"\033[0m"<<endl;
+
+    cv::Mat matchesImg;
+    cv::drawMatches(mpReferenceKF->mImg,mpReferenceKF->mvKeys,mCurrentFrame.mImg,mCurrentFrame.mvKeys,
+            vMatches12,matchesImg,cv::Scalar::all(-1),cv::Scalar::all(-1),std::vector<char>(),cv::DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS);
+    cv::imwrite("FrontWithRefKF.jpg",matchesImg);
 
     if(nmatches<15)
         return false;
@@ -1136,7 +1164,7 @@ bool Tracking::TrackReferenceKeyFrame()
     }
 
 
-    return nmatchesMap+nmatchesBirdMap>=10;
+    return nmatchesMap+nmatchesBirdMap>=15;
 }
 
 void Tracking::UpdateLastFrame()
@@ -1227,20 +1255,28 @@ bool Tracking::TrackWithMotionModel()
 
     fill(mCurrentFrame.mvpMapPoints.begin(),mCurrentFrame.mvpMapPoints.end(),static_cast<MapPoint*>(NULL));
 
+    vector<cv::DMatch> vMatches12;
     // Project points seen in previous frame
     int th;
     if(mSensor!=System::STEREO)
         th=15;
     else
         th=7;
-    int nmatches = matcher.SearchByProjection(mCurrentFrame,mLastFrame,th,mSensor==System::MONOCULAR);
+    int nmatches = matcher.SearchByProjectionDraw(mCurrentFrame,mLastFrame,th,vMatches12);
 
     // If few matches, uses a wider window search
     if(nmatches<20)
     {
         fill(mCurrentFrame.mvpMapPoints.begin(),mCurrentFrame.mvpMapPoints.end(),static_cast<MapPoint*>(NULL));
-        nmatches = matcher.SearchByProjection(mCurrentFrame,mLastFrame,2*th,mSensor==System::MONOCULAR);
+        nmatches = matcher.SearchByProjectionDraw(mCurrentFrame,mLastFrame,2*th,vMatches12);
     }
+
+    cout<<"Tracking with Motion Before Optimization, "<< nmatches <<" Matches in Map."<<endl;
+
+    cv::Mat matchesImg;
+    cv::drawMatches(mLastFrame.mImg,mLastFrame.mvKeys,mCurrentFrame.mImg,mCurrentFrame.mvKeys,
+            vMatches12,matchesImg,cv::Scalar::all(-1),cv::Scalar::all(-1),std::vector<char>(),cv::DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS);
+    cv::imwrite("FrontWithMotionModel.jpg",matchesImg);
 
     int nmatchesBird = 0;
     if(mbHaveBirdview && false)
@@ -1293,7 +1329,7 @@ bool Tracking::TrackWithMotionModel()
         }
     }
 
-    cout<<"After Optimization, "<<nmatchesMap<<" Matches in Map."<<endl;
+    cout<<"Tracking with Motion After Optimization, "<<nmatchesMap<<" Matches in Map."<<endl;
 
     if(mbHaveBirdview)
     {
@@ -1400,9 +1436,9 @@ bool Tracking::TrackLocalMap()
         cout<<"Track Local Map, Birdview MatchesInliers = "<<nMatchesInliersBird<<endl;
     }
 
-    if(mnMatchesInliers+nMatchesInliersBird<15)
+    if(mnMatchesInliers+nMatchesInliersBird<30)
     {
-        cout<<"Inliers less than 15 , tracking lost. It is: "<< mnMatchesInliers+nMatchesInliersBird << endl;
+        cout<<"Inliers less than 30 , tracking lost. It is: "<< mnMatchesInliers+nMatchesInliersBird << endl;
         return false;
     } 
     else
@@ -2053,6 +2089,111 @@ bool Tracking::Relocalization()
         return true;
     }
 
+}
+
+
+bool Tracking::ReInitiation()
+{
+    cout << "\033[32m" << "ReInitiation " << "\033[0m" << endl;
+    
+    if (mLastFrame.mTcw.empty())
+    {
+        cout << "mLastFrame.mTcw is empty, which may not exit? " << endl;
+    }
+    
+    cout << "mLastFrame.mnId : " << mLastFrame.mnId  << endl;
+    cout << "mCurrentFrame.mnId : " << mCurrentFrame.mnId << endl;
+
+    mVelocity = GetPriorMotion();
+    if (mVelocity.empty())
+    {
+        cout << "mVelocity is empty, why? " << endl;
+    }
+    
+    mCurrentFrame.SetPose(mVelocity*mLastFrame.mTcw);
+
+    cout << "mLastFrame.mTcw : " << mLastFrame.mTcw  << endl;
+    cout << "mCurrentFrame.mTcw : " << mCurrentFrame.mTcw  << endl;
+
+    ORBmatcher matcher(0.9,true);
+    vector<cv::DMatch> vDMatches12;
+    vector<int> vnMatch12(mLastFrame.mvKeysUn.size(),-1);
+    int nmatches = matcher.SearchForReInitiationDraw(mLastFrame,mCurrentFrame,vnMatch12,vDMatches12,100);
+    cout << "\033[32m" << "nmatches of ReInitiation: " << nmatches << "\033[0m" << endl;
+
+    cv::Mat matchesImg;
+    cv::drawMatches(mLastFrame.mImg,mLastFrame.mvKeys,mCurrentFrame.mImg,mCurrentFrame.mvKeys,
+            vDMatches12,matchesImg,cv::Scalar::all(-1),cv::Scalar::all(-1),std::vector<char>(),cv::DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS);
+    cv::imwrite("FrontWithReInitiation.jpg",matchesImg);
+
+    if (nmatches < 20)
+    {
+        return false;
+    }
+    
+    vector<cv::Point3f> vP3D;
+    vector<bool> vbGood;
+    float parallax;
+    int nGood = mpInitializer->ReInitCheckRT(mLastFrame.mTcw, mCurrentFrame.mTcw, mLastFrame.mvKeysUn, mCurrentFrame.mvKeysUn, vnMatch12, mCurrentFrame.mK, vP3D, 4, vbGood, parallax);
+    cout << "number of trianguler: " << nGood << endl;
+
+    if (nGood < 20)
+    {
+        return false;
+    }
+
+    // build New KF and MPs?
+    KeyFrame* pKFcur = new KeyFrame(mCurrentFrame,mpMap,mpKeyFrameDB);
+    pKFcur->ComputeBoW();
+    mpMap->AddKeyFrame(pKFcur);
+
+    cout << "KeyFrame is build " << endl;
+
+    for (size_t i = 0; i < vbGood.size(); i++)
+    {
+        if (!vbGood[i])
+            continue;
+        
+        //Create MapPoint.
+        cv::Mat worldPos(vP3D[i]);
+
+        MapPoint* pMP = new MapPoint(worldPos,pKFcur,mpMap);
+
+        pKFcur->AddMapPoint(pMP,vnMatch12[i]);        
+        pMP->AddObservation(pKFcur,vnMatch12[i]);
+
+        pMP->ComputeDistinctiveDescriptors();
+        pMP->UpdateNormalAndDepth();
+
+        //Fill Current Frame structure
+        mCurrentFrame.mvpMapPoints[vnMatch12[i]] = pMP;
+        mCurrentFrame.mvbOutlier[vnMatch12[i]] = false;
+
+        //Add to Map
+        mpMap->AddMapPoint(pMP);        
+    }
+    
+    cout << "Mappoints is build " << endl;
+
+    //optimization?
+
+    mpLocalMapper->InsertKeyFrame(pKFcur);
+    mCurrentFrame.SetPose(pKFcur->GetPose());
+    mnLastKeyFrameId=mCurrentFrame.mnId;
+    mpLastKeyFrame = pKFcur;
+
+    mvpLocalKeyFrames.push_back(pKFcur);
+    mvpLocalMapPoints=mpMap->GetAllMapPoints();
+
+    mpReferenceKF = pKFcur;
+    mCurrentFrame.mpReferenceKF = pKFcur;
+
+    mpMap->SetReferenceMapPoints(mvpLocalMapPoints);
+    mpMapDrawer->SetCurrentCameraPose(pKFcur->GetPose());
+
+    cout << "\033[35m" << "ReInitiation Successful" << "\033[0m" << endl;
+
+    return true;
 }
 
 void Tracking::Reset()
