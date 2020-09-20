@@ -92,6 +92,7 @@ public:
     void ReplaceMapPointMatch(const size_t &idx, MapPoint* pMP);
     std::set<MapPoint*> GetMapPoints();
     std::vector<MapPoint*> GetMapPointMatches();
+    int GetMapPointsInlierNum();
     int TrackedMapPoints(const int &minObs);
     MapPoint* GetMapPoint(const size_t &idx);
 

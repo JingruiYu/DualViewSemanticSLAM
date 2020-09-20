@@ -24,6 +24,7 @@
 
 #include "Optimizer.h"
 #include "ORBmatcher.h"
+#include "Converter.h"
 
 #include<thread>
 // #include<fstream>
@@ -146,6 +147,75 @@ bool Initializer::Initialize(const Frame &CurrentFrame, const vector<int> &vMatc
         return ReconstructF(vbMatchesInliersF,F,mK,R21,t21,vP3D,vbTriangulated,1.0,50);
 
     return false;
+}
+
+
+bool Initializer::ReInitialize(const Frame &ReInitFrame, const Frame &CurrentFrame, const vector<int> &vMatches12, 
+            cv::Mat &R21, cv::Mat &t21, vector<cv::Point3f> &vP3D, vector<bool> &vbTriangulated)
+{
+    // Fill structures with current keypoints and matches with reference frame
+    // Reference Frame: 1, Current Frame: 2
+    mvKeys2 = CurrentFrame.mvKeysUn;
+    /********************* Modified Here *********************/
+    mCurFrame = Frame(CurrentFrame);
+    
+    mvMatches12.clear();
+    mvMatches12.reserve(mvKeys2.size());
+    mvbMatched1.resize(mvKeys1.size());
+    for(size_t i=0, iend=vMatches12.size();i<iend; i++)
+    {
+        if(vMatches12[i]>=0)
+        {
+            mvMatches12.push_back(make_pair(i,vMatches12[i]));
+            mvbMatched1[i]=true;
+        }
+        else
+            mvbMatched1[i]=false;
+    }
+
+    const int N = mvMatches12.size();
+
+    // Indices for minimum set selection
+    vector<size_t> vAllIndices;
+    vAllIndices.reserve(N);
+    vector<size_t> vAvailableIndices;
+
+    for(int i=0; i<N; i++)
+    {
+        vAllIndices.push_back(i);
+    }
+
+    // Generate sets of 8 points for each RANSAC iteration
+    mvSets = vector< vector<size_t> >(mMaxIterations,vector<size_t>(8,0));
+
+    DUtils::Random::SeedRandOnce(0);
+
+    for(int it=0; it<mMaxIterations; it++)
+    {
+        vAvailableIndices = vAllIndices;
+
+        // Select a minimum set
+        for(size_t j=0; j<8; j++)
+        {
+            int randi = DUtils::Random::RandomInt(0,vAvailableIndices.size()-1);
+            int idx = vAvailableIndices[randi];
+
+            mvSets[it][j] = idx;
+
+            vAvailableIndices[randi] = vAvailableIndices.back();
+            vAvailableIndices.pop_back();
+        }
+    }
+
+    // Launch threads to compute in parallel a fundamental matrix and a homography
+    vector<bool> vbMatchesInliersF;
+    float SF;
+    cv::Mat F;
+
+    FindFundamental(vbMatchesInliersF,SF,F); 
+    
+    return ReInitconstructF(vbMatchesInliersF,F,mK,R21,t21,vP3D,vbTriangulated,1.0,50); //TODO
+
 }
 
 
@@ -695,6 +765,179 @@ bool Initializer::ReconstructF(vector<bool> &vbMatchesInliers, cv::Mat &F21, cv:
     return false;
 }
 
+bool Initializer::ReInitconstructF(vector<bool> &vbMatchesInliers, cv::Mat &F21, cv::Mat &K,
+                            cv::Mat &R21, cv::Mat &t21, vector<cv::Point3f> &vP3D, vector<bool> &vbTriangulated, float minParallax, int minTriangulated)
+{
+    int N=0;
+    for(size_t i=0, iend = vbMatchesInliers.size() ; i<iend; i++)
+        if(vbMatchesInliers[i])
+            N++;
+    // Compute Essential Matrix from Fundamental Matrix
+    cv::Mat E21 = K.t()*F21*K;
+
+    cv::Mat R1, R2, t;
+
+    // Recover the 4 motion hypotheses
+    DecomposeE(E21,R1,R2,t);
+
+    cv::Mat Twb1 = mRefFrame.GetGTPoseTwb();
+    cv::Mat Twb2 = mCurFrame.GetGTPoseTwb();
+
+    cv::Mat T12b = Converter::invT(Twb1)*Twb2;
+
+    if(norm(T12b.rowRange(0,3).col(3))<0.2)
+    {
+        cout << "Twb1 : " << endl << Twb1 << endl;
+        cout << "Twb2 : " << endl << Twb2 << endl;
+        cout << "T12b : " << endl << T12b << endl;
+        cout << " T12b<0.2 : "<< norm(T12b.rowRange(0,3).col(3)) <<endl;
+        
+        return false;
+    }
+
+    cv::Mat T12c = Frame::Tcb*T12b*Frame::Tbc;
+    cv::Mat R12 = T12c.rowRange(0,3).colRange(0,3);
+    cv::Mat t12 = T12c.rowRange(0,3).col(3);
+
+    cv::Mat R3 = R12.t();
+    cv::Mat t_icp = -R3*t12;
+
+    t = t/norm(t);
+    t = t.dot(t_icp)*t;
+
+    cv::Mat t1=t;
+    cv::Mat t2=-t;
+
+    // Reconstruct with the 4 hyphoteses and check
+    vector<cv::Point3f> vP3D1, vP3D2, vP3D3, vP3D4, vP3D5, vP3D6;
+    vector<bool> vbTriangulated1,vbTriangulated2,vbTriangulated3, vbTriangulated4, vbTriangulated5, vbTriangulated6;
+    float parallax1,parallax2, parallax3, parallax4, parallax5, parallax6;
+
+    int nGood1 = ReCheckRT(R1,t1,mvKeys1,mvKeys2,mvMatches12,vbMatchesInliers,K, vP3D1, 4.0*mSigma2, vbTriangulated1, parallax1);
+    int nGood2 = ReCheckRT(R2,t1,mvKeys1,mvKeys2,mvMatches12,vbMatchesInliers,K, vP3D2, 4.0*mSigma2, vbTriangulated2, parallax2);
+    int nGood3 = ReCheckRT(R1,t2,mvKeys1,mvKeys2,mvMatches12,vbMatchesInliers,K, vP3D3, 4.0*mSigma2, vbTriangulated3, parallax3);
+    int nGood4 = ReCheckRT(R2,t2,mvKeys1,mvKeys2,mvMatches12,vbMatchesInliers,K, vP3D4, 4.0*mSigma2, vbTriangulated4, parallax4);
+    int nGood5 = ReCheckRT(R3,t1,mvKeys1,mvKeys2,mvMatches12,vbMatchesInliers,K, vP3D5, 4.0*mSigma2, vbTriangulated5, parallax5);
+    int nGood6 = ReCheckRT(R3,t2,mvKeys1,mvKeys2,mvMatches12,vbMatchesInliers,K, vP3D6, 4.0*mSigma2, vbTriangulated6, parallax6);
+
+    cout<<"nGood1 = "<<nGood1<<" , nGood2 = "<<nGood2<<endl;
+    cout<<"nGood3 = "<<nGood3<<" , nGood4 = "<<nGood4<<endl;
+    cout<<"nGood5 = "<<nGood5<<" , nGood6 = "<<nGood6<<endl;
+
+    int maxGood = max(nGood1,max(nGood2,max(nGood3,nGood4)));
+    // int maxGood = max(nGood1, max(nGood2, max(nGood3, max(nGood4, max(nGood5, nGood6)))));
+
+    R21 = cv::Mat();
+    t21 = cv::Mat();
+
+    int nMinGood = max(static_cast<int>(0.9*N),minTriangulated);
+
+    int nsimilar = 0;
+    if(nGood1>0.7*maxGood)
+        nsimilar++;
+    if(nGood2>0.7*maxGood)
+        nsimilar++;
+    if(nGood3>0.7*maxGood)
+        nsimilar++;
+    if(nGood4>0.7*maxGood)
+        nsimilar++;
+
+    int maxGoodBird = max(nGood5,nGood6);
+    int nsimilarBird = 0;
+    if(nGood5>0.7*maxGoodBird)
+        nsimilarBird++;
+    if(nGood6>0.7*maxGoodBird)
+        nsimilarBird++;
+
+    // If there is not a clear winner or not enough triangulated points reject initialization
+    if(max(maxGood,maxGoodBird)<nMinGood || nsimilar>1||nsimilarBird>1)
+    {
+        cout << "maxGood wrong: " << endl;
+        return false;
+    }
+
+
+    maxGood = max(maxGood,maxGoodBird);
+
+    bool isTru = false;
+    // If best reconstruction has enough parallax initialize
+    if(maxGood==nGood1)
+    {
+        if(parallax1>minParallax)
+        {
+            cout<<"maxGood = maxGood1."<<endl;
+            vP3D = vP3D1;
+            vbTriangulated = vbTriangulated1;
+
+            R1.copyTo(R21);
+            t1.copyTo(t21);
+            isTru = true;
+        }
+    }else if(maxGood==nGood2)
+    {
+        if(parallax2>minParallax)
+        {
+            cout<<"maxGood = maxGood2."<<endl;
+            vP3D = vP3D2;
+            vbTriangulated = vbTriangulated2;
+
+            R2.copyTo(R21);
+            t1.copyTo(t21);
+            isTru = true;
+        }
+    }else if(maxGood==nGood3)
+    {
+        if(parallax3>minParallax)
+        {
+            cout<<"maxGood = maxGood3."<<endl;
+            vP3D = vP3D3;
+            vbTriangulated = vbTriangulated3;
+
+            R1.copyTo(R21);
+            t2.copyTo(t21);
+            isTru = true;
+        }
+    }else if(maxGood==nGood4)
+    {
+        if(parallax4>minParallax)
+        {
+            cout<<"maxGood = maxGood4."<<endl;
+            vP3D = vP3D4;
+            vbTriangulated = vbTriangulated4;
+
+            R2.copyTo(R21);
+            t2.copyTo(t21);
+            isTru = true;
+        }
+    }else if(maxGood==nGood5)
+    {
+        if(parallax5>minParallax)
+        {
+            cout<<"maxGood = maxGood5."<<endl;
+            vP3D = vP3D5;
+            vbTriangulated = vbTriangulated5;
+
+            R3.copyTo(R21);
+            t1.copyTo(t21);
+            isTru = true;
+        }
+    }else if(maxGood==nGood6)
+    {
+        if(parallax6>minParallax)
+        {
+            cout<<"maxGood = maxGood6."<<endl;
+            vP3D = vP3D6;
+            vbTriangulated = vbTriangulated6;
+
+            R3.copyTo(R21);
+            t2.copyTo(t21);
+            isTru = true;
+        }
+    }
+
+    return isTru;
+}
+
 bool Initializer::ReconstructH(vector<bool> &vbMatchesInliers, cv::Mat &H21, cv::Mat &K,
                       cv::Mat &R21, cv::Mat &t21, vector<cv::Point3f> &vP3D, vector<bool> &vbTriangulated, float minParallax, int minTriangulated)
 {
@@ -1033,6 +1276,131 @@ int Initializer::CheckRT(const cv::Mat &R, const cv::Mat &t, const vector<cv::Ke
 }
 
 
+
+int Initializer::ReCheckRT(const cv::Mat &R, const cv::Mat &t, const vector<cv::KeyPoint> &vKeys1, const vector<cv::KeyPoint> &vKeys2,
+                       const vector<Match> &vMatches12, vector<bool> &vbMatchesInliers,
+                       const cv::Mat &K, vector<cv::Point3f> &vP3D, float th2, vector<bool> &vbGood, float &parallax)
+{
+    // Calibration parameters
+    const float fx = K.at<float>(0,0);
+    const float fy = K.at<float>(1,1);
+    const float cx = K.at<float>(0,2);
+    const float cy = K.at<float>(1,2);
+
+    vbGood = vector<bool>(vKeys1.size(),false);
+    vP3D.resize(vKeys1.size());
+
+    vector<float> vCosParallax;
+    vCosParallax.reserve(vKeys1.size());
+
+    // Camera 1 Projection Matrix K[Rcw|tcw]
+    cv::Mat P1(3,4,CV_32F,cv::Scalar(0));
+    cv::Mat Tcw1 = mRefFrame.mTcw.clone();
+    cv::Mat Rcw1 = Tcw1.rowRange(0,3).colRange(0,3).clone();
+    cv::Mat tcw1 = Tcw1.rowRange(0,3).col(3).clone();
+    Rcw1.copyTo(P1.rowRange(0,3).colRange(0,3));
+    tcw1.copyTo(P1.rowRange(0,3).col(3));
+    P1 = K*P1;
+
+    cv::Mat O1 = -Rcw1.t()*tcw1;
+
+    // Camera 2 Projection Matrix K[R|t][Rcw|tcw]
+    cv::Mat Tcw2 = cv::Mat::eye(4,4,CV_32F);
+    R.copyTo(Tcw2.rowRange(0,3).colRange(0,3));
+    t.copyTo(Tcw2.rowRange(0,3).col(3));
+    Tcw2 = Tcw2*Tcw1;
+    cv::Mat Rcw2 = Tcw2.rowRange(0,3).colRange(0,3).clone();
+    cv::Mat tcw2 = Tcw2.rowRange(0,3).col(3).clone();
+    cv::Mat P2(3,4,CV_32F);
+    Rcw2.copyTo(P2.rowRange(0,3).colRange(0,3));
+    tcw2.copyTo(P2.rowRange(0,3).col(3));
+    P2 = K*P2;
+
+    cv::Mat O2 = -Rcw2.t()*tcw2;
+
+    int nGood=0;
+
+    for(size_t i=0, iend=vMatches12.size();i<iend;i++)
+    {
+        if(!vbMatchesInliers[i])
+            continue;
+
+        const cv::KeyPoint &kp1 = vKeys1[vMatches12[i].first];
+        const cv::KeyPoint &kp2 = vKeys2[vMatches12[i].second];
+        cv::Mat p3dC;
+
+        Triangulate(kp1,kp2,P1,P2,p3dC);
+
+        if(!isfinite(p3dC.at<float>(0)) || !isfinite(p3dC.at<float>(1)) || !isfinite(p3dC.at<float>(2)))
+        {
+            vbGood[vMatches12[i].first]=false;
+            continue;
+        }
+
+        // Check parallax
+        cv::Mat normal1 = p3dC - O1;
+        float dist1 = cv::norm(normal1);
+
+        cv::Mat normal2 = p3dC - O2;
+        float dist2 = cv::norm(normal2);
+
+        float cosParallax = normal1.dot(normal2)/(dist1*dist2);
+
+        cv::Mat p3dC1 = Rcw1*p3dC+tcw1;
+        // Check depth in front of first camera (only if enough parallax, as "infinite" points can easily go to negative depth)
+        if(p3dC1.at<float>(2)<=0 && cosParallax<0.99998)
+            continue;
+
+        // Check depth in front of second camera (only if enough parallax, as "infinite" points can easily go to negative depth)
+        cv::Mat p3dC2 = Rcw2*p3dC+tcw2;
+
+        if(p3dC2.at<float>(2)<=0 && cosParallax<0.99998)
+            continue;
+
+        // Check reprojection error in first image
+        float im1x, im1y;
+        float invZ1 = 1.0/p3dC1.at<float>(2);
+        im1x = fx*p3dC1.at<float>(0)*invZ1+cx;
+        im1y = fy*p3dC1.at<float>(1)*invZ1+cy;
+
+        float squareError1 = (im1x-kp1.pt.x)*(im1x-kp1.pt.x)+(im1y-kp1.pt.y)*(im1y-kp1.pt.y);
+
+        if(squareError1>th2)
+            continue;
+
+        // Check reprojection error in second image
+        float im2x, im2y;
+        float invZ2 = 1.0/p3dC2.at<float>(2);
+        im2x = fx*p3dC2.at<float>(0)*invZ2+cx;
+        im2y = fy*p3dC2.at<float>(1)*invZ2+cy;
+
+        float squareError2 = (im2x-kp2.pt.x)*(im2x-kp2.pt.x)+(im2y-kp2.pt.y)*(im2y-kp2.pt.y);
+
+        if(squareError2>th2)
+            continue;
+
+        vCosParallax.push_back(cosParallax);
+        vP3D[vMatches12[i].first] = cv::Point3f(p3dC.at<float>(0),p3dC.at<float>(1),p3dC.at<float>(2));
+        nGood++;
+
+        if(cosParallax<0.99998)
+            vbGood[vMatches12[i].first]=true;
+    }
+
+    if(nGood>0)
+    {
+        sort(vCosParallax.begin(),vCosParallax.end());
+
+        size_t idx = min(50,int(vCosParallax.size()-1));
+        parallax = acos(vCosParallax[idx])*180/CV_PI;
+    }
+    else
+        parallax=0;
+
+    return nGood;
+}
+
+
 int Initializer::ReInitCheckRT(const cv::Mat &Tcw1, const cv::Mat &Tcw2, const vector<cv::KeyPoint> &vKeys1, const vector<cv::KeyPoint> &vKeys2,
                        const vector<int> &vMatches12, const cv::Mat &K, vector<cv::Point3f> &vP3D, float th2, vector<bool> &vbGood, float &parallax)
 {
@@ -1132,10 +1500,13 @@ int Initializer::ReInitCheckRT(const cv::Mat &Tcw1, const cv::Mat &Tcw2, const v
 
         vCosParallax.push_back(cosParallax);
         vP3D[i] = cv::Point3f(p3dC.at<float>(0),p3dC.at<float>(1),p3dC.at<float>(2));
-        nGood++;
 
         if(cosParallax<0.99998)
+        {
             vbGood[i]=true;
+            nGood++;
+        }
+            
     }
 
     if(nGood>0)

@@ -356,10 +356,10 @@ int Optimizer::PoseOptimization(Frame *pFrame)
                 vnIndexEdgeStereo.push_back(i);
             }
         }
-
     }
     }
 
+    cout << "TrackLocalMap before Optimization:" << vpEdgesMono.size() << endl;
 
     if(nInitialCorrespondences<3)
         return 0;
@@ -446,6 +446,8 @@ int Optimizer::PoseOptimization(Frame *pFrame)
     g2o::SE3Quat SE3quat_recov = vSE3_recov->estimate();
     cv::Mat pose = Converter::toCvMat(SE3quat_recov);
     pFrame->SetPose(pose);
+ 
+    cout << "TrackLocalMap after Optimization: " << nInitialCorrespondences-nBad << endl;
 
     return nInitialCorrespondences-nBad;
 }

@@ -25,3 +25,4 @@ Check why the pure front slam don't have good shape?
 v0.7:
 Try ReInitiation.
 While several problem need to be check.
+Second kind of ReInitiation is did. The KF create need change.

@@ -43,6 +43,10 @@ public:
     /********************* Modified Here *********************/
     bool Initialize(const Frame &CurrentFrame, const vector<int> &vMatches12, const vector<int> &vMatchesBird12, 
             cv::Mat &R21, cv::Mat &t21, vector<cv::Point3f> &vP3D, vector<bool> &vbTriangulated);
+    
+    bool ReInitialize(const Frame &ReInitFrame, const Frame &CurrentFrame, const vector<int> &vMatches12, 
+            cv::Mat &R21, cv::Mat &t21, vector<cv::Point3f> &vP3D, vector<bool> &vbTriangulated);
+
     vector<bool> GetMatchesInliersBird();
 
     int ReInitCheckRT(const cv::Mat &Tcw1, const cv::Mat &Tcw2, const vector<cv::KeyPoint> &vKeys1, const vector<cv::KeyPoint> &vKeys2,
@@ -63,6 +67,9 @@ private:
     bool ReconstructF(vector<bool> &vbMatchesInliers, cv::Mat &F21, cv::Mat &K,
                       cv::Mat &R21, cv::Mat &t21, vector<cv::Point3f> &vP3D, vector<bool> &vbTriangulated, float minParallax, int minTriangulated);
 
+    bool ReInitconstructF(vector<bool> &vbMatchesInliers, cv::Mat &F21, cv::Mat &K,
+                      cv::Mat &R21, cv::Mat &t21, vector<cv::Point3f> &vP3D, vector<bool> &vbTriangulated, float minParallax, int minTriangulated);
+
     bool ReconstructH(vector<bool> &vbMatchesInliers, cv::Mat &H21, cv::Mat &K,
                       cv::Mat &R21, cv::Mat &t21, vector<cv::Point3f> &vP3D, vector<bool> &vbTriangulated, float minParallax, int minTriangulated);
 
@@ -71,6 +78,10 @@ private:
     void Normalize(const vector<cv::KeyPoint> &vKeys, vector<cv::Point2f> &vNormalizedPoints, cv::Mat &T);
 
     int CheckRT(const cv::Mat &R, const cv::Mat &t, const vector<cv::KeyPoint> &vKeys1, const vector<cv::KeyPoint> &vKeys2,
+                       const vector<Match> &vMatches12, vector<bool> &vbInliers,
+                       const cv::Mat &K, vector<cv::Point3f> &vP3D, float th2, vector<bool> &vbGood, float &parallax);
+
+    int ReCheckRT(const cv::Mat &R, const cv::Mat &t, const vector<cv::KeyPoint> &vKeys1, const vector<cv::KeyPoint> &vKeys2,
                        const vector<Match> &vMatches12, vector<bool> &vbInliers,
                        const cv::Mat &K, vector<cv::Point3f> &vP3D, float th2, vector<bool> &vbGood, float &parallax);
 

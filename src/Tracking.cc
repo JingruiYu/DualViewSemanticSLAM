@@ -470,7 +470,8 @@ void Tracking::Track()
             else
             {
                 // bOK = Relocalization();
-                bOK = ReInitiation();
+                // bOK = ReInitiation();
+                bOK = ReInitialization();
             }
         }
         else
@@ -1053,6 +1054,110 @@ void Tracking::CreateInitialMapMonocular()
     mState=OK;
 }
 
+bool Tracking::CreateReInitialMapPoints()
+{
+    // Create KeyFrames
+    KeyFrame* pKFReI = new KeyFrame(mReInitFrame,mpMap,mpKeyFrameDB);
+    KeyFrame* pKFcur = new KeyFrame(mCurrentFrame,mpMap,mpKeyFrameDB);
+
+    cout << "pKFini->mnFrameId : " << pKFReI->mnFrameId << endl;
+    cout << "pKFcur->mnFrameId : " << pKFcur->mnFrameId << endl;
+
+    pKFReI->ComputeBoW();
+    pKFcur->ComputeBoW();
+
+    // Insert KFs in the map
+    mpMap->AddKeyFrame(pKFReI);
+    mpMap->AddKeyFrame(pKFcur);
+
+    // Create MapPoints and asscoiate to keyframes
+    for(size_t i=0; i<mvIniMatches.size();i++)
+    {
+        if(mvIniMatches[i]<0)
+            continue;
+
+        //Create MapPoint.
+        cv::Mat worldPos(mvIniP3D[i]);
+
+        MapPoint* pMP = new MapPoint(worldPos,pKFcur,mpMap);
+
+        pKFReI->AddMapPoint(pMP,i);
+        pKFcur->AddMapPoint(pMP,mvIniMatches[i]);
+
+        pMP->AddObservation(pKFReI,i);
+        pMP->AddObservation(pKFcur,mvIniMatches[i]);
+
+        pMP->ComputeDistinctiveDescriptors();
+        pMP->UpdateNormalAndDepth();
+
+        //Fill Current Frame structure
+        mCurrentFrame.mvpMapPoints[mvIniMatches[i]] = pMP;
+        mCurrentFrame.mvbOutlier[mvIniMatches[i]] = false;
+
+        //Add to Map
+        mpMap->AddMapPoint(pMP);
+    }
+    cout << "pKFini->InlierNum : " << pKFReI->GetMapPointsInlierNum() << endl;
+    cout << "pKFcur->InlierNum : " << pKFcur->GetMapPointsInlierNum() << endl;
+
+    // Update Connections
+    pKFReI->UpdateConnections();
+    pKFcur->UpdateConnections();
+
+    // Bundle Adjustment
+    cout << "New Map created with " << mpMap->MapPointsInMap() << " points" << endl;
+
+    // if(mbHaveBirdview)
+    // {
+    //     Optimizer::GlobalBundleAdjustemntWithBirdview(mpMap,20);
+    //     // Optimizer::GlobalBundleAdjustemnt(mpMap,20);
+    // }
+    // else
+    // {
+        // Optimizer::GlobalBundleAdjustemnt(mpMap,20);
+    // }
+    
+    cout << "After GlobalBundleAdjustemnt" << endl;
+    cout << "pKFini->InlierNum : " << pKFReI->GetMapPointsInlierNum() << endl;
+    cout << "pKFcur->InlierNum : " << pKFcur->GetMapPointsInlierNum() << endl;
+
+    // Set median depth to 1
+    float medianDepth = pKFReI->ComputeSceneMedianDepth(2);
+    float invMedianDepth = 1.0f/medianDepth;
+
+    if(medianDepth<0 || pKFcur->TrackedMapPoints(1)<90)
+    {
+        cout << "Wrong initialization, reseting..." << endl;
+        cout<<"medianDepth = "<<medianDepth<<" , TrackedMapPoint = "<<pKFcur->TrackedMapPoints(1)<<endl;
+        
+        return false;
+    }
+
+    mpLocalMapper->InsertKeyFrame(pKFReI);
+    mpLocalMapper->InsertKeyFrame(pKFcur);
+
+    mCurrentFrame.SetPose(pKFcur->GetPose());
+    mnLastKeyFrameId=mCurrentFrame.mnId;
+    mpLastKeyFrame = pKFcur;
+
+    mvpLocalKeyFrames.push_back(pKFcur);
+    mvpLocalKeyFrames.push_back(pKFReI);
+    mvpLocalMapPoints=mpMap->GetAllMapPoints();
+
+    mpReferenceKF = pKFcur;
+    mCurrentFrame.mpReferenceKF = pKFcur;
+
+    mpMap->SetReferenceMapPoints(mvpLocalMapPoints);
+
+    mpMapDrawer->SetCurrentCameraPose(pKFcur->GetPose());
+
+    mpMap->mvpKeyFrameOrigins.push_back(pKFReI);
+
+    mState=OK;
+    return true;
+}
+
+
 void Tracking::CheckReplacedInLastFrame()
 {
     for(int i =0; i<mLastFrame.N; i++)
@@ -1357,7 +1462,7 @@ bool Tracking::TrackWithMotionModel()
         return nmatches>20;
     }
 
-    return nmatchesMap>=10;
+    return nmatchesMap>=20;
 }
 
 bool Tracking::TrackLocalMap()
@@ -1541,6 +1646,7 @@ void Tracking::CreateNewKeyFrame()
 
     KeyFrame* pKF = new KeyFrame(mCurrentFrame,mpMap,mpKeyFrameDB);
 
+    cout << "CreateNewKeyFrame ? should not! " << endl;
     DrawCurPose(mpReferenceKF->GetPose(),0,150,70,"PoseAfterLocalMapping");
 
     saveUnCloosing();
@@ -2110,10 +2216,19 @@ bool Tracking::ReInitiation()
         cout << "mVelocity is empty, why? " << endl;
     }
     
-    mCurrentFrame.SetPose(mVelocity*mLastFrame.mTcw);
+    // mCurrentFrame.SetPose(mVelocity*mLastFrame.mTcw);
 
-    cout << "mLastFrame.mTcw : " << mLastFrame.mTcw  << endl;
-    cout << "mCurrentFrame.mTcw : " << mCurrentFrame.mTcw  << endl;
+    cv::Mat Twb_now  = mCurrentFrame.GetGTPoseTwb();
+    cv::Mat Tc_wc = Converter::Twb2Tcw(Twb_now);
+    mCurrentFrame.SetPose(Tc_wc);
+
+    cout << endl << "Norm of mVelocity : " << norm(mVelocity.rowRange(0,3).col(3))  << endl;
+
+    if (norm(mVelocity.rowRange(0,3).col(3)) < 0.2)
+    {
+        return false;
+    }
+    
 
     ORBmatcher matcher(0.9,true);
     vector<cv::DMatch> vDMatches12;
@@ -2126,7 +2241,7 @@ bool Tracking::ReInitiation()
             vDMatches12,matchesImg,cv::Scalar::all(-1),cv::Scalar::all(-1),std::vector<char>(),cv::DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS);
     cv::imwrite("FrontWithReInitiation.jpg",matchesImg);
 
-    if (nmatches < 20)
+    if (nmatches < 100)
     {
         return false;
     }
@@ -2137,18 +2252,24 @@ bool Tracking::ReInitiation()
     int nGood = mpInitializer->ReInitCheckRT(mLastFrame.mTcw, mCurrentFrame.mTcw, mLastFrame.mvKeysUn, mCurrentFrame.mvKeysUn, vnMatch12, mCurrentFrame.mK, vP3D, 4, vbGood, parallax);
     cout << "number of trianguler: " << nGood << endl;
 
-    if (nGood < 20)
+    if (nGood < 100)
     {
         return false;
     }
 
     // build New KF and MPs?
+    KeyFrame* pKFref = new KeyFrame(mLastFrame,mpMap,mpKeyFrameDB);
     KeyFrame* pKFcur = new KeyFrame(mCurrentFrame,mpMap,mpKeyFrameDB);
+    
+    pKFref->ComputeBoW();
     pKFcur->ComputeBoW();
+
+    mpMap->AddKeyFrame(pKFref);
     mpMap->AddKeyFrame(pKFcur);
 
     cout << "KeyFrame is build " << endl;
 
+    int buildMPs = 0;
     for (size_t i = 0; i < vbGood.size(); i++)
     {
         if (!vbGood[i])
@@ -2159,7 +2280,10 @@ bool Tracking::ReInitiation()
 
         MapPoint* pMP = new MapPoint(worldPos,pKFcur,mpMap);
 
+        pKFref->AddMapPoint(pMP,i); 
         pKFcur->AddMapPoint(pMP,vnMatch12[i]);        
+        
+        pMP->AddObservation(pKFref,i);
         pMP->AddObservation(pKFcur,vnMatch12[i]);
 
         pMP->ComputeDistinctiveDescriptors();
@@ -2170,18 +2294,21 @@ bool Tracking::ReInitiation()
         mCurrentFrame.mvbOutlier[vnMatch12[i]] = false;
 
         //Add to Map
-        mpMap->AddMapPoint(pMP);        
+        mpMap->AddMapPoint(pMP);     
+
+        buildMPs++;   
     }
     
-    cout << "Mappoints is build " << endl;
+    cout << "Mappoints " << buildMPs << " is build " << endl;
 
     //optimization?
-
+    mpLocalMapper->InsertKeyFrame(pKFref);
     mpLocalMapper->InsertKeyFrame(pKFcur);
     mCurrentFrame.SetPose(pKFcur->GetPose());
     mnLastKeyFrameId=mCurrentFrame.mnId;
     mpLastKeyFrame = pKFcur;
 
+    mvpLocalKeyFrames.push_back(pKFref);
     mvpLocalKeyFrames.push_back(pKFcur);
     mvpLocalMapPoints=mpMap->GetAllMapPoints();
 
@@ -2194,6 +2321,89 @@ bool Tracking::ReInitiation()
     cout << "\033[35m" << "ReInitiation Successful" << "\033[0m" << endl;
 
     return true;
+}
+
+
+bool Tracking::ReInitialization()
+{
+    if (mLastFrame.mTcw.empty())
+        cout << "mLastFrame.mTcw is empty, which may not exit? " << endl;
+    
+    mVelocity = GetPriorMotion();
+    if (mVelocity.empty())
+        cout << "mVelocity is empty, why? " << endl;
+    
+    // mCurrentFrame.SetPose(mVelocity*mLastFrame.mTcw);
+    cv::Mat Twb_now  = mCurrentFrame.GetGTPoseTwb();
+    cv::Mat Tc_wc = Converter::Twb2Tcw(Twb_now);
+    mCurrentFrame.SetPose(Tc_wc);
+
+    if (!mpReInitial)
+    {
+        if (mCurrentFrame.mvKeys.size()>100)
+        {
+            mReInitFrame = Frame(mCurrentFrame);
+            mLastFrame = Frame(mCurrentFrame);
+            mvbPrevMatched.resize(mCurrentFrame.mvKeysUn.size());
+            for (size_t i = 0; i < mCurrentFrame.mvKeysUn.size(); i++)
+                mvbPrevMatched[i] = mCurrentFrame.mvKeysUn[i].pt;
+            
+            if (mpReInitial)
+                delete mpReInitial;
+            
+            mpReInitial = new Initializer(mCurrentFrame,1.0,200);
+
+            fill(mvIniMatches.begin(),mvIniMatches.end(),-1);           
+        }
+    }
+    else
+    {
+        if (mCurrentFrame.mvKeys.size()<100)
+        {
+            delete mpReInitial;
+            mpReInitial = static_cast<Initializer*>(NULL);
+            fill(mvIniMatches.begin(),mvIniMatches.end(),-1);
+            return false;
+        }
+
+        ORBmatcher matcher(0.9,true);
+        int nmatches = matcher.SearchForInitialization(mReInitFrame,mCurrentFrame,mvbPrevMatched,mvIniMatches,100);
+        
+        if (nmatches<100)
+        {
+            delete mpReInitial;
+            mpReInitial = static_cast<Initializer*>(NULL);
+            return false;
+        }
+
+        cv::Mat R21;
+        cv::Mat t21;
+        vector<bool> vbTriangulated;
+        bool isRe = false;
+        if (mpReInitial->ReInitialize(mReInitFrame,mCurrentFrame,mvIniMatches,R21,t21,mvIniP3D,vbTriangulated))
+        {
+            for (size_t i = 0; i < mvIniMatches.size(); i++)
+            {
+                if (mvIniMatches[i] >=0 && !vbTriangulated[i])
+                {
+                    mvIniMatches[i]=-1;
+                    nmatches--;
+                }
+            }
+            
+            cv::Mat T21 = cv::Mat::eye(4,4,CV_32F);
+            R21.copyTo(T21.rowRange(0,3).colRange(0,3));
+            t21.copyTo(T21.rowRange(0,3).col(3));
+            cv::Mat Tcw = T21 * mReInitFrame.mTcw;
+            mCurrentFrame.SetPose(Tcw);
+
+            isRe = CreateReInitialMapPoints();
+        }
+
+        return isRe;
+    }  
+
+    return false;  
 }
 
 void Tracking::Reset()
@@ -2505,6 +2715,13 @@ cv::Mat Tracking::GetPriorMotion()
     cv::Mat Tcw_now = Converter::Twb2Tcw(Twb_now);
 
     cv::Mat deltaTcw = Tcw_now*Twc_last;
+
+    // delta cannot preIntergert.
+    // cv::Mat Tb2b1 = Converter::invT(Twb_now) * Twb_last;
+    // cv::Mat Tc2c1 = Frame::Tcb * Tb2b1 * Frame::Tbc;
+    // cout << "Tb2b1 : " << Tb2b1 << endl << "norm is " << norm(Tb2b1.rowRange(0,3).col(3)) << endl;
+    // cout << "Tc2c1 : " << Tc2c1 << endl << "norm is " << norm(Tc2c1.rowRange(0,3).col(3)) << endl;
+    // cout << "deltaTcw : " << deltaTcw << endl << "norm is " << norm(deltaTcw.rowRange(0,3).col(3)) << endl;
 
     return deltaTcw.clone();
 }

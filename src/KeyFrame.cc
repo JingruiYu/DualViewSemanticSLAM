@@ -297,6 +297,21 @@ vector<MapPoint*> KeyFrame::GetMapPointMatches()
     return mvpMapPoints;
 }
 
+int KeyFrame::GetMapPointsInlierNum()
+{
+    int inliers = 0;
+    unique_lock<mutex> lock(mMutexFeatures);
+    {
+        for (size_t i = 0; i < mvpMapPoints.size(); i++)
+        {
+            MapPoint* pMP = mvpMapPoints[i];
+            if (pMP)
+                inliers++;            
+        }
+    }
+    return inliers;
+}
+
 MapPoint* KeyFrame::GetMapPoint(const size_t &idx)
 {
     unique_lock<mutex> lock(mMutexFeatures);
