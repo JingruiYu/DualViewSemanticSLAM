@@ -146,6 +146,7 @@ public:
 
     // True if local mapping is deactivated and we are performing only localization
     bool mbOnlyTracking;
+    bool IsReInit;
 
     /**************** Modify **********************/
     pcl::visualization::PCLVisualizer::Ptr Twc_ptr_;

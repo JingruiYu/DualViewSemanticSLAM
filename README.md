@@ -23,6 +23,8 @@ If the weight of PoseGraph is larger, tracking will be lost. So, the rebuilt map
 Check why the pure front slam don't have good shape?
 
 v0.7:
-Try ReInitiation.
-While several problem need to be check.
-Second kind of ReInitiation is did. The KF create need change.
+Two kinds of re-initialization were implemented.
+First is re-init by the prior pose.
+Second is re-init by both Fundamental and the prior pose.
+Now using the second method, the lost can be find successfully.
+While the loop closing have problem, still need to debug.

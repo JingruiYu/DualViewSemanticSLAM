@@ -47,7 +47,7 @@ namespace ORB_SLAM2
 {
 
 Tracking::Tracking(System *pSys, ORBVocabulary* pVoc, FrameDrawer *pFrameDrawer, MapDrawer *pMapDrawer, Map *pMap, KeyFrameDatabase* pKFDB, const string &strSettingPath, const int sensor):
-    mState(NO_IMAGES_YET), mSensor(sensor), mbOnlyTracking(false), 
+    mState(NO_IMAGES_YET), mSensor(sensor), mbOnlyTracking(false), IsReInit(false),
     Twc_ptr_(new pcl::visualization::PCLVisualizer("Twc_viewer")),
     mbVO(false), mpORBVocabulary(pVoc),
     mpKeyFrameDB(pKFDB), mpInitializer(static_cast<Initializer*>(NULL)), mpSystem(pSys), mpViewer(NULL),
@@ -570,7 +570,11 @@ void Tracking::Track()
         if(bOK)
             mState = OK;
         else
+        {
             mState=LOST;
+            IsReInit=false;
+        }
+            
 
         // Update drawer
         mpFrameDrawer->Update(this);
@@ -1154,6 +1158,7 @@ bool Tracking::CreateReInitialMapPoints()
     mpMap->mvpKeyFrameOrigins.push_back(pKFReI);
 
     mState=OK;
+    IsReInit=true;
     return true;
 }
 
@@ -1568,10 +1573,15 @@ bool Tracking::NeedNewKeyFrame()
 
     // Tracked MapPoints in the reference keyframe
     int nMinObs = 3;
-    if(nKFs<=2)
+    if(nKFs<=2 || IsReInit)
         nMinObs=2;
     int nRefMatches = mpReferenceKF->TrackedMapPoints(nMinObs);
 
+    if (IsReInit)
+    {
+        mpLocalMapper->SetAcceptKeyFrames(true);
+    }
+    
     // Local Mapping accept keyframes?
     bool bLocalMappingIdle = mpLocalMapper->AcceptKeyFrames();
 
@@ -1605,7 +1615,7 @@ bool Tracking::NeedNewKeyFrame()
     // Condition 1a: More than "MaxFrames" have passed from last keyframe insertion
     const bool c1a = mCurrentFrame.mnId>=mnLastKeyFrameId+mMaxFrames;
     // Condition 1b: More than "MinFrames" have passed and Local Mapping is idle
-    const bool c1b = (mCurrentFrame.mnId>=mnLastKeyFrameId+mMinFrames && bLocalMappingIdle);
+    const bool c1b = (mCurrentFrame.mnId>mnLastKeyFrameId+mMinFrames && bLocalMappingIdle);
     //Condition 1c: tracking is weak
     const bool c1c =  mSensor!=System::MONOCULAR && (mnMatchesInliers<nRefMatches*0.25 || bNeedToInsertClose) ;
     // Condition 2: Few tracked points compared to reference keyframe. Lots of visual odometry compared to map matches.
@@ -1619,6 +1629,7 @@ bool Tracking::NeedNewKeyFrame()
         // Otherwise send a signal to interrupt BA
         if(bLocalMappingIdle)
         {
+            IsReInit = false;
             return true;
         }
         else
