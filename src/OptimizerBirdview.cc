@@ -41,9 +41,9 @@ void Optimizer::BundleAdjustmentWithBirdview(const vector<KeyFrame *> &vpKFs, co
     vbNotIncludedMPBird.resize(vpMPBird.size());
 
     g2o::SparseOptimizer optimizer;
-    g2o::BlockSolver_6_3::LinearSolverType * linearSolver;
-    linearSolver = new g2o::LinearSolverEigen<g2o::BlockSolver_6_3::PoseMatrixType>();
-    g2o::BlockSolver_6_3 * solver_ptr = new g2o::BlockSolver_6_3(linearSolver);
+    g2o::BlockSolverX::LinearSolverType * linearSolver;
+    linearSolver = new g2o::LinearSolverEigen<g2o::BlockSolverX::PoseMatrixType>();
+    g2o::BlockSolverX * solver_ptr = new g2o::BlockSolverX(linearSolver);
     g2o::OptimizationAlgorithmLevenberg* solver = new g2o::OptimizationAlgorithmLevenberg(solver_ptr);
     optimizer.setAlgorithm(solver);
 
@@ -174,63 +174,63 @@ void Optimizer::BundleAdjustmentWithBirdview(const vector<KeyFrame *> &vpKFs, co
         }
     }
 
-    // Set MapPointBird vertices
-    for(size_t i=0; i<vpMPBird.size(); i++)
-    {
-        MapPointBird* pMPBird = vpMPBird[i];
-        g2o::VertexSBAPointXYZ* vPoint = new g2o::VertexSBAPointXYZ();
-        vPoint->setEstimate(Converter::toVector3d(pMPBird->GetWorldPos()));
-        const int id = pMPBird->mnId+maxMPid+1;
-        vPoint->setId(id);
-        vPoint->setMarginalized(true);
-        optimizer.addVertex(vPoint);
+    // // Set MapPointBird vertices
+    // for(size_t i=0; i<vpMPBird.size(); i++)
+    // {
+    //     MapPointBird* pMPBird = vpMPBird[i];
+    //     g2o::VertexSBAPointXYZ* vPoint = new g2o::VertexSBAPointXYZ();
+    //     vPoint->setEstimate(Converter::toVector3d(pMPBird->GetWorldPos()));
+    //     const int id = pMPBird->mnId+maxMPid+1;
+    //     vPoint->setId(id);
+    //     vPoint->setMarginalized(true);
+    //     optimizer.addVertex(vPoint);
 
-        const map<KeyFrame*,size_t> observations = pMPBird->GetObservations();
-        int nEdgesBird = 0;
-        //SET EDGES Birdview
-        for(map<KeyFrame*,size_t>::const_iterator mit=observations.begin(); mit!=observations.end(); mit++)
-        {
-            KeyFrame* pKF = mit->first;
-            if(pKF->isBad() || pKF->mnId>maxKFid)
-                continue;
+    //     const map<KeyFrame*,size_t> observations = pMPBird->GetObservations();
+    //     int nEdgesBird = 0;
+    //     //SET EDGES Birdview
+    //     for(map<KeyFrame*,size_t>::const_iterator mit=observations.begin(); mit!=observations.end(); mit++)
+    //     {
+    //         KeyFrame* pKF = mit->first;
+    //         if(pKF->isBad() || pKF->mnId>maxKFid)
+    //             continue;
 
-            nEdgesBird++;
+    //         nEdgesBird++;
 
-            const cv::Point3f pt = pKF->mvKeysBirdCamXYZ[mit->second];
+    //         const cv::Point3f pt = pKF->mvKeysBirdCamXYZ[mit->second];
 
-            Eigen::Matrix<double,3,1> obs;
-            obs << pt.x, pt.y,pt.z;
+    //         Eigen::Matrix<double,3,1> obs;
+    //         obs << pt.x, pt.y,pt.z;
 
-            EdgeSE3ProjectXYZ2XYZQuat *e = new EdgeSE3ProjectXYZ2XYZQuat();
-            e->setVertex(0, dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertex(id)));
-            e->setVertex(1, dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertex(pKF->mnId)));
-            e->setMeasurement(obs);
-            // float scale = Frame::meter2pixel*Frame::meter2pixel;
-            float scale = 3.0;
-            const float &invSigma2 = pKF->mvInvLevelSigma2[pKF->mvKeysBird[mit->second].octave]*scale;
-            e->setInformation(Eigen::Matrix3d::Identity()*invSigma2);
+    //         EdgeSE3ProjectXYZ2XYZQuat *e = new EdgeSE3ProjectXYZ2XYZQuat();
+    //         e->setVertex(0, dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertex(id)));
+    //         e->setVertex(1, dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertex(pKF->mnId)));
+    //         e->setMeasurement(obs);
+    //         // float scale = Frame::meter2pixel*Frame::meter2pixel;
+    //         float scale = 3.0;
+    //         const float &invSigma2 = pKF->mvInvLevelSigma2[pKF->mvKeysBird[mit->second].octave]*scale;
+    //         e->setInformation(Eigen::Matrix3d::Identity()*invSigma2);
 
-            if(bRobust)
-            {
-                g2o::RobustKernelHuber* rk = new g2o::RobustKernelHuber;
-                e->setRobustKernel(rk);
-                // rk->setDelta(thHuber2D);
-                rk->setDelta(thHuber3D);
-            }
+    //         if(bRobust)
+    //         {
+    //             g2o::RobustKernelHuber* rk = new g2o::RobustKernelHuber;
+    //             e->setRobustKernel(rk);
+    //             // rk->setDelta(thHuber2D);
+    //             rk->setDelta(thHuber3D);
+    //         }
 
-            optimizer.addEdge(e);
-        }
+    //         optimizer.addEdge(e);
+    //     }
 
-        if(nEdgesBird==0)
-        {
-            optimizer.removeVertex(vPoint);
-            vbNotIncludedMPBird[i]=true;
-        }
-        else
-        {
-            vbNotIncludedMPBird[i]=false;
-        }
-    }
+    //     if(nEdgesBird==0)
+    //     {
+    //         optimizer.removeVertex(vPoint);
+    //         vbNotIncludedMPBird[i]=true;
+    //     }
+    //     else
+    //     {
+    //         vbNotIncludedMPBird[i]=false;
+    //     }
+    // }
 
     //PoseGraph Constraint
     sort(vKFvertices.begin(),vKFvertices.end());
@@ -305,16 +305,16 @@ void Optimizer::BundleAdjustmentWithBirdview(const vector<KeyFrame *> &vpKFs, co
         }
     }
 
-    // Birdview Points
-    for(size_t i=0; i<vpMPBird.size(); i++)
-    {
-        if(vbNotIncludedMPBird[i])
-            continue;
+    // // Birdview Points
+    // for(size_t i=0; i<vpMPBird.size(); i++)
+    // {
+    //     if(vbNotIncludedMPBird[i])
+    //         continue;
 
-        MapPointBird* pMPBird = vpMPBird[i];
-        g2o::VertexSBAPointXYZ* vPoint = static_cast<g2o::VertexSBAPointXYZ*>(optimizer.vertex(pMPBird->mnId+maxMPid+1));
-        pMPBird->SetWorldPos(Converter::toCvMat(vPoint->estimate()));
-    }
+    //     MapPointBird* pMPBird = vpMPBird[i];
+    //     g2o::VertexSBAPointXYZ* vPoint = static_cast<g2o::VertexSBAPointXYZ*>(optimizer.vertex(pMPBird->mnId+maxMPid+1));
+    //     pMPBird->SetWorldPos(Converter::toCvMat(vPoint->estimate()));
+    // }
 
 }
 
@@ -403,6 +403,7 @@ int Optimizer::PoseOptimizationWithBirdview(Frame *pFrame, Frame* pRefFrame, dou
                 vnIndexEdgeMono.push_back(i);
             }
         }
+
     }
 
     vector<MapPointBird*> &vpMapPointsBird = pFrame->mvpMapPointsBird;
@@ -610,7 +611,7 @@ int Optimizer::PoseOptimizationWithBirdview(Frame *pFrame, Frame* pRefFrame, dou
 
 void Optimizer::LocalBundleAdjustmentWithPoseGraph(KeyFrame *pKF, bool* pbStopFlag, Map* pMap, double wPC)
 {    
-    cout  << "LocalBundleAdjustmentWithPoseGraph " << "\033[0m" << endl;
+    cout << "\033[31m" << "LocalBundleAdjustmentWithPoseGraph " << "\033[0m" << endl;
     // Local KeyFrames: First Breath Search from Current Keyframe
     list<KeyFrame*> lLocalKeyFrames;
 
