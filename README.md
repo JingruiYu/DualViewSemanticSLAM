@@ -27,4 +27,4 @@ Two kinds of re-initialization were implemented.
 First is re-init by the prior pose.
 Second is re-init by both Fundamental and the prior pose.
 Now using the second method, the lost can be find successfully.
-While the loop closing have problem, still need to debug.
+While the loop closing have problem, still need to debug. Cannot find.

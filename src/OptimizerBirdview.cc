@@ -403,7 +403,6 @@ int Optimizer::PoseOptimizationWithBirdview(Frame *pFrame, Frame* pRefFrame, dou
                 vnIndexEdgeMono.push_back(i);
             }
         }
-
     }
 
     vector<MapPointBird*> &vpMapPointsBird = pFrame->mvpMapPointsBird;
@@ -611,7 +610,7 @@ int Optimizer::PoseOptimizationWithBirdview(Frame *pFrame, Frame* pRefFrame, dou
 
 void Optimizer::LocalBundleAdjustmentWithPoseGraph(KeyFrame *pKF, bool* pbStopFlag, Map* pMap, double wPC)
 {    
-    cout << "\033[31m" << "LocalBundleAdjustmentWithPoseGraph " << "\033[0m" << endl;
+    cout  << "LocalBundleAdjustmentWithPoseGraph " << "\033[0m" << endl;
     // Local KeyFrames: First Breath Search from Current Keyframe
     list<KeyFrame*> lLocalKeyFrames;
 

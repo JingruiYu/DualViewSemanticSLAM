@@ -1274,7 +1274,7 @@ bool Tracking::TrackReferenceKeyFrame()
     }
 
 
-    return nmatchesMap+nmatchesBirdMap>=15;
+    return nmatchesMap+nmatchesBirdMap>=10;
 }
 
 void Tracking::UpdateLastFrame()
@@ -1467,7 +1467,7 @@ bool Tracking::TrackWithMotionModel()
         return nmatches>20;
     }
 
-    return nmatchesMap>=20;
+    return nmatchesMap>=10;
 }
 
 bool Tracking::TrackLocalMap()
@@ -1546,9 +1546,9 @@ bool Tracking::TrackLocalMap()
         cout<<"Track Local Map, Birdview MatchesInliers = "<<nMatchesInliersBird<<endl;
     }
 
-    if(mnMatchesInliers+nMatchesInliersBird<30)
+    if(mnMatchesInliers+nMatchesInliersBird<15)
     {
-        cout<<"Inliers less than 30 , tracking lost. It is: "<< mnMatchesInliers+nMatchesInliersBird << endl;
+        cout<<"Inliers less than 15 , tracking lost. It is: "<< mnMatchesInliers+nMatchesInliersBird << endl;
         return false;
     } 
     else

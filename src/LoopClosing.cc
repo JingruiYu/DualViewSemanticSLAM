@@ -401,7 +401,7 @@ bool LoopClosing::ComputeSim3()
 
 void LoopClosing::CorrectLoop()
 {
-    cout << "Loop detected!" << endl;
+    cout << "\033[31m" << "Loop detected!" << "\033[0m" << endl;
 
     // Send a stop signal to Local Mapping
     // Avoid new keyframes are inserted while correcting the loop
@@ -644,16 +644,16 @@ void LoopClosing::ResetIfRequested()
 
 void LoopClosing::RunGlobalBundleAdjustment(unsigned long nLoopKF)
 {
-    cout << "Starting Global Bundle Adjustment" << endl;
+    cout << "\033[31m" <<  "Starting Global Bundle Adjustment" << "\033[0m" << endl;
 
     int idx =  mnFullBAIdx;
     // if(mpTracker->mbHaveBirdview)
     // {
-    //     Optimizer::GlobalBundleAdjustemntWithBirdview(mpMap,10,&mbStopGBA,nLoopKF,false);
+        Optimizer::GlobalBundleAdjustemntWithBirdview(mpMap,10,&mbStopGBA,nLoopKF,false);
     // }
     // else
     // {
-        Optimizer::GlobalBundleAdjustemnt(mpMap,10,&mbStopGBA,nLoopKF,false);
+        // Optimizer::GlobalBundleAdjustemnt(mpMap,10,&mbStopGBA,nLoopKF,false);
     // }
     
     

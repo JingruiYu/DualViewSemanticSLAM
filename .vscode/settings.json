@@ -64,7 +64,8 @@
         "map": "cpp",
         "queue": "cpp",
         "set": "cpp",
-        "stack": "cpp"
+        "stack": "cpp",
+        "polynomials": "cpp"
     },
     "git.ignoreLimitWarning": true
 }
